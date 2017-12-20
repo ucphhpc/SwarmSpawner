@@ -273,7 +273,7 @@ class SwarmSpawner(Spawner):
         state = self.get_state()
         self.log.warn("user_options: {}".format(user_options))
         self.log.info("user: {}".format(self.user))
-        self.log.info("user mig mount: {}".format(self.user.mig_mount))
+        self.log.info("user mig mount: " + str(self.user.mig_mount))
 
         service = yield self.get_service()
 
@@ -300,21 +300,18 @@ class SwarmSpawner(Spawner):
                         username=self.service_owner)
 
                 if 'driver_config' in m:
-                    device = m['driver_config']['options']['device'].format(
-                        username=self.service_owner
-                    )
-                    m['driver_config']['options']['device'] = device
-                    m['driver_config'] = docker.types.DriverConfig(
-                        **m['driver_config'])
+                    # Add target sshcmd and id_rsa key
+                    if 'sshcmd' in m['driver_options']:
+                        m['driver_options']['sshcmd'] = m['driver_options']['sshcmd'].format(
+                            sshcmd=self.user.mig_mount['SESSIONID'] + "@test-io.idmc.dk:"
+                        )
+                    if 'id_rsa' in m['driver_options']:
+                        m['driver_options']['id_rsa'] = m['driver_options']['id_rsa'].format(
+                            id_rsa=self.user.mig_mount['MOUNTSSHPRIVATEKEY']
+                        )
 
-                if 'volume-opt=sshcmd' in m:
-                    m['volume-opt=sshcmd'] = m['volume-opt=sshcmd'].format(
-                        sshcmd=self.user.mig_mount['SESSIONID']
-                    )
-                if 'volume-opt=id_rsa' in m:
-                    m['volume-opt=id_rsa'] = m['volume-opt=id_rsa'].format(
-                        id_rsa=self.user.mig_mount['MOUNTSSHPRIVATEKEY']
-                    )
+                    m['driver_config'] = docker.types.DriverConfig(name=m['driver_config'], options=m['driver_options'])
+                    del m['driver_options']
 
                 container_spec['mounts'].append(docker.types.Mount(**m))
 
@@ -396,3 +393,4 @@ class SwarmSpawner(Spawner):
             self.service_name, self.service_id[:7])
 
         self.clear_state()
+
