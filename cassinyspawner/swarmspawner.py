@@ -270,7 +270,10 @@ class SwarmSpawner(Spawner):
         else:
             user_options = {}
 
+        state = self.get_state()
         self.log.warn("user_options: {}".format(user_options))
+        self.log.info("user: {}".format(self.user))
+        self.log.info("user mig mount: {}".format(self.user.mig_mount))
 
         service = yield self.get_service()
 
@@ -282,7 +285,7 @@ class SwarmSpawner(Spawner):
             if hasattr(self, 'container_spec') and self.container_spec is not None:
                 container_spec = dict(**self.container_spec)
             elif user_options == {}:
-                raise("A container_spec is needed in to create a service")
+                raise ("A container_spec is needed in to create a service")
 
             container_spec.update(user_options.get('container_spec', {}))
 
@@ -303,6 +306,15 @@ class SwarmSpawner(Spawner):
                     m['driver_config']['options']['device'] = device
                     m['driver_config'] = docker.types.DriverConfig(
                         **m['driver_config'])
+
+                if 'volume-opt=sshcmd' in m:
+                    m['volume-opt=sshcmd'] = m['volume-opt=sshcmd'].format(
+                        sshcmd=self.user.mig_mount['SESSIONID']
+                    )
+                if 'volume-opt=id_rsa' in m:
+                    m['volume-opt=id_rsa'] = m['volume-opt=id_rsa'].format(
+                        id_rsa=self.user.mig_mount['MOUNTSSHPRIVATEKEY']
+                    )
 
                 container_spec['mounts'].append(docker.types.Mount(**m))
 
