@@ -210,7 +210,6 @@ class SwarmSpawner(Spawner):
             return 0
 
         task_filter = {'service': service['Spec']['Name']}
-
         tasks = yield self.docker(
             'tasks', task_filter
         )
@@ -231,7 +230,7 @@ class SwarmSpawner(Spawner):
         if running_task is not None:
             return None
         else:
-            return 1
+            return 0
 
     @gen.coroutine
     def get_service(self):
@@ -270,15 +269,8 @@ class SwarmSpawner(Spawner):
         else:
             user_options = {}
 
-        state = self.get_state()
-        self.log.warn("user_options: {}".format(user_options))
-        self.log.info("user: {}".format(self.user))
-        self.log.info("user mig mount: " + str(self.user.mig_mount))
-
         service = yield self.get_service()
-
         if service is None:
-
             if 'name' in user_options:
                 self.server_name = user_options['name']
 
@@ -300,15 +292,12 @@ class SwarmSpawner(Spawner):
                         username=self.service_owner)
 
                 if 'driver_config' in m:
-                    # Add target sshcmd and id_rsa key
                     if 'sshcmd' in m['driver_options']:
-                        m['driver_options']['sshcmd'] = m['driver_options']['sshcmd'].format(
-                            sshcmd=self.user.mig_mount['SESSIONID'] + "@test-io.idmc.dk:"
-                        )
+                        m['driver_options']['sshcmd'] = self.user.mig_mount['SESSIONID'] + \
+                                                        self.user.mig_mount['TARGET_MOUNT_ADDR']
+
                     if 'id_rsa' in m['driver_options']:
-                        m['driver_options']['id_rsa'] = m['driver_options']['id_rsa'].format(
-                            id_rsa=self.user.mig_mount['MOUNTSSHPRIVATEKEY']
-                        )
+                        m['driver_options']['id_rsa'] = self.user.mig_mount['MOUNTSSHPRIVATEKEY']
 
                     m['driver_config'] = docker.types.DriverConfig(name=m['driver_config'], options=m['driver_options'])
                     del m['driver_options']
@@ -372,6 +361,8 @@ class SwarmSpawner(Spawner):
 
         ip = self.service_name
         port = self.service_port
+
+
 
         # we use service_name instead of ip
         # https://docs.docker.com/engine/swarm/networking/#use-swarm-mode-service-discovery
