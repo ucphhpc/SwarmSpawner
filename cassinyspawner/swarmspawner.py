@@ -3,7 +3,7 @@ A Spawner for JupyterHub that runs each user's
 server in a separate Docker Service
 """
 
-import hashlib
+import hashlib, time
 from textwrap import dedent
 from concurrent.futures import ThreadPoolExecutor
 from pprint import pformat
@@ -217,13 +217,14 @@ class SwarmSpawner(Spawner):
         running_task = None
         for task in tasks:
             task_state = task['Status']['State']
-            self.log.debug(
-                "Task %s of Docker service %s status: %s",
-                task['ID'][:7],
-                self.service_id[:7],
-                pformat(task_state),
-            )
+
             if task_state == 'running':
+                self.log.debug(
+                    "Task %s of Docker service %s status: %s",
+                    task['ID'][:7],
+                    self.service_id[:7],
+                    pformat(task_state),
+                )
                 # there should be at most one running task
                 running_task = task
 
@@ -362,8 +363,6 @@ class SwarmSpawner(Spawner):
         ip = self.service_name
         port = self.service_port
 
-
-
         # we use service_name instead of ip
         # https://docs.docker.com/engine/swarm/networking/#use-swarm-mode-service-discovery
         # service_port is actually equal to 8888
@@ -378,10 +377,26 @@ class SwarmSpawner(Spawner):
         self.log.info(
             "Stopping and removing Docker service %s (id: %s)",
             self.service_name, self.service_id[:7])
-        yield self.docker('remove_service', self.service_id[:7])
-        self.log.info(
-            "Docker service %s (id: %s) removed",
-            self.service_name, self.service_id[:7])
 
-        self.clear_state()
+        service = yield self.get_service()
+        self.log.info("service type: %s", str(type(service)))
+        if not service:
+            self.log.warn("Docker service not found")
+            return
 
+        volumes = service['Spec']['TaskTemplate']['ContainerSpec']['Mounts']
+        # Eventhough it returns the service is not gone yet
+        removed_service = yield self.docker('remove_service', service['ID'])
+        if removed_service:
+            self.log.info(
+                "Docker service %s (id: %s) removed",
+                self.service_name, self.service_id[:7])
+
+            # Wait for service to disappear, TODO -> query service until it is gone
+            yield gen.sleep(5)
+            # Volumes can only be removed after the service is gone
+            for volume in volumes:
+                name = str(volume['Source'])
+                removed = yield self.docker('remove_volume', name=name, force=True)
+                self.log.info('volume: %s was removed: %s', volume['Source'], str(removed))
+            self.clear_state()
