@@ -369,6 +369,18 @@ class SwarmSpawner(Spawner):
         return (ip, port)
 
     @gen.coroutine
+    def removed_volume(self, name):
+        result = False
+        try:
+            yield self.docker('remove_volume', name=name)
+            result = True
+        except APIError as err:
+            if err.response.status_code == 409:
+                self.log.info("Can't remove volume yet, waiting for %s to disappear", name)
+
+        return result
+
+    @gen.coroutine
     def stop(self, now=False):
         """Stop and remove the service
 
@@ -379,24 +391,26 @@ class SwarmSpawner(Spawner):
             self.service_name, self.service_id[:7])
 
         service = yield self.get_service()
-        self.log.info("service type: %s", str(type(service)))
         if not service:
             self.log.warn("Docker service not found")
             return
 
         volumes = service['Spec']['TaskTemplate']['ContainerSpec']['Mounts']
-        # Eventhough it returns the service is not gone yet
+        # Even though it returns the service is gone the underlying containers are still being removed
         removed_service = yield self.docker('remove_service', service['ID'])
         if removed_service:
             self.log.info(
                 "Docker service %s (id: %s) removed",
                 self.service_name, self.service_id[:7])
 
-            # Wait for service to disappear, TODO -> query service until it is gone
-            yield gen.sleep(5)
-            # Volumes can only be removed after the service is gone
             for volume in volumes:
                 name = str(volume['Source'])
-                removed = yield self.docker('remove_volume', name=name, force=True)
-                self.log.info('volume: %s was removed: %s', volume['Source'], str(removed))
+                removed = False
+                # Volumes can only be removed after the service is gone
+                while removed is False:
+                    self.log.info("Removing volume %s", name)
+                    removed = yield self.removed_volume(name=name)
+                    yield gen.sleep(1)
+                self.log.info("Removed volume %s", name)
+
             self.clear_state()
