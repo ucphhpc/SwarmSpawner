@@ -376,7 +376,7 @@ class SwarmSpawner(Spawner):
             result = True
         except APIError as err:
             if err.response.status_code == 409:
-                self.log.info("Can't remove volume yet, waiting for %s to disappear", name)
+                self.log.info("Can't remove volume: %s yet", name),
 
         return result
 
@@ -411,6 +411,7 @@ class SwarmSpawner(Spawner):
                     self.log.info("Removing volume %s", name)
                     removed = yield self.removed_volume(name=name)
                     yield gen.sleep(1)
+
                 self.log.info("Removed volume %s", name)
 
             self.clear_state()
