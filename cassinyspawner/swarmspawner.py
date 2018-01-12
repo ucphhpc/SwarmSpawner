@@ -373,12 +373,29 @@ class SwarmSpawner(Spawner):
         result = False
         try:
             yield self.docker('remove_volume', name=name)
+            self.log.info("Removed volume %s", name)
             result = True
         except APIError as err:
             if err.response.status_code == 409:
                 self.log.info("Can't remove volume: %s yet", name),
 
         return result
+
+    @gen.coroutine
+    def remove_volume(self, name, max_attempts=30):
+        attempt = 0
+        removed = False
+        # Volumes can only be removed after the service is gone
+        while removed is False:
+            if attempt > max_attempts:
+                self.log.info("Failed to remove volume %s", name)
+                break
+            self.log.info("Removing volume %s", name)
+            removed = yield self.removed_volume(name=name)
+            yield gen.sleep(1)
+            attempt += 1
+
+        return removed
 
     @gen.coroutine
     def stop(self, now=False):
@@ -405,13 +422,6 @@ class SwarmSpawner(Spawner):
 
             for volume in volumes:
                 name = str(volume['Source'])
-                removed = False
-                # Volumes can only be removed after the service is gone
-                while removed is False:
-                    self.log.info("Removing volume %s", name)
-                    removed = yield self.removed_volume(name=name)
-                    yield gen.sleep(1)
+                yield self.remove_volume(name=name, max_attempts=30)
 
-                self.log.info("Removed volume %s", name)
-
-            self.clear_state()
+        self.clear_state()
