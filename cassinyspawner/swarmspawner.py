@@ -27,7 +27,7 @@ class UnicodeOrFalse(Unicode):
     info_text = 'a unicode string or False'
 
     def validate(self, obj, value):
-        if value is False:
+        if not value:
             return value
         return super(UnicodeOrFalse, self).validate(obj, value)
 
@@ -386,7 +386,7 @@ class SwarmSpawner(Spawner):
         attempt = 0
         removed = False
         # Volumes can only be removed after the service is gone
-        while removed is False:
+        while not removed:
             if attempt > max_attempts:
                 self.log.info("Failed to remove volume %s", name)
                 break
