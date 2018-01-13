@@ -3,16 +3,15 @@ A Spawner for JupyterHub that runs each user's
 server in a separate Docker Service
 """
 
-import hashlib, time
+import hashlib
+import docker
+
 from textwrap import dedent
 from concurrent.futures import ThreadPoolExecutor
 from pprint import pformat
-
-import docker
 from docker.errors import APIError
 from docker.utils import kwargs_from_env
 from tornado import gen
-
 from jupyterhub.spawner import Spawner
 from traitlets import (
     Dict,
@@ -235,7 +234,8 @@ class SwarmSpawner(Spawner):
 
     @gen.coroutine
     def get_service(self):
-        self.log.debug("Getting Docker service '%s'", self.service_name)
+        self.log.debug("Getting Docker service '%s' with id: '%s'",
+                       self.service_name, self.service_id)
         try:
             service = yield self.docker(
                 'inspect_service', self.service_name
@@ -275,32 +275,50 @@ class SwarmSpawner(Spawner):
             if 'name' in user_options:
                 self.server_name = user_options['name']
 
-            if hasattr(self, 'container_spec') and self.container_spec is not None:
+            if hasattr(self,
+                       'container_spec') and self.container_spec is not None:
                 container_spec = dict(**self.container_spec)
             elif user_options == {}:
                 raise ("A container_spec is needed in to create a service")
 
             container_spec.update(user_options.get('container_spec', {}))
-
             # iterates over mounts to create
             # a new mounts list of docker.types.Mount
             container_spec['mounts'] = []
             for mount in self.container_spec['mounts']:
                 m = dict(**mount)
 
+                # Volume name
                 if 'source' in m:
                     m['source'] = m['source'].format(
                         username=self.service_owner)
+                    self.log.info("Volume name: " + m['source'])
 
+                    # If a previous user volume is present, remove it
+                    try:
+                        yield self.docker('inspect_volume', m['source'])
+                    except docker.errors.NotFound:
+                        self.log.info("No volume named: " + m['source'])
+                    else:
+                        yield self.remove_volume(m['source'])
+
+                # Custom volume
                 if 'driver_config' in m:
                     if 'sshcmd' in m['driver_options']:
-                        m['driver_options']['sshcmd'] = self.user.mig_mount['SESSIONID'] + \
-                                                        self.user.mig_mount['TARGET_MOUNT_ADDR']
+                        m['driver_options']['sshcmd'] = self.user.mig_mount[
+                                                            'SESSIONID'] + \
+                                                        self.user.mig_mount[
+                                                            'TARGET_MOUNT_ADDR']
 
+                    # If the id_rsa flag is present, set key
                     if 'id_rsa' in m['driver_options']:
-                        m['driver_options']['id_rsa'] = self.user.mig_mount['MOUNTSSHPRIVATEKEY']
+                        m['driver_options']['id_rsa'] = self.user.mig_mount[
+                            'MOUNTSSHPRIVATEKEY']
 
-                    m['driver_config'] = docker.types.DriverConfig(name=m['driver_config'], options=m['driver_options'])
+
+
+                    m['driver_config'] = docker.types.DriverConfig(
+                        name=m['driver_config'], options=m['driver_options'])
                     del m['driver_options']
 
                 container_spec['mounts'].append(docker.types.Mount(**m))
@@ -382,7 +400,7 @@ class SwarmSpawner(Spawner):
         return result
 
     @gen.coroutine
-    def remove_volume(self, name, max_attempts=30):
+    def remove_volume(self, name, max_attempts=15):
         attempt = 0
         removed = False
         # Volumes can only be removed after the service is gone
@@ -413,7 +431,8 @@ class SwarmSpawner(Spawner):
             return
 
         volumes = service['Spec']['TaskTemplate']['ContainerSpec']['Mounts']
-        # Even though it returns the service is gone the underlying containers are still being removed
+        # Even though it returns the service is gone
+        # the underlying containers are still being removed
         removed_service = yield self.docker('remove_service', service['ID'])
         if removed_service:
             self.log.info(
@@ -422,6 +441,6 @@ class SwarmSpawner(Spawner):
 
             for volume in volumes:
                 name = str(volume['Source'])
-                yield self.remove_volume(name=name, max_attempts=30)
+                yield self.remove_volume(name=name, max_attempts=15)
 
         self.clear_state()
