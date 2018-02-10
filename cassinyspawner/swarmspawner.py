@@ -5,15 +5,15 @@ server in a separate Docker Service
 
 import hashlib
 import docker
-
 from textwrap import dedent
 from concurrent.futures import ThreadPoolExecutor
 from pprint import pformat
 from docker.errors import APIError
 from docker.utils import kwargs_from_env
-from tornado import gen
+from tornado import gen, web
 from jupyterhub.spawner import Spawner
 from traitlets import (
+    default,
     Dict,
     Unicode,
     List,
@@ -33,9 +33,54 @@ class UnicodeOrFalse(Unicode):
 
 class SwarmSpawner(Spawner):
     """A Spawner for JupyterHub using Docker Engine in Swarm mode
+
+    Makes a list of docker images available for the user to spawn
+    Specify in the jupyterhub configuration file which are allowed:
+    e.g.
+
+    c.JupyterHub.spawner_class = 'cassinyspawner.SwarmSpawner'
+    # Available docker images the user can spawn
+    c.SwarmSpawner.dockerimages = [
+        '127.0.0.1:5000/nbi_jupyter_notebook'
+    ]
+
+    The images must be locally available before the user can spawn them
     """
 
+    dockerimages = List(
+        trait = Dict(),
+        default_value = [{'image': '127.0.0.1:5000/nbi_jupyter_notebook',
+                          'name': 'Image with default MiG Homedrive mount,'
+                                  ' supports Py2/3 and R'}],
+        minlen = 1,
+        config = True,
+        help = "Docker images that have been pre-pulled to the execution host."
+    )
+
+    form_template = Unicode("""
+        <label for="dockerimage">Select a notebook image:</label>
+        <select class="form-control" name="dockerimage" required autofocus>
+            {option_template}
+        </select>""",
+        config = True, help = "Form template."
+    )
+
+    option_template = Unicode("""
+        <option value="{image}">{name}</option>""",
+        config = True, help = "Template for html form options."
+    )
+
     _executor = None
+
+    @default('options_form')
+    def _options_form(self):
+        """Return the form with the drop-down menu."""
+        options = ''.join([
+            self.option_template.format(image=di['image'], name=di['name'])
+            for di in self.dockerimages
+        ])
+        return self.form_template.format(option_template=options)
+
 
     @property
     def executor(self, max_workers=1):
@@ -204,7 +249,7 @@ class SwarmSpawner(Spawner):
     def poll(self):
         """Check for a task state like `docker service ps id`"""
         service = yield self.get_service()
-        if not service:
+        if service is None:
             self.log.warn("Docker service not found")
             return 0
 
@@ -226,6 +271,14 @@ class SwarmSpawner(Spawner):
                 )
                 # there should be at most one running task
                 running_task = task
+            if task_state == 'rejected':
+                task_err = task['Status']['State']['Err']
+                self.log.error("Task {} of Docker service {} status {} "
+                               "message {}"
+                               .format(task['ID'][:7], self.service_id[:7],
+                                       pformat(task_state), pformat(task_err)))
+                # If the tasks is rejected -> remove it
+                yield self.stop()
 
         if running_task is not None:
             return None
@@ -279,7 +332,44 @@ class SwarmSpawner(Spawner):
                        'container_spec') and self.container_spec is not None:
                 container_spec = dict(**self.container_spec)
             elif user_options == {}:
-                raise ("A container_spec is needed in to create a service")
+                self.log.error("User: {} is trying to create a service "
+                               "without a container_spec".format(
+                                self.user.real_name))
+                raise Exception("That notebook is missing a specification"
+                                "to launch it, contact the admin to resolve "
+                                "this issue")
+
+            # If using rasmunk/sshfs mounts, ensure that the mig_mount
+            # attributes is set
+            for mount in self.container_spec['mounts']:
+                if 'driver_config' in mount \
+                        and 'rasmunk/sshfs' in mount['driver_config']:
+                    if not hasattr(self.user, 'mig_mount') or \
+                                    self.user.mig_mount is None:
+                        self.log.error("User: {} missing mig_mount "
+                                       "attribute".format(self.user.real_name))
+                        raise Exception("Can't start that particular "
+                                        "notebook image, missing MiG mount "
+                                        "authentication keys, "
+                                        "try reinitializing them "
+                                        "through the MiG interface")
+                    else:
+                        # Validate required dictionary keys
+                        required_keys = ['SESSIONID', 'USER_CERT',
+                                         'TARGET_MOUNT_ADDR',
+                                         'MOUNTSSHPRIVATEKEY',
+                                         'MOUNTSSHPUBLICKEY']
+                        missing_keys = [key for key in required_keys if key
+                                        not in self.user.mig_mount]
+                        if len(missing_keys) > 0:
+                            self.log.error("User: {} missing mig_mount keys: {}"
+                                           .format(self.user.real_name,
+                                                   ",".join(missing_keys)))
+                            raise Exception("MiG mount keys are available but "
+                                            "missing the following items: {} "
+                                            "try reinitialize them "
+                                            "through the MiG interface"
+                                            .format(",".join(missing_keys)))
 
             container_spec.update(user_options.get('container_spec', {}))
             # iterates over mounts to create
@@ -314,8 +404,6 @@ class SwarmSpawner(Spawner):
                     if 'id_rsa' in m['driver_options']:
                         m['driver_options']['id_rsa'] = self.user.mig_mount[
                             'MOUNTSSHPRIVATEKEY']
-
-
 
                     m['driver_config'] = docker.types.DriverConfig(
                         name=m['driver_config'], options=m['driver_options'])
@@ -353,17 +441,15 @@ class SwarmSpawner(Spawner):
                          'placement': placement
                          }
             task_tmpl = docker.types.TaskTemplate(**task_spec)
-
             resp = yield self.docker('create_service',
                                      task_tmpl,
                                      name=self.service_name,
                                      networks=networks)
 
             self.service_id = resp['ID']
-
-            self.log.info(
-                "Created Docker service '%s' (id: %s) from image %s",
-                self.service_name, self.service_id[:7], image)
+            self.log.info("Created Docker service '%s' (id: %s) from image %s"
+                          " for user %s", self.service_name,
+                          self.service_id[:7], image, self.user.real_name)
 
         else:
             self.log.info(
@@ -380,6 +466,8 @@ class SwarmSpawner(Spawner):
 
         ip = self.service_name
         port = self.service_port
+        self.log.debug("Active service: '%s' with user '%s'",
+                       self.service_name, self.user)
 
         # we use service_name instead of ip
         # https://docs.docker.com/engine/swarm/networking/#use-swarm-mode-service-discovery
