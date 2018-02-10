@@ -272,7 +272,7 @@ class SwarmSpawner(Spawner):
                 # there should be at most one running task
                 running_task = task
             if task_state == 'rejected':
-                task_err = task['Status']['State']['Err']
+                task_err = task['Status']['Err']
                 self.log.error("Task {} of Docker service {} status {} "
                                "message {}"
                                .format(task['ID'][:7], self.service_id[:7],
