@@ -33,7 +33,6 @@ class UnicodeOrFalse(Unicode):
 
 class SwarmSpawner(Spawner):
     """A Spawner for JupyterHub using Docker Engine in Swarm mode
-
     Makes a list of docker images available for the user to spawn
     Specify in the jupyterhub configuration file which are allowed:
     e.g.
@@ -64,9 +63,9 @@ class SwarmSpawner(Spawner):
         </select>""", config=True, help="Form template.")
 
     option_template = Unicode("""
-        <option value="{image}">{name}</option>""", config=True,
+        <option value="{image}">{name}</option>""",
+                              config=True,
                               help="Template for html form options.")
-
     _executor = None
 
     @default('options_form')
@@ -152,7 +151,6 @@ class SwarmSpawner(Spawner):
     def tls_client(self):
         """A tuple consisting of the TLS client certificate and key if they
         have been provided, otherwise None.
-
         """
         if self.tls_cert and self.tls_key:
             return (self.tls_cert, self.tls_key)
@@ -507,7 +505,6 @@ class SwarmSpawner(Spawner):
     @gen.coroutine
     def stop(self, now=False):
         """Stop and remove the service
-
         Consider using stop/start when Docker adds support
         """
         self.log.info(
