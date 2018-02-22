@@ -10,7 +10,7 @@ from concurrent.futures import ThreadPoolExecutor
 from pprint import pformat
 from docker.errors import APIError
 from docker.utils import kwargs_from_env
-from tornado import gen, web
+from tornado import gen
 from jupyterhub.spawner import Spawner
 from traitlets import (
     default,
@@ -48,27 +48,24 @@ class SwarmSpawner(Spawner):
     """
 
     dockerimages = List(
-        trait = Dict(),
-        default_value = [{'image': '127.0.0.1:5000/nbi_jupyter_notebook',
-                          'name': 'Image with default MiG Homedrive mount,'
-                                  ' supports Py2/3 and R'}],
-        minlen = 1,
-        config = True,
-        help = "Docker images that have been pre-pulled to the execution host."
+        trait=Dict(),
+        default_value=[{'image': '127.0.0.1:5000/nbi_jupyter_notebook',
+                        'name': 'Image with default MiG Homedrive mount,'
+                                ' supports Py2/3 and R'}],
+        minlen=1,
+        config=True,
+        help="Docker images that have been pre-pulled to the execution host."
     )
 
     form_template = Unicode("""
         <label for="dockerimage">Select a notebook image:</label>
         <select class="form-control" name="dockerimage" required autofocus>
             {option_template}
-        </select>""",
-        config = True, help = "Form template."
-    )
+        </select>""", config=True, help="Form template.")
 
     option_template = Unicode("""
-        <option value="{image}">{name}</option>""",
-        config = True, help = "Template for html form options."
-    )
+        <option value="{image}">{name}</option>""", config=True,
+                              help="Template for html form options.")
 
     _executor = None
 
@@ -80,7 +77,6 @@ class SwarmSpawner(Spawner):
             for di in self.dockerimages
         ])
         return self.form_template.format(option_template=options)
-
 
     @property
     def executor(self, max_workers=1):
@@ -328,13 +324,13 @@ class SwarmSpawner(Spawner):
             if 'name' in user_options:
                 self.server_name = user_options['name']
 
-            if hasattr(self,
-                       'container_spec') and self.container_spec is not None:
+            if hasattr(self, 'container_spec') and \
+               self.container_spec is not None:
                 container_spec = dict(**self.container_spec)
             elif user_options == {}:
-                self.log.error("User: {} is trying to create a service "
-                               "without a container_spec".format(
-                                self.user.real_name))
+                self.log.error(
+                    "User: {} is trying to create a service"
+                    " without a container_spec".format(self.user.real_name))
                 raise Exception("That notebook is missing a specification"
                                 "to launch it, contact the admin to resolve "
                                 "this issue")
@@ -362,14 +358,19 @@ class SwarmSpawner(Spawner):
                         missing_keys = [key for key in required_keys if key
                                         not in self.user.mig_mount]
                         if len(missing_keys) > 0:
-                            self.log.error("User: {} missing mig_mount keys: {}"
-                                           .format(self.user.real_name,
-                                                   ",".join(missing_keys)))
+                            self.log.error(
+                                "User: {} missing mig_mount keys: {}"
+                                    .format(self.user.real_name,
+                                            ",".join(missing_keys)))
                             raise Exception("MiG mount keys are available but "
                                             "missing the following items: {} "
                                             "try reinitialize them "
                                             "through the MiG interface"
                                             .format(",".join(missing_keys)))
+                        else:
+                            self.log.debug("User: {} mig_mount contains: {}"
+                                           .format(self.user.real_name,
+                                                   self.user.mig_mount))
 
             container_spec.update(user_options.get('container_spec', {}))
             # iterates over mounts to create
