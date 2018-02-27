@@ -306,11 +306,12 @@ class SwarmSpawner(Spawner):
     @gen.coroutine
     def start(self):
         """Start the single-user server in a docker service.
-        You can specify the params for the service through jupyterhub_config.py
-        or using the user_options
+        You can specify the params for the service through
+        jupyterhub_config.py or using the user_options
         """
 
-        # https://github.com/jupyterhub/jupyterhub/blob/master/jupyterhub/user.py#L202
+        # https://github.com/jupyterhub/jupyterhub
+        # /blob/master/jupyterhub/user.py#L202
         # By default jupyterhub calls the spawner passing user_options
         if self.use_user_options:
             user_options = self.user_options
@@ -319,8 +320,8 @@ class SwarmSpawner(Spawner):
 
         service = yield self.get_service()
         if service is None:
-            if hasattr(self, 'container_spec') and \
-                            self.container_spec is not None:
+            if hasattr(self, 'container_spec') \
+                    and self.container_spec is not None:
                 container_spec = dict(**self.container_spec)
             elif user_options == {}:
                 self.log.error(
@@ -336,7 +337,7 @@ class SwarmSpawner(Spawner):
                 if 'driver_config' in mount \
                         and 'rasmunk/sshfs' in mount['driver_config']:
                     if not hasattr(self.user, 'mig_mount') or \
-                                    self.user.mig_mount is None:
+                            self.user.mig_mount is None:
                         self.log.error("User: {} missing mig_mount "
                                        "attribute".format(self.user))
                         raise Exception("Can't start that particular "
@@ -391,10 +392,9 @@ class SwarmSpawner(Spawner):
                 # Custom volume
                 if 'driver_config' in m:
                     if 'sshcmd' in m['driver_options']:
-                        m['driver_options']['sshcmd'] = self.user.mig_mount[
-                                                            'SESSIONID'] + \
-                                                        self.user.mig_mount[
-                                                            'TARGET_MOUNT_ADDR']
+                        m['driver_options']['sshcmd'] \
+                            = self.user.mig_mount['SESSIONID'] \
+                            + self.user.mig_mount['TARGET_MOUNT_ADDR']
 
                     # If the id_rsa flag is present, set key
                     if 'id_rsa' in m['driver_options']:
