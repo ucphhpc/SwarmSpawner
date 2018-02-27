@@ -36,8 +36,11 @@ def hub_image():
     image = client.images.build(path=parent_dir, tag=HUB_IMAGE_TAG, rm=True,
                                 pull=True)
     yield image
-    print(str(image))
-    client.images.remove(image.tags[0])
+    print(type(image))
+    if type(image) == tuple:
+        client.images.remove(image[0].tags[0])
+    else:
+        client.images.remove(image.tags[0])
 
 
 @pytest.fixture(scope="session")
