@@ -61,7 +61,6 @@ def network():
 @pytest.fixture
 def hub_service(hub_image, swarm, network):
     """Launch the hub service.
-
     Note that we don't directly use any of the arguments, but those fixtures need to be
     in place before we can launch the service.
     """
@@ -91,3 +90,26 @@ def hub_service(hub_image, swarm, network):
 
     yield service
     service.remove()
+
+
+@pytest.fixture
+def mig_image(hub_image, swarm, network):
+    """Launch the hub service.
+    Note that we don't directly use any of the arguments,
+    but those fixtures need to be in place before we can launch the service.
+    """
+
+    client = docker.from_env()
+    config_path = os.path.join(os.path.dirname(os.path.realpath(__file__)),
+                               "jupyter_config.py")
+    service = client.services.create(
+        image=HUB_IMAGE_TAG,
+        name=HUB_SERVICE_NAME,
+        mounts=[
+            ":".join(["/var/run/docker.sock", "/var/run/docker.sock", "rw"]),
+            ":".join(
+                [config_path, "/srv/jupyterhub/jupyter_config.py", "ro"])],
+        networks=[NETWORK_NAME],
+        endpoint_spec=docker.types.EndpointSpec(ports={8000: 8000}))
+
+    

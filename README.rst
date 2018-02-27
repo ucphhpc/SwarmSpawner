@@ -2,13 +2,8 @@
 SwarmSpawner
 ==============================
 
-.. image:: https://badge.fury.io/py/swarmspawner.svg
-   :target: https://badge.fury.io/py/swarmspawner
-   :alt: PyPI version
-
-.. image:: https://img.shields.io/pypi/pyversions/swarmspawner.svg
-   :target: https://pypi.org/project/swarmspawner/
-   :alt: Python Versions
+.. image:: https://travis-ci.org/rasmunk/SwarmSpawner.svg?branch=master
+    :target: https://travis-ci.org/rasmunk/SwarmSpawner
 
 
 **SwarmSpawner** enables `JupyterHub <https://github.com/jupyterhub/jupyterhub>`_ to spawn single user notebook servers in Docker Services.
