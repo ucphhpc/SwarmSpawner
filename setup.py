@@ -1,9 +1,7 @@
 # Copyright (c) Cassiny.io OÜ.
-
 import re
 from setuptools import setup, find_packages
 from pathlib import Path
-
 
 with (Path(__file__).parent / 'cassinyspawner' / '__init__.py').open() as fp:
     try:
@@ -17,7 +15,6 @@ with open('./requirements/base.txt') as test_reqs_txt:
 
 long_description = open('README.rst').read()
 
-
 setup(
     name='swarmspawner',
     version=version,
@@ -25,7 +22,7 @@ setup(
     description="""
                 SwarmSpawner: A spawner for JupyterHub that uses Docker Swarm's services
                 """,
-    url='https://github.com/cassinyio/SwarmSpawner',
+    url='https://github.com/rasmunk/SwarmSpawner',
     # Author details
     author='Christian Barra',
     author_email='info@cassiny.io',

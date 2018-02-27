@@ -1,8 +1,4 @@
 ==============================
-This project is deprecated, please check `DockerSpawner <https://github.com/jupyterhub/dockerspawner>`_.
-==============================
-
-==============================
 SwarmSpawner
 ==============================
 
@@ -38,7 +34,7 @@ Installation from GitHub
 
 .. code-block:: sh
 
-   git clone https://github.com/cassinyio/SwarmSpawner
+   git clone https://github.com/rasmunk/SwarmSpawner
    cd SwarmSpawner
    python setup.py install
 
@@ -278,5 +274,3 @@ Credit
 License
 =======
 All code is licensed under the terms of the revised BSD license.
-
-

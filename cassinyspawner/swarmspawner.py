@@ -320,7 +320,7 @@ class SwarmSpawner(Spawner):
         service = yield self.get_service()
         if service is None:
             if hasattr(self, 'container_spec') and \
-               self.container_spec is not None:
+                            self.container_spec is not None:
                 container_spec = dict(**self.container_spec)
             elif user_options == {}:
                 self.log.error(
