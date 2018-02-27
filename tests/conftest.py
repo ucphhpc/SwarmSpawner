@@ -6,12 +6,12 @@ import time
 import docker
 import pytest
 
-
 HUB_IMAGE_TAG = "hub:test"
 NETWORK_NAME = "jh_test"
 HUB_SERVICE_NAME = "jupyterhub"
 
 CONFIG_TEMPLATE_PATH = "tests/jupyter_config.j2"
+
 
 @pytest.fixture(scope="session")
 def swarm():
@@ -23,6 +23,7 @@ def swarm():
     yield client.swarm.attrs
     client.swarm.leave(force=True)
 
+
 @pytest.fixture(scope="session")
 def hub_image():
     """Build the image for the jupyterhub. We'll run this as a service
@@ -32,9 +33,12 @@ def hub_image():
 
     # Build the image from the root of the package
     parent_dir = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
-    image = client.images.build(path=parent_dir, tag=HUB_IMAGE_TAG, rm=True)
+    image = client.images.build(path=parent_dir, tag=HUB_IMAGE_TAG, rm=True,
+                                pull=True)
     yield image
+    print(str(image))
     client.images.remove(image.tags[0])
+
 
 @pytest.fixture(scope="session")
 def network():
@@ -60,17 +64,21 @@ def hub_service(hub_image, swarm, network):
     """
 
     client = docker.from_env()
-    config_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), "jupyter_config.py")
+    config_path = os.path.join(os.path.dirname(os.path.realpath(__file__)),
+                               "jupyter_config.py")
     service = client.services.create(
         image=HUB_IMAGE_TAG,
         name=HUB_SERVICE_NAME,
-        mounts=[":".join(["/var/run/docker.sock", "/var/run/docker.sock", "rw"]),
-                ":".join([config_path, "/srv/jupyterhub/jupyter_config.py", "ro"])],
+        mounts=[
+            ":".join(["/var/run/docker.sock", "/var/run/docker.sock", "rw"]),
+            ":".join(
+                [config_path, "/srv/jupyterhub/jupyter_config.py", "ro"])],
         networks=[NETWORK_NAME],
         endpoint_spec=docker.types.EndpointSpec(ports={8000: 8000}))
 
     # Wait for the service's task to start running
-    while service.tasks() and service.tasks()[0]["Status"]["State"] != "running":
+    while service.tasks() and service.tasks()[0]["Status"][
+        "State"] != "running":
         time.sleep(1)
 
     # And wait some more. This is...not great, but there seems to be a period after the task

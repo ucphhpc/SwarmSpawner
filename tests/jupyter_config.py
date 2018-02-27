@@ -5,6 +5,9 @@ c = get_config()
 c.JupyterHub.spawner_class = 'cassinyspawner.SwarmSpawner'
 c.JupyterHub.hub_ip = '0.0.0.0'
 
+# First pulls can be really slow, so let's give it a big timeout
+c.SwarmSpawner.start_timeout = 60 * 5
+
 # The name of the service that's running the hub
 c.SwarmSpawner.jupyterhub_service_name = "jupyterhub"
 
