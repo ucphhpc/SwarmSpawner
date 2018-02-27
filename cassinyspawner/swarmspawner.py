@@ -319,16 +319,13 @@ class SwarmSpawner(Spawner):
 
         service = yield self.get_service()
         if service is None:
-            if 'name' in user_options:
-                self.server_name = user_options['name']
-
             if hasattr(self, 'container_spec') and \
                self.container_spec is not None:
                 container_spec = dict(**self.container_spec)
             elif user_options == {}:
                 self.log.error(
                     "User: {} is trying to create a service"
-                    " without a container_spec".format(self.user.real_name))
+                    " without a container_spec".format(self.user))
                 raise Exception("That notebook is missing a specification"
                                 "to launch it, contact the admin to resolve "
                                 "this issue")
@@ -341,7 +338,7 @@ class SwarmSpawner(Spawner):
                     if not hasattr(self.user, 'mig_mount') or \
                                     self.user.mig_mount is None:
                         self.log.error("User: {} missing mig_mount "
-                                       "attribute".format(self.user.real_name))
+                                       "attribute".format(self.user))
                         raise Exception("Can't start that particular "
                                         "notebook image, missing MiG mount "
                                         "authentication keys, "
@@ -358,7 +355,7 @@ class SwarmSpawner(Spawner):
                         if len(missing_keys) > 0:
                             self.log.error(
                                 "User: {} missing mig_mount keys: {}"
-                                    .format(self.user.real_name,
+                                    .format(self.user,
                                             ",".join(missing_keys)))
                             raise Exception("MiG mount keys are available but "
                                             "missing the following items: {} "
@@ -367,7 +364,7 @@ class SwarmSpawner(Spawner):
                                             .format(",".join(missing_keys)))
                         else:
                             self.log.debug("User: {} mig_mount contains: {}"
-                                           .format(self.user.real_name,
+                                           .format(self.user,
                                                    self.user.mig_mount))
 
             container_spec.update(user_options.get('container_spec', {}))
@@ -448,7 +445,7 @@ class SwarmSpawner(Spawner):
             self.service_id = resp['ID']
             self.log.info("Created Docker service '%s' (id: %s) from image %s"
                           " for user %s", self.service_name,
-                          self.service_id[:7], image, self.user.real_name)
+                          self.service_id[:7], image, self.user)
 
         else:
             self.log.info(
