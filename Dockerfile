@@ -7,7 +7,8 @@ ADD cassinyspawner SwarmSpawner/cassinyspawner
 ADD setup.py SwarmSpawner/setup.py
 ADD requirements SwarmSpawner/requirements
 
-RUN pip install jupyterhub-dummyauthenticator
+RUN pip install jupyterhub-dummyauthenticator \
+    && pip install jhub_remote_user_auth_mig_mount
 
 RUN cd SwarmSpawner \
  && pip install -r requirements/base.txt \
