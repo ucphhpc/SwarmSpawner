@@ -12,9 +12,9 @@ c.JupyterHub.cleanup_servers = True
 # First pulls can be really slow, so let's give it a big timeout
 c.SwarmSpawner.start_timeout = 60 * 5
 
-c.SwarmSpawner.jupyterhub_service_name = 'nbibda_service_jupyterhub'
+c.SwarmSpawner.jupyterhub_service_name = 'jupyterhub'
 
-c.SwarmSpawner.networks = ["nbibda_service_default"]
+c.SwarmSpawner.networks = ["jh_test"]
 
 notebook_dir = os.environ.get('NOTEBOOK_DIR') or '/home/jovyan/work/'
 c.SwarmSpawner.notebook_dir = notebook_dir
@@ -32,7 +32,7 @@ mounts = [{'type': 'volume',
 c.SwarmSpawner.container_spec = {
     'args': ['/usr/local/bin/start-singleuser.sh'],
     # image needs to be previously pulled
-    'Image': '127.0.0.1:5000/nbi_mig_mount_notebook',
+    'Image': '127.0.0.1:5000/nbi_base_notebook',
     'mounts': mounts
 }
 

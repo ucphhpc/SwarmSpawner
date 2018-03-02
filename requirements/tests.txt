@@ -3,4 +3,4 @@ pygments
 flake8
 requests
 pytest
-docker
+docker==2.7.0

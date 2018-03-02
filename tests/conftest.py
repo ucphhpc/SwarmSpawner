@@ -50,7 +50,8 @@ def network():
         name=NETWORK_NAME,
         driver="overlay",
         options={"subnet": "192.168.0.0/20"},
-        attachable=True)
+        attachable=True
+    )
     yield network
     network.remove()
 
@@ -77,7 +78,7 @@ def hub_service(hub_image, swarm, network):
 
     # Wait for the service's task to start running
     while service.tasks() and \
-            service.tasks()[0]["Status"]["State"] != "running":
+                    service.tasks()[0]["Status"]["State"] != "running":
         time.sleep(1)
 
     # And wait some more. This is...not great, but there seems to be
@@ -109,10 +110,55 @@ def mig_service(hub_image, swarm, network):
             ":".join(
                 [config_path, "/srv/jupyterhub/jupyter_config.py", "ro"])],
         networks=[NETWORK_NAME],
-        endpoint_spec=docker.types.EndpointSpec(ports={8000: 8000}))
+        endpoint_spec=docker.types.EndpointSpec(ports={8000: 8000})
+    )
 
     state = service.tasks()[0]["Status"]["State"]
     while state != "running":
         time.sleep(1)
         state = service.tasks()[0]["Status"]["State"]
         assert state != 'failed'
+
+    # And wait some more. This is...not great, but there seems to be
+    # a period after the task is running but before the hub will accept
+    # connections.
+    # If the test code attempts to connect to the hub during that time,
+    # it fails.
+    time.sleep(10)
+
+    yield service
+    service.remove()
+
+
+@pytest.fixture
+def mig_mount_target(swarm, network):
+    """
+    Sets up the host container that the notebook containers can mount
+    """
+    client = docker.from_env()
+    services = client.services.list(filters={'name': HUB_SERVICE_NAME})
+    assert len(services) == 1
+    containers = client.containers.list(
+        filters={'label':
+                     "com.docker.swarm.service.id=" + services[0].attrs['ID']})
+
+    assert len(containers) == 1
+    ip = containers[0].attrs['NetworkSettings']['Networks'][NETWORK_NAME]['IPAddress']
+
+    args = "--hub-url=http://{}:8000".format(ip)
+    service = client.services.create(
+        image='nielsbohr/mig-mount-dummy',
+        name='mig-dummy',
+        networks=[NETWORK_NAME],
+        args=[args]
+    )
+    state = service.tasks()[0]["Status"]["State"]
+
+    while state != "running":
+        time.sleep(1)
+        state = service.tasks()[0]["Status"]["State"]
+        assert state != 'failed'
+
+    yield service
+    service.remove()
+
