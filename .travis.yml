@@ -12,6 +12,9 @@ install:
   - pip install -r requirements/tests.txt
   - docker pull jupyterhub/jupyterhub:0.8.0rc2
   - docker pull jupyterhub/singleuser:0.8
+  - docker pull nielsbohr/mig-mount-dummy
+  - docker pull nielsbohr/nbi_base_notebook
+  - docker plugin install rasmunk/sshfs
 
 script:
   - python setup.py check -rms

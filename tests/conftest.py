@@ -3,6 +3,9 @@ import os
 import time
 import docker
 import pytest
+import socket
+
+from docker.errors import NotFound
 
 HUB_IMAGE_TAG = "hub:test"
 NETWORK_NAME = "jh_test"
@@ -110,7 +113,9 @@ def mig_service(hub_image, swarm, network):
             ":".join(
                 [config_path, "/srv/jupyterhub/jupyter_config.py", "ro"])],
         networks=[NETWORK_NAME],
-        endpoint_spec=docker.types.EndpointSpec(ports={8000: 8000})
+        endpoint_spec=docker.types.EndpointSpec(ports={8000: 8000}),
+        command=["jupyterhub", "-f", "/srv/jupyterhub/jupyter_config.py",
+                 '--debug']
     )
 
     state = service.tasks()[0]["Status"]["State"]
@@ -137,19 +142,36 @@ def mig_mount_target(swarm, network):
     """
     client = docker.from_env()
     services = client.services.list(filters={'name': HUB_SERVICE_NAME})
+    # Make sure mig sshfs plugin is installed
+    plugin = None
+    try:
+        plugin = client.plugins.get("rasmunk/sshfs")
+    except NotFound:
+        plugin = client.plugins.install("rasmunk/sshfs")
+    finally:
+        if not plugin.enabled:
+            plugin.enable()
+
     assert len(services) == 1
     containers = client.containers.list(
         filters={'label':
                      "com.docker.swarm.service.id=" + services[0].attrs['ID']})
 
     assert len(containers) == 1
-    ip = containers[0].attrs['NetworkSettings']['Networks'][NETWORK_NAME]['IPAddress']
+    ip = containers[0].attrs['NetworkSettings']['Networks'][NETWORK_NAME][
+        'IPAddress']
 
     args = "--hub-url=http://{}:8000".format(ip)
     service = client.services.create(
         image='nielsbohr/mig-mount-dummy',
         name='mig-dummy',
         networks=[NETWORK_NAME],
+        endpoint_spec=docker.types.EndpointSpec(ports={2222: 22}),
+        # The mig dummy mount target needs this, because the jupyterhub
+        # service needs to know it should try sshfs mount at the host level
+        # which will pass it to the mig target, internal mount dosen't work
+        # because no fuse access without running in priviliged mode
+        env=["DOCKER_HOST=" + socket.gethostname()],
         args=[args]
     )
     state = service.tasks()[0]["Status"]["State"]
@@ -161,4 +183,3 @@ def mig_mount_target(swarm, network):
 
     yield service
     service.remove()
-

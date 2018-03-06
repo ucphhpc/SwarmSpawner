@@ -40,7 +40,7 @@ class SwarmSpawner(Spawner):
     c.JupyterHub.spawner_class = 'cassinyspawner.SwarmSpawner'
     # Available docker images the user can spawn
     c.SwarmSpawner.dockerimages = [
-        '127.0.0.1:5000/nbi_jupyter_notebook'
+        'nielsbohr/nbi_base_notebook'
     ]
 
     The images must be locally available before the user can spawn them
@@ -48,7 +48,7 @@ class SwarmSpawner(Spawner):
 
     dockerimages = List(
         trait=Dict(),
-        default_value=[{'image': '127.0.0.1:5000/nbi_jupyter_notebook',
+        default_value=[{'image': 'nielsbohr/nbi_base_notebook',
                         'name': 'Image with default MiG Homedrive mount,'
                                 ' supports Py2/3 and R'}],
         minlen=1,
@@ -409,6 +409,10 @@ class SwarmSpawner(Spawner):
 
             # some Envs are required by the single-user-image
             container_spec['env'] = self.get_env()
+
+            # Log mounts config
+            self.log.debug("User: {} container_spec mounts: {}".format(
+                self.user, container_spec['mounts']))
 
             if hasattr(self, 'resource_spec'):
                 resource_spec = self.resource_spec

@@ -20,10 +20,10 @@ notebook_dir = os.environ.get('NOTEBOOK_DIR') or '/home/jovyan/work/'
 c.SwarmSpawner.notebook_dir = notebook_dir
 
 mounts = [{'type': 'volume',
-           'driver_config': 'rasmunk/sshfs:next',
+           'driver_config': 'rasmunk/sshfs:latest',
            'driver_options': {'sshcmd': '{sshcmd}', 'id_rsa': '{id_rsa}',
-                              'allow_other': '', 'big_writes': '',
-                              'reconnect': ''},
+                              'big_writes': '', 'allow_other': '',
+                              'reconnect': '', 'port': '2222'},
            'source': 'sshvolume-user-{username}',
            'target': notebook_dir
            }]
@@ -32,13 +32,13 @@ mounts = [{'type': 'volume',
 c.SwarmSpawner.container_spec = {
     'args': ['/usr/local/bin/start-singleuser.sh'],
     # image needs to be previously pulled
-    'Image': '127.0.0.1:5000/nbi_base_notebook',
+    'Image': 'nielsbohr/nbi_base_notebook',
     'mounts': mounts
 }
 
 # Available docker images the user can spawn
 c.SwarmSpawner.dockerimages = [
-    {'image': '127.0.0.1:5000/nbi_mig_mount_notebook',
+    {'image': 'nielsbohr/nbi_base_notebook',
      'name': 'Image with default MiG Homedrive mount, supports Py2/3 and R'}
 ]
 
