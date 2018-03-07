@@ -58,6 +58,7 @@ def test_create_mig_service(mig_service, mig_mount_target):
         spawn_resp = s.post(jhub_url + "/hub/spawn", data=payload)
         assert spawn_resp.status_code == 200
         # If error, check whether the images is being pulled from the repo
+        # If so wait of it
         services_after_spawn = client.services.list()
         spawned_services = (set(services_after_spawn)
                             - set(services_before_spawn))
@@ -65,13 +66,20 @@ def test_create_mig_service(mig_service, mig_mount_target):
         if 'Error: HTTP 500: Internal Server Error' in spawn_resp.text and \
            len(spawned_services) > 0:
             for service in spawned_services:
-                state = service.task()[0]['Status']['State']
+                state = service.tasks()[0]['Status']['State']
                 while state != 'running':
                     time.sleep(1)
                     state = service.tasks()[0]["Status"]["State"]
                     assert state != 'failed'
 
-        # Remove the services we just created,
-        # or we'll get errors when tearing down the fixtures
         if len(spawned_services) > 0:
+            # Validate the Spawned services
+            for service in spawned_services:
+                for task in service.tasks():
+                    assert task['Status']['State'] == 'running'
+                    for mount in task['Spec']['ContainerSpec']['Mounts']:
+                        assert mount['VolumeOptions']['DriverConfig']['Name'] \
+                               == 'rasmunk/sshfs:latest'
+            # Remove the services we just created,
+            # or we'll get errors when tearing down the fixtures
             spawned_services.pop().remove()
