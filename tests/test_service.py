@@ -1,5 +1,6 @@
 import docker
 import requests
+import time
 
 jhub_url = "http://127.0.0.1:8000"
 
@@ -46,17 +47,31 @@ def test_create_mig_service(mig_service, mig_mount_target):
         )
         assert login_resp.status_code == 200
 
-        # Spawn a MiG mount container without having provided the MiG Mount header
-        # spawn_no_mig_resp = session.post("http://127.0.0.1:8000/hub/spawn")
-        # assert 'missing MiG mount authentication keys, try reinitializing them '
-        #  \
-        #        'through the MiG interface' in spawn_no_mig_resp.text
-        # assert (len(client.services.list()) - len(services_before_login)) == 0
 
-        spawn_resp = s.post(jhub_url + "/hub/spawn")
+        spawn_form_resp = s.get(jhub_url + "/hub/spawn")
+        assert spawn_form_resp.status_code == 200
+        assert 'Select a notebook image' in spawn_form_resp.text
+
+        payload = {
+            'dockerimage': 'nielsbohr/nbi_base_notebook'
+        }
+        spawn_resp = s.post(jhub_url + "/hub/spawn", data=payload)
         assert spawn_resp.status_code == 200
+        # If error, check whether the images is being pulled from the repo
         services_after_spawn = client.services.list()
+        spawned_services = (set(services_after_spawn)
+                            - set(services_before_spawn))
 
-    # Remove the service we just created,
-    # or we'll get errors when tearing down the fixtures
-    (set(services_after_spawn) - set(services_before_spawn)).pop().remove()
+        if 'Error: HTTP 500: Internal Server Error' in spawn_resp.text and \
+           len(spawned_services) > 0:
+            for service in spawned_services:
+                state = service.task()[0]['Status']['State']
+                while state != 'running':
+                    time.sleep(1)
+                    state = service.tasks()[0]["Status"]["State"]
+                    assert state != 'failed'
+
+        # Remove the services we just created,
+        # or we'll get errors when tearing down the fixtures
+        if len(spawned_services) > 0:
+            spawned_services.pop().remove()

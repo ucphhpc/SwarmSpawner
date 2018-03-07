@@ -25,7 +25,7 @@ mounts = [{'type': 'volume',
                               'big_writes': '', 'allow_other': '',
                               'reconnect': '', 'port': '2222'},
            'source': 'sshvolume-user-{username}',
-           'target': notebook_dir
+           'target': '/home/jovyan/tmp'
            }]
 
 # 'args' is the command to run inside the service
@@ -36,10 +36,11 @@ c.SwarmSpawner.container_spec = {
     'mounts': mounts
 }
 
+# TODO -> Dynamic MOUNT-HOST naming
 # Available docker images the user can spawn
 c.SwarmSpawner.dockerimages = [
     {'image': 'nielsbohr/nbi_base_notebook',
-     'name': 'Image with default MiG Homedrive mount, supports Py2/3 and R'}
+     'name': 'Image with automatic {mount_host} mount, supports Py2/3 and R'}
 ]
 
 # Authenticator -> remote user header

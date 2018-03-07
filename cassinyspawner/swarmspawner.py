@@ -310,6 +310,7 @@ class SwarmSpawner(Spawner):
         jupyterhub_config.py or using the user_options
         """
 
+        self.log.info("User: {}, Start swarmspawner".format(self.user))
         # https://github.com/jupyterhub/jupyterhub
         # /blob/master/jupyterhub/user.py#L202
         # By default jupyterhub calls the spawner passing user_options
