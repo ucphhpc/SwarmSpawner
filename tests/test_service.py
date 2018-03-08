@@ -63,8 +63,12 @@ def test_create_mig_service(mig_service, mig_mount_target):
         spawned_services = (set(services_after_spawn)
                             - set(services_before_spawn))
 
-        if 'Error: HTTP 500: Internal Server Error' in spawn_resp.text and \
-           len(spawned_services) > 0:
+        # Wait for services to spawn
+        time.sleep(5)
+        assert len(spawned_services) > 0
+
+        # Wait for possible image pull
+        if 'Error: HTTP 500: Internal Server Error' in spawn_resp.text:
             for service in spawned_services:
                 state = service.tasks()[0]['Status']['State']
                 while state != 'running':
@@ -72,14 +76,13 @@ def test_create_mig_service(mig_service, mig_mount_target):
                     state = service.tasks()[0]["Status"]["State"]
                     assert state != 'failed'
 
-        if len(spawned_services) > 0:
-            # Validate the Spawned services
-            for service in spawned_services:
-                for task in service.tasks():
-                    assert task['Status']['State'] == 'running'
-                    for mount in task['Spec']['ContainerSpec']['Mounts']:
-                        assert mount['VolumeOptions']['DriverConfig']['Name'] \
-                               == 'rasmunk/sshfs:latest'
-            # Remove the services we just created,
-            # or we'll get errors when tearing down the fixtures
-            spawned_services.pop().remove()
+        # Validate the Spawned services
+        for service in spawned_services:
+            for task in service.tasks():
+                assert task['Status']['State'] == 'running'
+                for mount in task['Spec']['ContainerSpec']['Mounts']:
+                    assert mount['VolumeOptions']['DriverConfig']['Name'] \
+                           == 'rasmunk/sshfs:latest'
+        # Remove the services we just created,
+        # or we'll get errors when tearing down the fixtures
+        spawned_services.pop().remove()
