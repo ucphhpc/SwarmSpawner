@@ -1,21 +1,24 @@
 sudo: required
-
-services:
-    docker
-
+services: docker
 language: python
-
-python:
-    "3.6"
-
+python: "3.6"
 install:
   - pip install -r requirements/tests.txt
   - docker pull jupyterhub/jupyterhub:0.7.2
   - docker pull nielsbohr/mig-mount-dummy
-  - docker pull nielsbohr/nbi_base_notebook
+  - docker pull nielsbohr/base-notebook
   - docker plugin install rasmunk/sshfs --grant-all-permissions
 
 script:
   - python setup.py check -rms
   - flake8
-  - pytest -v tests/
+  - pytest -s -v tests/
+#deploy:
+#  skip_cleanup: true
+#  distributions: 'sdist bdist_wheel'
+#  provider: pypi
+#  user: rasmunk
+#
+#  on:
+#    tags: true
+#    branch: master

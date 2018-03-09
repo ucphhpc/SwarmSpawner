@@ -1,31 +1,26 @@
-# Copyright (c) Cassiny.io OÜ.
-import re
+import os
 from setuptools import setup, find_packages
-from pathlib import Path
 
-with (Path(__file__).parent / 'cassinyspawner' / '__init__.py').open() as fp:
-    try:
-        version = re.findall(r"^__version__ = '([^']+)'\r?$",
-                             fp.read(), re.M)[0]
-    except IndexError:
-        raise RuntimeError('Unable to determine version.')
+cur_dir = os.path.abspath(os.path.dirname(__file__))
 
-with open('./requirements/base.txt') as test_reqs_txt:
-    requirements = list(iter(test_reqs_txt))
+# Get the current package version.
+version_ns = {}
+with open(os.path.join(cur_dir, 'version.py')) as f:
+    exec(f.read(), {}, version_ns)
 
 long_description = open('README.rst').read()
 
 setup(
-    name='swarmspawner',
-    version=version,
+    name='mig-swarmspawner',
+    version=version_ns['__version__'],
     long_description=long_description,
     description="""
                 SwarmSpawner: A spawner for JupyterHub that uses Docker Swarm's services
                 """,
     url='https://github.com/rasmunk/SwarmSpawner',
     # Author details
-    author='Christian Barra',
-    author_email='info@cassiny.io',
+    author='Rasmus Munk',
+    author_email='rasmus.munk@nbi.ku.dk',
     license='BSD',
     classifiers=[
         'Development Status :: 3 - Alpha',
@@ -39,6 +34,8 @@ setup(
     ],
     keywords=['Interactive', 'Interpreter', 'Shell', 'Web'],
     packages=find_packages(exclude=['contrib', 'docs', 'tests']),
-    install_requires=requirements,
-    extras_require={},
+    install_requires=[
+        'docker==2.7.0',
+        'jupyterhub>=0.7.2'
+    ]
 )

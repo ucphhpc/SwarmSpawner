@@ -22,7 +22,7 @@ Installation
 
 .. code-block:: sh
 
-   pip install swarmspawner
+   pip install nbi-swarmspawner
 
 Installation from GitHub
 ============================
@@ -46,7 +46,7 @@ Tell JupyterHub to use SwarmSpawner by adding the following lines to your `jupyt
 
 .. code-block:: python
 
-        c.JupyterHub.spawner_class = 'cassinyspawner.SwarmSpawner'
+        c.JupyterHub.spawner_class = 'nbi.SwarmSpawner'
         c.JupyterHub.hub_ip = '0.0.0.0'
         # This should be the name of the jupyterhub service
         c.SwarmSpawner.jupyterhub_service_name = 'NameOfTheService'
@@ -249,22 +249,11 @@ You can use all the docker images inside the `Jupyter docker-stacks`_.
 
 .. _Jupyter docker-stacks: https://github.com/jupyter/docker-stacks
 
-Contributing
--------------
-If you would like to contribute to the project, please read `contributor documentation <http://jupyter.readthedocs.io/en/latest/contributor/content-contributor.html>`_.
-
-For a **development install**, clone the `repository <https://github.com/cassiny/SwarmSpawner>`_ and then install from source:
-
-.. code-block:: sh
-
-        git clone https://github.com/cassiny/SwarmSpawner
-        cd SwarmSpawner
-        pip install -r requirements/base.txt -e .
-
 
 Credit
 =======
-`DockerSpawner <https://github.com/jupyterhub/dockerspawner>`_
+`DockerSpawner <https://github.com/jupyterhub/dockerspawner>
+SwarmSpawner <https://github.com/cassinyio/SwarmSpawner>`_
 
 License
 =======

@@ -1,7 +1,7 @@
 """A simple jupyter config file for testing the spawner."""
 c = get_config()
 
-c.JupyterHub.spawner_class = 'cassinyspawner.SwarmSpawner'
+c.JupyterHub.spawner_class = 'mig.SwarmSpawner'
 c.JupyterHub.hub_ip = '0.0.0.0'
 
 # The name of the service that's running the hub

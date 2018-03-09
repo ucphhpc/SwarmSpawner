@@ -3,7 +3,7 @@ import os
 c = get_config()
 pwd = os.path.dirname(__file__)
 
-c.JupyterHub.spawner_class = 'cassinyspawner.SwarmSpawner'
+c.JupyterHub.spawner_class = 'mig.SwarmSpawner'
 c.JupyterHub.ip = '0.0.0.0'
 c.JupyterHub.hub_ip = '0.0.0.0'
 
@@ -32,14 +32,14 @@ mounts = [{'type': 'volume',
 c.SwarmSpawner.container_spec = {
     'args': ['/usr/local/bin/start-singleuser.sh'],
     # image needs to be previously pulled
-    'Image': 'nielsbohr/nbi_base_notebook',
+    'Image': 'nielsbohr/base-notebook',
     'mounts': mounts
 }
 
 # TODO -> Dynamic MOUNT-HOST naming
 # Available docker images the user can spawn
 c.SwarmSpawner.dockerimages = [
-    {'image': 'nielsbohr/nbi_base_notebook',
+    {'image': 'nielsbohr/base-notebook',
      'name': 'Image with automatic {mount_host} mount, supports Py2/3 and R'}
 ]
 

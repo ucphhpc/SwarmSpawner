@@ -3,9 +3,10 @@
 
 FROM jupyterhub/jupyterhub:0.7.2
 
-ADD cassinyspawner SwarmSpawner/cassinyspawner
+ADD mig SwarmSpawner/mig
 ADD setup.py SwarmSpawner/setup.py
 ADD requirements SwarmSpawner/requirements
+ADD version.py SwarmSpawner/version.py
 
 RUN pip install jupyterhub-dummyauthenticator \
     && pip install jhub_remote_user_auth_mig_mount

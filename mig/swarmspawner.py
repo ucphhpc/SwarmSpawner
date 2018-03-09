@@ -37,10 +37,10 @@ class SwarmSpawner(Spawner):
     Specify in the jupyterhub configuration file which are allowed:
     e.g.
 
-    c.JupyterHub.spawner_class = 'cassinyspawner.SwarmSpawner'
+    c.JupyterHub.spawner_class = 'mig.SwarmSpawner'
     # Available docker images the user can spawn
     c.SwarmSpawner.dockerimages = [
-        'nielsbohr/nbi_base_notebook'
+        'nielsbohr/base-notebook'
     ]
 
     The images must be locally available before the user can spawn them
@@ -48,7 +48,7 @@ class SwarmSpawner(Spawner):
 
     dockerimages = List(
         trait=Dict(),
-        default_value=[{'image': 'nielsbohr/nbi_base_notebook',
+        default_value=[{'image': 'nielsbohr/base-notebook',
                         'name': 'Image with default MiG Homedrive mount,'
                                 ' supports Py2/3 and R'}],
         minlen=1,

@@ -1,11 +1,9 @@
 # Configuration file for jupyterhub.
-
 import os
 
-c = get_config() # noqa
-pwd = os.path.dirname(__file__)
+c = get_config()
 
-c.JupyterHub.spawner_class = 'cassinyspawner.SwarmSpawner'
+c.JupyterHub.spawner_class = 'mig.SwarmSpawner'
 
 c.JupyterHub.ip = '0.0.0.0'
 c.JupyterHub.hub_ip = '0.0.0.0'
