@@ -19,12 +19,10 @@ def swarm():
     """Initialize the docker swarm that's going to run the servers
     as services.
     """
-    print("Enter Swarm")
     client = docker.from_env()
     client.swarm.init(advertise_addr="192.168.99.100")
     yield client.swarm.attrs
     client.swarm.leave(force=True)
-    print("Exit Swarm")
 
 
 @pytest.fixture(scope='function')
@@ -32,7 +30,6 @@ def hub_image():
     """Build the image for the jupyterhub. We'll run this as a service
     that's going to then spawn the notebook server services.
     """
-    print("Enter hub image")
     client = docker.from_env()
 
     # Build the image from the root of the package
@@ -52,7 +49,6 @@ def hub_image():
             client.images.get(image_id)
         except docker.errors.NotFound:
             removed = True
-    print("Exit hub image")
 
 
 @pytest.fixture(scope='function')
@@ -60,7 +56,6 @@ def network():
     """Create the overlay network that the hub and server services will
     use to communicate.
     """
-    print("Enter Network")
     client = docker.from_env()
     network = client.networks.create(
         name=NETWORK_NAME,
@@ -77,7 +72,6 @@ def network():
             client.networks.get(network_id)
         except docker.errors.NotFound:
             removed = True
-    print("Exit Network")
 
 
 @pytest.fixture
@@ -86,7 +80,6 @@ def hub_service(hub_image, swarm, network):
     Note that we don't directly use any of the arguments,
     but those fixtures need to be in place before we can launch the service.
     """
-    print("Enter hub_service")
     client = docker.from_env()
     config_path = os.path.join(os.path.dirname(os.path.realpath(__file__)),
                                "jupyter_config.py")
@@ -117,12 +110,10 @@ def hub_service(hub_image, swarm, network):
     service.remove()
     removed = False
     while not removed:
-        print("Removing: {}".format(service_id))
         try:
             client.services.get(service_id)
         except docker.errors.NotFound:
             removed = True
-    print("Finished hub service")
 
 
 @pytest.fixture
@@ -131,11 +122,9 @@ def mig_service(hub_image, swarm, network):
     Note that we don't directly use any of the arguments,
     but those fixtures need to be in place before we can launch the service.
     """
-    print("Enter mig service")
     client = docker.from_env()
     config_path = os.path.join(os.path.dirname(os.path.realpath(__file__)),
                                "mig_jupyter_config.py")
-    print("Creating mig service")
     service = client.services.create(
         image=HUB_IMAGE_TAG,
         name=HUB_SERVICE_NAME,
@@ -147,10 +136,8 @@ def mig_service(hub_image, swarm, network):
         endpoint_spec=docker.types.EndpointSpec(ports={8000: 8000}),
         command=["jupyterhub", "-f", "/srv/jupyterhub/jupyter_config.py"]
     )
-    print("Waiting for mig service tasks")
     while service.tasks() and \
                     service.tasks()[0]["Status"]["State"] != "running":
-        print("mig service tasks: {}".format(service.tasks()))
         time.sleep(1)
 
     # And wait some more. This is...not great, but there seems to be
@@ -169,7 +156,6 @@ def mig_service(hub_image, swarm, network):
             client.services.get(service_id)
         except docker.errors.NotFound:
             removed = True
-    print("Finished mig service")
 
 
 @pytest.fixture
@@ -177,7 +163,6 @@ def mig_mount_target(swarm, network):
     """
     Sets up the host container that the notebook containers can mount
     """
-    print("Enter mig mount target")
     client = docker.from_env()
     services = client.services.list(filters={'name': HUB_SERVICE_NAME})
     # Make sure mig sshfs plugin is installed
@@ -228,4 +213,3 @@ def mig_mount_target(swarm, network):
             client.services.get(service_id)
         except docker.errors.NotFound:
             removed = True
-    print("Finshed mig mount target")
