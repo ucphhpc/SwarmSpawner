@@ -31,6 +31,9 @@ c.SwarmSpawner.container_spec = {
     'mounts': mounts
 }
 
+# Set notebook arguments
+c.SwarmSpawner.args = ['--ip=0.0.0.0', '--port=8000', '--browser=False']
+
 c.SwarmSpawner.resource_spec = {
     # (int) – CPU limit in units of 10^9 CPU shares.
     'cpu_limit': int(1 * 1e9),

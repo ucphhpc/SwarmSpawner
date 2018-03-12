@@ -22,7 +22,7 @@ Installation
 
 .. code-block:: sh
 
-   pip install nbi-swarmspawner
+   pip install mig-swarmspawner
 
 Installation from GitHub
 ============================
@@ -46,7 +46,7 @@ Tell JupyterHub to use SwarmSpawner by adding the following lines to your `jupyt
 
 .. code-block:: python
 
-        c.JupyterHub.spawner_class = 'nbi.SwarmSpawner'
+        c.JupyterHub.spawner_class = 'mig.SwarmSpawner'
         c.JupyterHub.hub_ip = '0.0.0.0'
         # This should be the name of the jupyterhub service
         c.SwarmSpawner.jupyterhub_service_name = 'NameOfTheService'
@@ -115,8 +115,8 @@ With ``'type':'bind'`` you mount a local directory of the host inside the contai
                 'target' : 'MountPointInsideTheContainer',}]
 
 
-Mount a named volume
-----------------------
+Volumes
+-------
 With ``'type':'volume'`` you mount a Docker Volume inside the container.
 If the volume doesn't exist it will be created.
 
@@ -252,8 +252,9 @@ You can use all the docker images inside the `Jupyter docker-stacks`_.
 
 Credit
 =======
-`DockerSpawner <https://github.com/jupyterhub/dockerspawner>
-SwarmSpawner <https://github.com/cassinyio/SwarmSpawner>`_
+`DockerSpawner <https://github.com/jupyterhub/dockerspawner>`_
+`CassinyioSpawner <https://github.com/cassinyio/SwarmSpawner>`_
+
 
 License
 =======
