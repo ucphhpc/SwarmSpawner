@@ -16,8 +16,7 @@ c.SwarmSpawner.dockerimages = [
 ]
 
 c.SwarmSpawner.args = ['--ip=0.0.0.0', '--port=8000',
-                       '--browser=False',
-                       '--allow_origin=http://dag000.science']
+                       '--browser=False']
 
 c.SwarmSpawner.container_spec = {
     'args': ['/usr/local/bin/start-singleuser.sh'],

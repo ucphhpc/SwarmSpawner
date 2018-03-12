@@ -4,7 +4,6 @@ import time
 import docker
 import pytest
 import socket
-
 from docker.errors import NotFound
 
 HUB_IMAGE_TAG = "hub:test"
@@ -178,7 +177,7 @@ def mig_mount_target(swarm, network):
     assert len(services) == 1
     containers = client.containers.list(
         filters={'label':
-                     "com.docker.swarm.service.id=" + services[0].attrs['ID']})
+                 "com.docker.swarm.service.id=" + services[0].attrs['ID']})
 
     assert len(containers) == 1
     ip = containers[0].attrs['NetworkSettings']['Networks'][NETWORK_NAME][
