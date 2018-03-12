@@ -10,15 +10,18 @@ c.SwarmSpawner.jupyterhub_service_name = "jupyterhub"
 # The name of the overlay network that everything's connected to
 c.SwarmSpawner.networks = ["jh_test"]
 
-
 c.SwarmSpawner.dockerimages = [
-    {'image': 'jupyterhub/singleuser:0.8',
+    {'image': 'jupyterhub/singleuser:0.7.2',
      'name': 'Default jupyterhub singleuser notebook'}
 ]
 
+c.SwarmSpawner.args = ['--ip=0.0.0.0', '--port=8000',
+                       '--browser=False',
+                       '--allow_origin=http://dag000.science']
+
 c.SwarmSpawner.container_spec = {
     'args': ['/usr/local/bin/start-singleuser.sh'],
-    'Image': "jupyterhub/singleuser:0.8",
+    'Image': "jupyterhub/singleuser:0.7.2",
     "mounts": []
 }
 

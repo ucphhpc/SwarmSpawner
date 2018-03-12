@@ -11,23 +11,29 @@ def test_creates_service(hub_service):
     # jupyterhub service should be running at this point
     services_before_login = client.services.list()
 
-    # login
-    session = requests.session()
-    login_response = session.post(
-        "http://127.0.0.1:8000/hub/login?next=",
-        data={"username": "a-new-user",
-              "password": "just magnets"})
-    assert login_response.status_code == 200
-    # Spawn a new service
-    spawn_response = session.post("http://127.0.0.1:8000/hub/spawn")
-    assert spawn_response.status_code == 200
+    with requests.Session() as session:
+        # login
+        login_response = session.post(
+            "http://127.0.0.1:8000/hub/login?next=",
+            data={"username": "a-new-user",
+                  "password": "just magnets"})
+        assert login_response.status_code == 200
+        # Spawn a notebook
+        spawn_form_resp = session.get(jhub_url + "/hub/spawn")
+        assert spawn_form_resp.status_code == 200
+        assert 'Select a notebook image' in spawn_form_resp.text
+        payload = {
+            'dockerimage': 'jupyterhub/singleuser:0.7.2'
+        }
+        spawn_resp = session.post(jhub_url + "/hub/spawn", data=payload)
+        assert spawn_resp.status_code == 200
 
-    services_after_login = client.services.list()
-    assert len(services_after_login) - len(services_before_login) == 1
+        services_after_login = client.services.list()
+        assert len(services_after_login) - len(services_before_login) == 1
 
-    # Remove the service we just created,
-    # or we'll get errors when tearing down the fixtures
-    (set(services_after_login) - set(services_before_login)).pop().remove()
+        # Remove the service we just created,
+        # or we'll get errors when tearing down the fixtures
+        (set(services_after_login) - set(services_before_login)).pop().remove()
 
 
 def test_create_mig_service(mig_service, mig_mount_target):

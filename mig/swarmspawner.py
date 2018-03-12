@@ -40,7 +40,7 @@ class SwarmSpawner(Spawner):
     c.JupyterHub.spawner_class = 'mig.SwarmSpawner'
     # Available docker images the user can spawn
     c.SwarmSpawner.dockerimages = [
-        'nielsbohr/base-notebook'
+        'jupyterhub/singleuser:0.7.2'
     ]
 
     The images must be locally available before the user can spawn them
@@ -48,7 +48,7 @@ class SwarmSpawner(Spawner):
 
     dockerimages = List(
         trait=Dict(),
-        default_value=[{'image': 'nielsbohr/base-notebook',
+        default_value=[{'image': 'jupyterhub/singleuser:0.7.2',
                         'name': 'Image with default MiG Homedrive mount,'
                                 ' supports Py2/3 and R'}],
         minlen=1,
@@ -342,7 +342,7 @@ class SwarmSpawner(Spawner):
                 if 'driver_config' in mount \
                         and 'rasmunk/sshfs' in mount['driver_config']:
                     if not hasattr(self.user, 'mig_mount') or \
-                            self.user.mig_mount is None:
+                                    self.user.mig_mount is None:
                         self.log.error("User: {} missing mig_mount "
                                        "attribute".format(self.user))
                         raise Exception("Can't start that particular "
@@ -435,10 +435,20 @@ class SwarmSpawner(Spawner):
 
             image = container_spec['Image']
             if hasattr(self, 'args'):
+                # Combine arguments from the default setup and the once the
+                # user set through the 'SwarmSpawner.args' property
                 image_info = yield self.docker('inspect_image', image)
-                cmd = image_info['Config']['Cmd']
-                container_spec['command'] = cmd + self.get_args()
+                default_cmd = [row for row in image_info['Config']['Cmd']
+                               if '=' not in row]
+                default_args = {k: v for k, v in (row.split('=') for row in
+                                                  image_info['Config']['Cmd']
+                                                  if '=' in row)}
+                user_args = {k: v for k, v in (row.split('=') for row in
+                                               self.get_args())}
+                combined_args = [k + "=" + v for k, v in {**default_args,
+                                                          **user_args}.items()]
 
+                container_spec['command'] = default_cmd + combined_args
             del container_spec['Image']
 
             # create the service
