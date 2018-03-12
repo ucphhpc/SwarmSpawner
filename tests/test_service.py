@@ -25,16 +25,13 @@ def test_creates_service(hub_service):
     services_after_login = client.services.list()
     assert len(services_after_login) - len(services_before_login) == 1
 
-    print("Pre spawn removes")
     # Remove the service we just created,
     # or we'll get errors when tearing down the fixtures
     (set(services_after_login) - set(services_before_login)).pop().remove()
-    print("Finished creates_service")
 
 
 def test_create_mig_service(mig_service, mig_mount_target):
     """ Test that spawning a mig service works"""
-    print("Enter mig service test")
     client = docker.from_env()
     services_before_spawn = client.services.list()
 
@@ -50,11 +47,9 @@ def test_create_mig_service(mig_service, mig_mount_target):
         )
         assert login_resp.status_code == 200
 
-        print("Pre render spawn")
         spawn_form_resp = s.get(jhub_url + "/hub/spawn")
         assert spawn_form_resp.status_code == 200
         assert 'Select a notebook image' in spawn_form_resp.text
-        print("Pre Spawn")
         payload = {
             'dockerimage': 'nielsbohr/base-notebook'
         }
@@ -75,7 +70,6 @@ def test_create_mig_service(mig_service, mig_mount_target):
         # If error, check whether the images is being pulled from the repo
         # If so wait of it
         # Wait for possible image pull
-        print("Pre-responds check")
         if 'Error: HTTP 500: Internal Server Error' in spawn_resp.text:
             for service in spawned_services:
                 while service.tasks() and \
@@ -84,9 +78,7 @@ def test_create_mig_service(mig_service, mig_mount_target):
                     time.sleep(1)
                     state = service.tasks()[0]["Status"]["State"]
                     assert state != 'failed'
-                    print("Current state: {}".format(state))
 
-        print("Pre validate spawned tasks")
         # Validate the Spawned services
         for service in spawned_services:
             for task in service.tasks():
