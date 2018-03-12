@@ -1,6 +1,7 @@
+docker==2.7.0
+jupyterhub==0.7.2
 docutils
 pygments
 flake8
 requests
 pytest
-docker==2.7.0

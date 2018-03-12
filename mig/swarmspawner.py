@@ -224,6 +224,10 @@ class SwarmSpawner(Spawner):
 
         return env
 
+    def get_args(self):
+        args = super().get_args()
+        return args
+
     def _docker(self, method, *args, **kwargs):
         """wrapper for calling docker methods
 
@@ -430,6 +434,11 @@ class SwarmSpawner(Spawner):
                 placement = user_options.get('placement')
 
             image = container_spec['Image']
+            if hasattr(self, 'args'):
+                image_info = yield self.docker('inspect_image', image)
+                cmd = image_info['Config']['Cmd']
+                container_spec['command'] = cmd + self.get_args()
+
             del container_spec['Image']
 
             # create the service
