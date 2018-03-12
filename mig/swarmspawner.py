@@ -342,7 +342,7 @@ class SwarmSpawner(Spawner):
                 if 'driver_config' in mount \
                         and 'rasmunk/sshfs' in mount['driver_config']:
                     if not hasattr(self.user, 'mig_mount') or \
-                                    self.user.mig_mount is None:
+                            self.user.mig_mount is None:
                         self.log.error("User: {} missing mig_mount "
                                        "attribute".format(self.user))
                         raise Exception("Can't start that particular "
