@@ -224,7 +224,6 @@ class SwarmSpawner(Spawner):
 
         return env
 
-
     def _docker(self, method, *args, **kwargs):
         """wrapper for calling docker methods
 
