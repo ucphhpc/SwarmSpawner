@@ -4,7 +4,7 @@
 version_info = (
     0,
     0,
-    4,
+    5,
     # 'dev', # comment-out this line for a release
 )
 __version__ = '.'.join(map(str, version_info[:3]))
