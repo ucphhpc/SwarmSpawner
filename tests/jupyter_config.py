@@ -15,11 +15,8 @@ c.SwarmSpawner.dockerimages = [
      'name': 'Default jupyterhub singleuser notebook'}
 ]
 
-c.SwarmSpawner.args = ['--ip=0.0.0.0', '--port=8000',
-                       '--browser=False']
-
 c.SwarmSpawner.container_spec = {
-    'args': ['/usr/local/bin/start-singleuser.sh'],
+    'args': ['/usr/local/bin/start-singleuser.sh', '--NotebookApp.ip=0.0.0.0', '--NotebookApp.port=8888'],
     'Image': "jupyterhub/singleuser:0.7.2",
     "mounts": []
 }
