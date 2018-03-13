@@ -348,10 +348,9 @@ class SwarmSpawner(Spawner):
                                         "through the MiG interface")
                     else:
                         # Validate required dictionary keys
-                        required_keys = ['SESSIONID', 'USER_CERT',
-                                         'TARGET_MOUNT_ADDR',
-                                         'MOUNTSSHPRIVATEKEY',
-                                         'MOUNTSSHPUBLICKEY']
+                        required_keys = ['MOUNT_HOST', 'SESSION_ID',
+                                         'USER_CERT', 'TARGET_MOUNT_ADDR',
+                                         'MOUNT_SSH_PRIVATE_KEY']
                         missing_keys = [key for key in required_keys if key
                                         not in self.user.mig_mount]
                         if len(missing_keys) > 0:
@@ -394,13 +393,13 @@ class SwarmSpawner(Spawner):
                 if 'driver_config' in m:
                     if 'sshcmd' in m['driver_options']:
                         m['driver_options']['sshcmd'] \
-                            = self.user.mig_mount['SESSIONID'] \
+                            = self.user.mig_mount['SESSION_ID'] \
                             + self.user.mig_mount['TARGET_MOUNT_ADDR']
 
                     # If the id_rsa flag is present, set key
                     if 'id_rsa' in m['driver_options']:
                         m['driver_options']['id_rsa'] = self.user.mig_mount[
-                            'MOUNTSSHPRIVATEKEY']
+                            'MOUNT_SSH_PRIVATE_KEY']
 
                     m['driver_config'] = docker.types.DriverConfig(
                         name=m['driver_config'], options=m['driver_options'])
