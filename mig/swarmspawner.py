@@ -40,7 +40,9 @@ class SwarmSpawner(Spawner):
     c.JupyterHub.spawner_class = 'mig.SwarmSpawner'
     # Available docker images the user can spawn
     c.SwarmSpawner.dockerimages = [
-        'jupyterhub/singleuser:0.7.2'
+        {'image': 'jupyterhub/singleuser:0.7.2',
+        'name': 'Default jupyterhub singleuser notebook'}
+
     ]
 
     The images must be locally available before the user can spawn them
@@ -49,8 +51,7 @@ class SwarmSpawner(Spawner):
     dockerimages = List(
         trait=Dict(),
         default_value=[{'image': 'jupyterhub/singleuser:0.7.2',
-                        'name': 'Image with default MiG Homedrive mount,'
-                                ' supports Py2/3 and R'}],
+                        'name': 'Default jupyterhub singleuser notebook'}],
         minlen=1,
         config=True,
         help="Docker images that have been pre-pulled to the execution host."
@@ -71,6 +72,13 @@ class SwarmSpawner(Spawner):
     @default('options_form')
     def _options_form(self):
         """Return the form with the drop-down menu."""
+        if hasattr(self.user, 'mig_mount'):
+            for image in self.dockerimages:
+                if '{mount_host}' in image['name']:
+                    image['name'] = image['name'].replace('{mount_host}',
+                                                          self.user.mig_mount[
+                                                              'MOUNT_HOST'])
+
         options = ''.join([
             self.option_template.format(image=di['image'], name=di['name'])
             for di in self.dockerimages
