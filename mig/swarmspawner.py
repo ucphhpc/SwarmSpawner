@@ -78,7 +78,6 @@ class SwarmSpawner(Spawner):
                     image['name'] = image['name'].replace('{mount_host}',
                                                           self.user.mig_mount[
                                                               'MOUNT_HOST'])
-
         options = ''.join([
             self.option_template.format(image=di['image'], name=di['name'])
             for di in self.dockerimages
