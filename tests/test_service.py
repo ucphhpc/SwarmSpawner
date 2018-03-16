@@ -23,7 +23,7 @@ def test_creates_service(hub_service):
         assert spawn_form_resp.status_code == 200
         assert 'Select a notebook image' in spawn_form_resp.text
         payload = {
-            'dockerimage': 'jupyterhub/singleuser:0.7.2'
+            'dockerimage': 'jupyterhub/singleuser:0.8.1'
         }
         spawn_resp = session.post(jhub_url + "/hub/spawn", data=payload)
         assert spawn_resp.status_code == 200
