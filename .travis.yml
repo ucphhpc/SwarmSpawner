@@ -4,8 +4,8 @@ language: python
 python: '3.6'
 install:
 - pip install -r requirements/tests.txt
-- docker pull jupyterhub/jupyterhub:0.7.2
-- docker pull jupyterhub/singleuser:0.7.2
+- docker pull jupyterhub/jupyterhub:0.8.1
+- docker pull jupyterhub/singleuser:0.8.1
 - docker pull nielsbohr/mig-mount-dummy
 - docker pull nielsbohr/base-notebook:devel
 - docker plugin install rasmunk/sshfs --grant-all-permissions
