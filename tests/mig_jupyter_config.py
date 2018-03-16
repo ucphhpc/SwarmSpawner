@@ -32,14 +32,14 @@ mounts = [{'type': 'volume',
 c.SwarmSpawner.container_spec = {
     'args': ['/usr/local/bin/start-singleuser.sh'],
     # image needs to be previously pulled
-    'Image': 'nielsbohr/base-notebook',
+    'Image': 'nielsbohr/base-notebook:devel',
     'mounts': mounts
 }
 
 # TODO -> Dynamic MOUNT-HOST naming
 # Available docker images the user can spawn
 c.SwarmSpawner.dockerimages = [
-    {'image': 'nielsbohr/base-notebook',
+    {'image': 'nielsbohr/base-notebook:devel',
      'name': 'Image with automatic {mount_host} mount, supports Py2/3 and R'}
 ]
 

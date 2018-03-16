@@ -7,7 +7,7 @@ install:
 - docker pull jupyterhub/jupyterhub:0.7.2
 - docker pull jupyterhub/singleuser:0.7.2
 - docker pull nielsbohr/mig-mount-dummy
-- docker pull nielsbohr/base-notebook
+- docker pull nielsbohr/base-notebook:devel
 - docker plugin install rasmunk/sshfs --grant-all-permissions
 script:
 - python setup.py check -rms
