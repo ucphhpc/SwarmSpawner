@@ -36,7 +36,6 @@ c.SwarmSpawner.container_spec = {
     'mounts': mounts
 }
 
-# TODO -> Dynamic MOUNT-HOST naming
 # Available docker images the user can spawn
 c.SwarmSpawner.dockerimages = [
     {'image': 'nielsbohr/base-notebook:devel',
