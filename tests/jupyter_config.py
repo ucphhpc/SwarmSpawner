@@ -11,13 +11,13 @@ c.SwarmSpawner.jupyterhub_service_name = "jupyterhub"
 c.SwarmSpawner.networks = ["jh_test"]
 
 c.SwarmSpawner.dockerimages = [
-    {'image': 'jupyterhub/singleuser:0.8.1',
+    {'image': 'jupyter/base-notebook:30f16d52126f',
      'name': 'Default jupyterhub singleuser notebook'}
 ]
 
 c.SwarmSpawner.container_spec = {
     'args': ['/usr/local/bin/start-singleuser.sh'],
-    'Image': "jupyterhub/singleuser:0.8.1",
+    'Image': "jupyter/base-notebook:30f16d52126f",
     "mounts": []
 }
 

@@ -36,6 +36,6 @@ setup(
     packages=find_packages(exclude=['contrib', 'docs', 'tests']),
     install_requires=[
         'docker==2.7.0',
-        'jupyterhub>=0.7.2'
+        'jupyterhub>=0.8.1'
     ]
 )

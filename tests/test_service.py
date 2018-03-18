@@ -23,7 +23,7 @@ def test_creates_service(hub_service):
         assert spawn_form_resp.status_code == 200
         assert 'Select a notebook image' in spawn_form_resp.text
         payload = {
-            'dockerimage': 'jupyterhub/singleuser:0.8.1'
+            'dockerimage': 'jupyter/base-notebook:30f16d52126f'
         }
         spawn_resp = session.post(jhub_url + "/hub/spawn", data=payload)
         assert spawn_resp.status_code == 200
@@ -64,7 +64,7 @@ def test_create_mig_service(mig_service, mig_mount_target):
 
         attempts = 0
         spawned_services = set()
-        while not len(spawned_services) > 0 and attempts < 15:
+        while not len(spawned_services) > 0 and attempts < 20:
             services_after_spawn = client.services.list()
             spawned_services = (set(services_after_spawn)
                                 - set(services_before_spawn))
