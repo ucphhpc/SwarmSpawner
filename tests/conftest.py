@@ -36,11 +36,9 @@ def hub_image():
     image = client.images.build(path=parent_dir, tag=HUB_IMAGE_TAG, rm=True,
                                 pull=True)
     yield image
-    image_id = image.id
-    if type(image) == tuple:
-        client.images.remove(image[0].tags[0], force=True)
-    else:
-        client.images.remove(image.tags[0], force=True)
+    image_obj = image[0]
+    image_id = image_obj.id
+    client.images.remove(image_obj.tags[0], force=True)
 
     removed = False
     while not removed:
