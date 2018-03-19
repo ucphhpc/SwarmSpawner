@@ -35,7 +35,7 @@ setup(
     keywords=['Interactive', 'Interpreter', 'Shell', 'Web'],
     packages=find_packages(exclude=['contrib', 'docs', 'tests']),
     install_requires=[
-        'docker==2.7.0',
-        'jupyterhub==0.8.1'
+        'docker>=3.1.0',
+        'jupyterhub>=0.8.1'
     ]
 )
