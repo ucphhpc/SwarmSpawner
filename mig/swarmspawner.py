@@ -40,8 +40,8 @@ class SwarmSpawner(Spawner):
     c.JupyterHub.spawner_class = 'mig.SwarmSpawner'
     # Available docker images the user can spawn
     c.SwarmSpawner.dockerimages = [
-        {'image': 'jupyterhub/singleuser:0.7.2',
-        'name': 'Default jupyterhub singleuser notebook'}
+        {'image': 'jupyter/base-notebook:30f16d52126f',
+        'name': 'A basic jupyter notebook, supports py3'}
 
     ]
 
@@ -50,11 +50,11 @@ class SwarmSpawner(Spawner):
 
     dockerimages = List(
         trait=Dict(),
-        default_value=[{'image': 'jupyterhub/singleuser:0.7.2',
-                        'name': 'Default jupyterhub singleuser notebook'}],
+        default_value=[{'image': 'jupyter/base-notebook:30f16d52126f',
+                        'name': 'A basic jupyter notebook, supports py3'}],
         minlen=1,
         config=True,
-        help="Docker images that have been pre-pulled to the execution host."
+        help="Docker images that are available to the user of the host"
     )
 
     form_template = Unicode("""
@@ -69,13 +69,20 @@ class SwarmSpawner(Spawner):
                               help="Template for html form options.")
     _executor = None
 
+    disabled_form = Unicode()
+
     @default('options_form')
     def _options_form(self):
         """Return the form with the drop-down menu."""
+        # User options not enabled -> return default jupyterhub form
+        if not self.use_user_options:
+            return self.disabled_form
+
+        # Support the use of dynamic string replacement
         if hasattr(self.user, 'mig_mount'):
             for image in self.dockerimages:
-                if '{mount_host}' in image['name']:
-                    image['name'] = image['name'].replace('{mount_host}',
+                if '{replace_me}' in image['name']:
+                    image['name'] = image['name'].replace('{replace_me}',
                                                           self.user.mig_mount[
                                                               'MOUNT_HOST'])
         options = ''.join([
@@ -83,6 +90,23 @@ class SwarmSpawner(Spawner):
             for di in self.dockerimages
         ])
         return self.form_template.format(option_template=options)
+
+    def options_from_form(self, form_data):
+        """Parse the submitted form data and turn it into the correct
+           structures for self.user_options."""
+        # user options not enabled, just return input
+        if not self.use_user_options:
+            return form_data
+
+        default = self.dockerimages[0]
+        # formdata looks like {'dockerimage': ['jupyterhub/singleuser']}"""
+        dockerimage = form_data.get('dockerimage', [default])[0]
+
+        # Don't allow users to input their own images
+        if dockerimage not in self.dockerimages:
+            dockerimage = default
+        options = {'container_image': dockerimage}
+        return options
 
     @property
     def executor(self, max_workers=1):
@@ -316,8 +340,8 @@ class SwarmSpawner(Spawner):
         You can specify the params for the service through
         jupyterhub_config.py or using the user_options
         """
-
         self.log.info("User: {}, Start swarmspawner".format(self.user))
+
         # https://github.com/jupyterhub/jupyterhub
         # /blob/master/jupyterhub/user.py#L202
         # By default jupyterhub calls the spawner passing user_options
@@ -328,6 +352,8 @@ class SwarmSpawner(Spawner):
 
         service = yield self.get_service()
         if service is None:
+
+            # Validate State #
             if hasattr(self, 'container_spec') \
                     and self.container_spec is not None:
                 container_spec = dict(**self.container_spec)
@@ -339,13 +365,14 @@ class SwarmSpawner(Spawner):
                                 "to launch it, contact the admin to resolve "
                                 "this issue")
 
-            # If using rasmunk/sshfs mounts, ensure that the mig_mount
-            # attributes is set
-            for mount in self.container_spec['mounts']:
+            # If an image is using rasmunk/sshfs mounts
+            # ensure that the mig_mount attributes is set
+            for mount in [image['mounts'] for image in self.dockerimages
+                          if 'mounts' in image and len(image['mounts']) > 0]:
                 if 'driver_config' in mount \
                         and 'rasmunk/sshfs' in mount['driver_config']:
                     if not hasattr(self.user, 'mig_mount') or \
-                            self.user.mig_mount is None:
+                                    self.user.mig_mount is None:
                         self.log.error("User: {} missing mig_mount "
                                        "attribute".format(self.user))
                         raise Exception("Can't start that particular "
@@ -375,11 +402,26 @@ class SwarmSpawner(Spawner):
                                            .format(self.user,
                                                    self.user.mig_mount))
 
+            # Setup Service #
             container_spec.update(user_options.get('container_spec', {}))
-            # iterates over mounts to create
-            # a new mounts list of docker.types.Mount
+
+            # Which image to spawn
+            if self.use_user_options and 'container_image' in user_options \
+                    and 'image' in user_options['container_image']:
+                image = user_options['container_image']['image']
+            else:
+                image = self.dockerimages.get(de)
+
+            self.log.info("Selected image: {}".format(image))
+
             container_spec['mounts'] = []
-            for mount in self.container_spec['mounts']:
+            # Does the selected image have mounts associated
+            mounts = []
+            if 'mounts' in image:
+                mounts = image['mounts']
+
+            for mount in mounts:
+                self.log.info("mount: {}".format(mount))
                 m = dict(**mount)
 
                 # Volume name
@@ -401,7 +443,7 @@ class SwarmSpawner(Spawner):
                     if 'sshcmd' in m['driver_options']:
                         m['driver_options']['sshcmd'] \
                             = self.user.mig_mount['SESSIONID'] \
-                            + self.user.mig_mount['TARGET_MOUNT_ADDR']
+                              + self.user.mig_mount['TARGET_MOUNT_ADDR']
 
                     # If the id_rsa flag is present, set key
                     if 'id_rsa' in m['driver_options']:
@@ -435,9 +477,7 @@ class SwarmSpawner(Spawner):
             if user_options.get('placement') is not None:
                 placement = user_options.get('placement')
 
-            image = container_spec['Image']
-            del container_spec['Image']
-
+            self.log.info("Spawning image: {}".format(image))
             # create the service
             container_spec = docker.types.ContainerSpec(
                 image, **container_spec)

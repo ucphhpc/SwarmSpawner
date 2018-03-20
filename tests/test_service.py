@@ -64,7 +64,7 @@ def test_create_mig_service(mig_service, mig_mount_target):
 
         attempts = 0
         spawned_services = set()
-        while not len(spawned_services) > 0 and attempts < 20:
+        while not len(spawned_services) > 0 and attempts < 50:
             services_after_spawn = client.services.list()
             spawned_services = (set(services_after_spawn)
                                 - set(services_before_spawn))
@@ -95,3 +95,9 @@ def test_create_mig_service(mig_service, mig_mount_target):
         # Remove the services we just created,
         # or we'll get errors when tearing down the fixtures
         spawned_services.pop().remove()
+
+# TODO -> make test that validate use_user options
+
+# TODO -> make test that spawns many default images
+
+# TODO -> make test that validates different image spawn

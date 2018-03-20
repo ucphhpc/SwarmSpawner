@@ -29,17 +29,18 @@ mounts = [{'type': 'volume',
            }]
 
 # 'args' is the command to run inside the service
+# These are run inside every service
 c.SwarmSpawner.container_spec = {
-    'args': ['/usr/local/bin/start-singleuser.sh'],
-    # image needs to be previously pulled
-    'Image': 'nielsbohr/base-notebook:devel',
-    'mounts': mounts
+    'args': ['/usr/local/bin/start-singleuser.sh']
 }
 
 # Available docker images the user can spawn
 c.SwarmSpawner.dockerimages = [
+    {'image': 'jupyter/base-notebook:30f16d52126f',
+     'name': 'Default jupyterhub singleuser notebook'},
     {'image': 'nielsbohr/base-notebook:devel',
-     'name': 'Image with automatic {mount_host} mount, supports Py2/3 and R'}
+     'name': 'Image with automatic {replace_me} mount, supports Py2/3 and R,',
+     'mounts': mounts}
 ]
 
 # Authenticator -> remote user header
