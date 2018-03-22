@@ -40,8 +40,8 @@ class SwarmSpawner(Spawner):
     c.JupyterHub.spawner_class = 'mig.SwarmSpawner'
     # Available docker images the user can spawn
     c.SwarmSpawner.dockerimages = [
-        {'image': 'jupyter/base-notebook:30f16d52126f',
-        'name': 'A basic jupyter notebook, supports py3'}
+        {'image': 'jupyterhub/singleuser:0.8.1',
+        'name': 'Default jupyterhub singleuser notebook'}
 
     ]
 
@@ -50,8 +50,8 @@ class SwarmSpawner(Spawner):
 
     dockerimages = List(
         trait=Dict(),
-        default_value=[{'image': 'jupyter/base-notebook:30f16d52126f',
-                        'name': 'A basic jupyter notebook, supports py3'}],
+        default_value=[{'image': 'jupyterhub/singleuser:0.8.1',
+                        'name': 'Default jupyterhub singleuser notebook'}],
         minlen=1,
         config=True,
         help="Docker images that are available to the user of the host"
@@ -80,11 +80,11 @@ class SwarmSpawner(Spawner):
 
         # Support the use of dynamic string replacement
         if hasattr(self.user, 'mig_mount'):
-            for image in self.dockerimages:
-                if '{replace_me}' in image['name']:
-                    image['name'] = image['name'].replace('{replace_me}',
-                                                          self.user.mig_mount[
-                                                              'MOUNT_HOST'])
+            for di in self.dockerimages:
+                if '{replace_me}' in di['name']:
+                    di['name'] = di['name'].replace('{replace_me}',
+                                                    self.user.mig_mount[
+                                                        'MOUNT_HOST'])
         options = ''.join([
             self.option_template.format(image=di['image'], name=di['name'])
             for di in self.dockerimages
@@ -100,12 +100,11 @@ class SwarmSpawner(Spawner):
 
         default = self.dockerimages[0]
         # formdata looks like {'dockerimage': ['jupyterhub/singleuser']}"""
-        dockerimage = form_data.get('dockerimage', [default])[0]
-
+        image = form_data.get('dockerimage', [default])[0]
         # Don't allow users to input their own images
-        if dockerimage not in self.dockerimages:
-            dockerimage = default
-        options = {'container_image': dockerimage}
+        if image not in [image['image'] for image in self.dockerimages]:
+            image = default
+        options = {'user_selected_image': image}
         return options
 
     @property
@@ -367,58 +366,70 @@ class SwarmSpawner(Spawner):
 
             # If an image is using rasmunk/sshfs mounts
             # ensure that the mig_mount attributes is set
-            for mount in [image['mounts'] for image in self.dockerimages
-                          if 'mounts' in image and len(image['mounts']) > 0]:
-                if 'driver_config' in mount \
-                        and 'rasmunk/sshfs' in mount['driver_config']:
-                    if not hasattr(self.user, 'mig_mount') or \
-                                    self.user.mig_mount is None:
-                        self.log.error("User: {} missing mig_mount "
-                                       "attribute".format(self.user))
-                        raise Exception("Can't start that particular "
-                                        "notebook image, missing MiG mount "
-                                        "authentication keys, "
-                                        "try reinitializing them "
-                                        "through the MiG interface")
-                    else:
-                        # Validate required dictionary keys
-                        required_keys = ['MOUNT_HOST', 'SESSIONID',
-                                         'TARGET_MOUNT_ADDR',
-                                         'MOUNTSSHPRIVATEKEY']
-                        missing_keys = [key for key in required_keys if key
-                                        not in self.user.mig_mount]
-                        if len(missing_keys) > 0:
-                            self.log.error(
-                                "User: {} missing mig_mount keys: {}"
-                                    .format(self.user,
-                                            ",".join(missing_keys)))
-                            raise Exception("MiG mount keys are available but "
-                                            "missing the following items: {} "
-                                            "try reinitialize them "
-                                            "through the MiG interface"
-                                            .format(",".join(missing_keys)))
+            for image in self.dockerimages:
+                if 'mounts' not in image or len(image['mounts']) < 1:
+                    break
+
+                for mount in image['mounts']:
+                    if 'driver_config' in mount \
+                            and 'rasmunk/sshfs' in mount['driver_config']:
+                        if not hasattr(self.user, 'mig_mount') or \
+                                        self.user.mig_mount is None:
+                            self.log.error("User: {} missing mig_mount "
+                                           "attribute".format(self.user))
+                            raise Exception("Can't start that particular "
+                                            "notebook image, missing MiG mount "
+                                            "authentication keys, "
+                                            "try reinitializing them "
+                                            "through the MiG interface")
                         else:
-                            self.log.debug("User: {} mig_mount contains: {}"
-                                           .format(self.user,
-                                                   self.user.mig_mount))
+                            # Validate required dictionary keys
+                            required_keys = ['MOUNT_HOST', 'SESSIONID',
+                                             'TARGET_MOUNT_ADDR',
+                                             'MOUNTSSHPRIVATEKEY']
+                            missing_keys = [key for key in required_keys if key
+                                            not in self.user.mig_mount]
+                            if len(missing_keys) > 0:
+                                self.log.error(
+                                    "User: {} missing mig_mount keys: {}"
+                                        .format(self.user,
+                                                ",".join(missing_keys)))
+                                raise Exception("MiG mount keys are available but "
+                                                "missing the following items: {} "
+                                                "try reinitialize them "
+                                                "through the MiG interface"
+                                                .format(",".join(missing_keys)))
+                            else:
+                                self.log.debug("User: {} mig_mount contains: {}"
+                                               .format(self.user,
+                                                       self.user.mig_mount))
 
             # Setup Service #
             container_spec.update(user_options.get('container_spec', {}))
 
             # Which image to spawn
-            if self.use_user_options and 'container_image' in user_options \
-                    and 'image' in user_options['container_image']:
-                image = user_options['container_image']['image']
+            if self.use_user_options and 'user_selected_image' in user_options:
+                uimage = user_options['user_selected_image']
+                image_info = None
+                for di in self.dockerimages:
+                    if di['image'] == uimage:
+                        image_info = di
+                if image_info is None:
+                    err_msg = "User selected image: {} couldn't be found"\
+                        .format(uimage['image'])
+                    self.log.error(err_msg)
+                    raise Exception(err_msg)
             else:
-                image = self.dockerimages.get(de)
+                # Default image
+                image_info = self.dockerimages[0]
 
-            self.log.info("Selected image: {}".format(image))
+            self.log.info("Selected image info: {}".format(image_info))
 
-            container_spec['mounts'] = []
             # Does the selected image have mounts associated
+            container_spec['mounts'] = []
             mounts = []
-            if 'mounts' in image:
-                mounts = image['mounts']
+            if 'mounts' in image_info:
+                mounts = image_info['mounts']
 
             for mount in mounts:
                 self.log.info("mount: {}".format(mount))
@@ -477,6 +488,7 @@ class SwarmSpawner(Spawner):
             if user_options.get('placement') is not None:
                 placement = user_options.get('placement')
 
+            image = image_info['image']
             self.log.info("Spawning image: {}".format(image))
             # create the service
             container_spec = docker.types.ContainerSpec(

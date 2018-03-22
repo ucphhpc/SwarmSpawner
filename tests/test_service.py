@@ -93,8 +93,12 @@ def test_create_mig_service(mig_service, mig_mount_target):
                     assert mount['VolumeOptions']['DriverConfig']['Name'] \
                            == 'rasmunk/sshfs:latest'
         # Remove the services we just created,
+
         # or we'll get errors when tearing down the fixtures
+
         spawned_services.pop().remove()
+
+
 
 # TODO -> make test that validate use_user options
 
