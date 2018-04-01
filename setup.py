@@ -10,8 +10,6 @@ with open(os.path.join(cur_dir, 'version.py')) as f:
 
 long_description = open('README.rst').read()
 
-
-
 setup(
     name='mig-swarmspawner',
     version=version_ns['__version__'],

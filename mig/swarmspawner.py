@@ -374,12 +374,12 @@ class SwarmSpawner(Spawner):
                     if 'driver_config' in mount \
                             and 'rasmunk/sshfs' in mount['driver_config']:
                         if not hasattr(self.user, 'mig_mount') or \
-                                        self.user.mig_mount is None:
+                                self.user.mig_mount is None:
                             self.log.error("User: {} missing mig_mount "
                                            "attribute".format(self.user))
                             raise Exception("Can't start that particular "
-                                            "notebook image, missing MiG mount "
-                                            "authentication keys, "
+                                            "notebook image, missing MiG mount"
+                                            " authentication keys, "
                                             "try reinitializing them "
                                             "through the MiG interface")
                         else:
@@ -394,13 +394,16 @@ class SwarmSpawner(Spawner):
                                     "User: {} missing mig_mount keys: {}"
                                         .format(self.user,
                                                 ",".join(missing_keys)))
-                                raise Exception("MiG mount keys are available but "
-                                                "missing the following items: {} "
-                                                "try reinitialize them "
+                                raise Exception("MiG mount keys are available"
+                                                " but "
+                                                "missing the following items:"
+                                                " {} try reinitialize them "
                                                 "through the MiG interface"
-                                                .format(",".join(missing_keys)))
+                                                .format(",".join(missing_keys))
+                                                )
                             else:
-                                self.log.debug("User: {} mig_mount contains: {}"
+                                self.log.debug("User: {} mig_mount contains:"
+                                               " {}"
                                                .format(self.user,
                                                        self.user.mig_mount))
 
