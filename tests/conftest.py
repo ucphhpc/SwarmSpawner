@@ -188,10 +188,12 @@ def mig_mount_target(swarm, network):
         networks=[NETWORK_NAME],
         endpoint_spec=docker.types.EndpointSpec(ports={2222: 22}),
         # The mig dummy mount target needs this, because the jupyterhub
-        # service needs to know it should try sshfs mount at the host level
-        # which will pass it to the mig target, internal mount dosen't work
-        # because no fuse access without running in priviliged mode
-        env=["DOCKER_HOST=" + socket.gethostname()],
+        # service needs to know it should try sshfs mount via the host
+        # because the mig_mount target service is exposed via the host and
+        # therefore can't be reached via an internal mount.
+        # This is done to avoid running the container in privileged mode
+        # which is nessescary for fuse mount access
+        env=["DOCKER_HOST=" + "host.docker.internal"],
         args=[args]
     )
 

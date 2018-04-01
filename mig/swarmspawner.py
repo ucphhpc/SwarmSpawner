@@ -454,7 +454,7 @@ class SwarmSpawner(Spawner):
                     if 'sshcmd' in m['driver_options']:
                         m['driver_options']['sshcmd'] \
                             = self.user.mig_mount['SESSIONID'] \
-                              + self.user.mig_mount['TARGET_MOUNT_ADDR']
+                            + self.user.mig_mount['TARGET_MOUNT_ADDR']
 
                     # If the id_rsa flag is present, set key
                     if 'id_rsa' in m['driver_options']:
@@ -576,7 +576,10 @@ class SwarmSpawner(Spawner):
             self.log.warn("Docker service not found")
             return
 
-        volumes = service['Spec']['TaskTemplate']['ContainerSpec']['Mounts']
+        # lookup mounts before removing the service
+        volumes = None
+        if 'Mounts' in service['Spec']['TaskTemplate']['ContainerSpec']:
+            volumes = service['Spec']['TaskTemplate']['ContainerSpec']['Mounts']
         # Even though it returns the service is gone
         # the underlying containers are still being removed
         removed_service = yield self.docker('remove_service', service['ID'])
@@ -584,9 +587,9 @@ class SwarmSpawner(Spawner):
             self.log.info(
                 "Docker service %s (id: %s) removed",
                 self.service_name, self.service_id[:7])
-
-            for volume in volumes:
-                name = str(volume['Source'])
-                yield self.remove_volume(name=name, max_attempts=15)
+            if volumes is not None:
+                for volume in volumes:
+                    name = str(volume['Source'])
+                    yield self.remove_volume(name=name, max_attempts=15)
 
         self.clear_state()

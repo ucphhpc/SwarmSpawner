@@ -25,7 +25,7 @@ mounts = [{'type': 'volume',
                               'big_writes': '', 'allow_other': '',
                               'reconnect': '', 'port': '2222'},
            'source': 'sshvolume-user-{username}',
-           'target': '/home/jovyan/tmp'
+           'target': '/home/jovyan/work'
            }]
 
 # 'args' is the command to run inside the service
@@ -36,7 +36,7 @@ c.SwarmSpawner.container_spec = {
 
 # Before the user can select which image to spawn,
 # user_options has to be enabled
-c.SwarmSpawner.use_user_options = False
+c.SwarmSpawner.use_user_options = True
 
 # Available docker images the user can spawn
 c.SwarmSpawner.dockerimages = [

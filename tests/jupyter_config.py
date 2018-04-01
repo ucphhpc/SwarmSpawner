@@ -13,7 +13,7 @@ c.SwarmSpawner.networks = ["jh_test"]
 
 # Before the user can select which image to spawn,
 # user_options has to be enabled
-c.SwarmSpawner.use_user_options = False
+c.SwarmSpawner.use_user_options = True
 
 c.SwarmSpawner.dockerimages = [
     {'image': 'jupyterhub/singleuser:0.8.1',

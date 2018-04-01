@@ -6,7 +6,9 @@ SwarmSpawner
     :target: https://travis-ci.org/rasmunk/SwarmSpawner
 
 
-**SwarmSpawner** enables `JupyterHub <https://github.com/jupyterhub/jupyterhub>`_ to spawn single user notebook servers in Docker Services.
+**MiG SwarmSpawner** enables `JupyterHub <https://github
+.com/jupyterhub/jupyterhub>`_ to spawn jupyter notebooks that can interact
+with the MiG infrastructure.
 
 More info about Docker Services `here <https://docs.docker.com/engine/reference/commandline/service_create/>`_.
 
