@@ -174,9 +174,10 @@ def mig_mount_target(swarm, network):
             plugin.enable()
 
     assert len(services) == 1
+    service_id = services[0].id
     containers = client.containers.list(
         filters={'label':
-                 "com.docker.swarm.service.id=" + services[0].attrs['ID']})
+                 "com.docker.swarm.service.id={}".format(service_id)})
 
     assert len(containers) == 1
     ip = containers[0].attrs['NetworkSettings']['Networks'][NETWORK_NAME][
@@ -185,7 +186,6 @@ def mig_mount_target(swarm, network):
     args = "--hub-url=http://{}:8000".format(ip)
     docker_host = 'host.docker.internal'
     # default fqdn not supported on a linux host
-    print("platform: {} done".format(sys.platform))
     if sys.platform == 'linux':
         docker_host = socket.gethostname()
 
