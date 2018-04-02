@@ -179,6 +179,16 @@ def mig_mount_target(swarm, network):
         filters={'label':
                  "com.docker.swarm.service.id={}".format(service_id)})
 
+    attempts = 0
+    while not len(containers) < 1 and attempts < 50:
+        services = client.services.list(filters={'name': HUB_SERVICE_NAME})
+        assert len(services) == 1
+        service_id = services[0].id
+        containers = client.containers.list(
+            filters={'label':
+                     "com.docker.swarm.service.id={}".format(service_id)})
+        attempts += 1
+
     assert len(containers) == 1
     ip = containers[0].attrs['NetworkSettings']['Networks'][NETWORK_NAME][
         'IPAddress']
