@@ -20,7 +20,7 @@ c.SwarmSpawner.dockerimages = [
      'name': 'Default jupyterhub singleuser notebook'},
     {'image': 'jupyter/base-notebook:30f16d52126f',
      'name': 'Minimal jupyter notebook',
-     'mounts': []}
+     'mounts': []},
 ]
 
 c.SwarmSpawner.container_spec = {

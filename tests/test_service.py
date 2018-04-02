@@ -39,6 +39,10 @@ def test_creates_service(hub_service):
         # New services are there
         assert len(spawned_services) > 0
 
+        # Test home web access
+        home_resp = s.get(jhub_url + "/user/{}/tree?".format(user))
+        assert home_resp.status_code == 200
+
         # Remove via the web interface
         resp = s.delete(jhub_url + "/hub/api/users/{}/server".format(user),
                         headers={'Referer': '127.0.0.1:8000/hub/'})
@@ -107,10 +111,12 @@ def test_create_mig_service(mig_service, mig_mount_target):
                 for mount in task['Spec']['ContainerSpec']['Mounts']:
                     assert mount['VolumeOptions']['DriverConfig']['Name'] \
                            == 'rasmunk/sshfs:latest'
+
         # Remove the services we just created,
         # or we'll get errors when tearing down the fixtures
-        # TODO -> remove via web interface
         spawned_services.pop().remove()
+
+
 
 # TODO -> make test that validate use_user options
 
