@@ -42,7 +42,7 @@ def test_creates_service(hub_service):
         # Remove via the web interface
         resp = s.delete(jhub_url + "/hub/api/users/{}/server".format(user),
                         headers={'Referer': '127.0.0.1:8000/hub/'})
-        assert resp.status_code == 200
+        assert resp.status_code == 204
         # double check it is gone
         services_after_remove = client.services.list()
         assert len((set(services_before_spawn) - set(services_after_remove))) \
@@ -109,7 +109,7 @@ def test_create_mig_service(mig_service, mig_mount_target):
                            == 'rasmunk/sshfs:latest'
         # Remove the services we just created,
         # or we'll get errors when tearing down the fixtures
-        ## TODO -> remove via web interface
+        # TODO -> remove via web interface
         spawned_services.pop().remove()
 
 # TODO -> make test that validate use_user options
