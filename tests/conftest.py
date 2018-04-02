@@ -3,6 +3,7 @@ import os
 import time
 import docker
 import pytest
+import sys
 import socket
 from docker.errors import NotFound
 
@@ -182,6 +183,12 @@ def mig_mount_target(swarm, network):
         'IPAddress']
 
     args = "--hub-url=http://{}:8000".format(ip)
+    docker_host = 'host.docker.internal'
+    # default fqdn not supported on a linux host
+    print("platform: {} done".format(sys.platform))
+    if sys.platform == 'linux':
+        docker_host = socket.gethostname()
+
     service = client.services.create(
         image='nielsbohr/mig-mount-dummy',
         name='mig-dummy',
@@ -193,7 +200,7 @@ def mig_mount_target(swarm, network):
         # therefore can't be reached via an internal mount.
         # This is done to avoid running the container in privileged mode
         # which is nessescary for fuse mount access
-        env=["DOCKER_HOST=" + "host.docker.internal"],
+        env=["DOCKER_HOST=" + "{}".format(docker_host)],
         args=[args]
     )
 

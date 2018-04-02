@@ -1,6 +1,7 @@
 import docker
 import requests
 import time
+import sys
 
 jhub_url = "http://127.0.0.1:8000"
 
@@ -82,7 +83,6 @@ def test_create_mig_service(mig_service, mig_mount_target):
 
         attempts = 0
         spawned_services = set()
-        time.sleep(20)
         while not len(spawned_services) > 0 and attempts < 50:
             services_after_spawn = client.services.list()
             spawned_services = (set(services_after_spawn)
