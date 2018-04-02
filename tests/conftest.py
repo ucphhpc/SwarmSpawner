@@ -5,6 +5,7 @@ import docker
 import pytest
 import sys
 import socket
+import requests
 from docker.errors import NotFound
 
 HUB_IMAGE_TAG = "hub:test"
@@ -12,6 +13,7 @@ NETWORK_NAME = "jh_test"
 HUB_SERVICE_NAME = "jupyterhub"
 
 CONFIG_TEMPLATE_PATH = "tests/jupyter_config.j2"
+JHUB_URL = "http://127.0.0.1:8000"
 
 
 @pytest.fixture(scope='function')
@@ -101,7 +103,7 @@ def hub_service(hub_image, swarm, network):
     # connections.
     # If the test code attempts to connect to the hub during that time,
     # it fails.
-    time.sleep(10)
+    time.sleep(20)
 
     yield service
     service_id = service.id
