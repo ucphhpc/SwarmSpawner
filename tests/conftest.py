@@ -135,7 +135,7 @@ def mig_service(hub_image, swarm, network):
         command=["jupyterhub", "-f", "/srv/jupyterhub/jupyter_config.py"]
     )
     while service.tasks() and \
-                    service.tasks()[0]["Status"]["State"] != "running":
+            service.tasks()[0]["Status"]["State"] != "running":
         time.sleep(1)
 
     # And wait some more. This is...not great, but there seems to be
@@ -143,7 +143,7 @@ def mig_service(hub_image, swarm, network):
     # connections.
     # If the test code attempts to connect to the hub during that time,
     # it fails.
-    time.sleep(10)
+    time.sleep(20)
 
     yield service
     service_id = service.id
@@ -178,16 +178,6 @@ def mig_mount_target(swarm, network):
     containers = client.containers.list(
         filters={'label':
                  "com.docker.swarm.service.id={}".format(service_id)})
-
-    attempts = 0
-    while not len(containers) < 1 and attempts < 50:
-        services = client.services.list(filters={'name': HUB_SERVICE_NAME})
-        assert len(services) == 1
-        service_id = services[0].id
-        containers = client.containers.list(
-            filters={'label':
-                     "com.docker.swarm.service.id={}".format(service_id)})
-        attempts += 1
 
     assert len(containers) == 1
     ip = containers[0].attrs['NetworkSettings']['Networks'][NETWORK_NAME][
