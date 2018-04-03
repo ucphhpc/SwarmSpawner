@@ -8,16 +8,11 @@ ADD setup.py SwarmSpawner/setup.py
 ADD requirements SwarmSpawner/requirements
 ADD version.py SwarmSpawner/version.py
 
-RUN pip install jupyterhub-dummyauthenticator
-
-RUN git clone https://github.com/rasmunk/jhub_remote_user_auth_mig_mount.git --single-branch --branch devel \
-    && cd jhub_remote_user_auth_mig_mount \
-    && pip install -r requirements.txt \
-    && python setup.py install
+RUN pip install jupyterhub-dummyauthenticator \
+    jhub_remote_user_auth_mig_mount==0.0.4
 
 RUN cd SwarmSpawner \
     && pip install -r requirements/base.txt \
-    && touch README.rst \
     && python setup.py install
 
 # We'll need to mount the jupyter_config in the container when we
