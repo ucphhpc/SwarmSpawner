@@ -78,11 +78,11 @@ Container_spec__
 __ https://github.com/docker/docker-py/blob/master/docs/user_guides/swarm_services.md
 
 
-``command`` and ``args`` definitions depends on the image that you are using.
+The ``command`` and ``args`` definitions depends on the image that you are using.
 I.e the command must be possible to execute in the selected image
 The '/usr/local/bin/start-singleuser.sh' is provided by the jupyter
 `base-notebook <https://github.com/jupyter/docker-stacks/tree/master/base-notebook>`_
-The start-singleuser.sh ``args` assumes that the launched image is extended from a version of this.
+The start-singleuser.sh ``args`` assumes that the launched image is extended from a version of this.
 
 .. code-block:: python
 
