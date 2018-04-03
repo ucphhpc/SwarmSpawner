@@ -13,6 +13,7 @@ RUN pip install jupyterhub-dummyauthenticator \
 
 RUN cd SwarmSpawner \
     && pip install -r requirements/base.txt \
+    && touch README.rst \
     && python setup.py install
 
 # We'll need to mount the jupyter_config in the container when we

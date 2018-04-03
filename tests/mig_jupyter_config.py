@@ -42,7 +42,7 @@ c.SwarmSpawner.use_user_options = True
 c.SwarmSpawner.dockerimages = [
     {'image': 'jupyter/base-notebook:30f16d52126f',
      'name': 'Minimal python notebook'},
-    {'image': 'nielsbohr/base-notebook:devel',
+    {'image': 'nielsbohr/base-notebook:latest',
      'name': 'Image with automatic {replace_me} mount, supports Py2/3 and R,',
      'mounts': mounts}
 ]
