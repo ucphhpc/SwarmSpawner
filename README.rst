@@ -78,19 +78,17 @@ Container_spec__
 __ https://github.com/docker/docker-py/blob/master/docs/user_guides/swarm_services.md
 
 
-``command`` and ``args`` depends on the image that you are using.
-
-If you use one of the images from the Jupyter docker-stack you need to specify ``args`` as: ``/usr/local/bin/start-singleuser.sh``
-
-If you are using a specific image, well it's up to you to specify the right command.
+``command`` and ``args`` definitions depends on the image that you are using.
+I.e the command must be possible to execute in the selected image
+The '/usr/local/bin/start-singleuser.sh' is provided by the jupyter
+`base-notebook <https://github.com/jupyter/docker-stacks/tree/master/base-notebook>`_
+The start-singleuser.sh ``args` assumes that the launched image is extended from a version of this.
 
 .. code-block:: python
 
     c.SwarmSpawner.container_spec = {
                   # The command to run inside the service
-                  # 'args' : ['/usr/local/bin/start-singleuser.sh'], # (list)
-                  'Image' : 'YourImage',
-                  'mounts' : mounts
+                  'args' : ['/usr/local/bin/start-singleuser.sh']
           }
 
 
@@ -98,6 +96,36 @@ If you are using a specific image, well it's up to you to specify the right comm
 The notebook server command should not be the ENTRYPOINT, so generally use ``args``, not ``command``, to specify how to launch the notebook server.
 
 See this `issue <https://github.com/cassinyio/SwarmSpawner/issues/6>`_  for more info.
+
+Dockerimages
+---------------------
+
+To define which images are available to the users, a list of dockerimages must be declared
+The individual dictionaries also makes it possible to define whether the image should mount any volumes when it is spawned
+
+.. code-block:: python
+
+    # Available docker images the user can spawn
+    c.SwarmSpawner.dockerimages = [
+        {'image': 'jupyter/base-notebook:30f16d52126f',
+         'name': 'Minimal python notebook'},
+        {'image': 'nielsbohr/base-notebook:devel',
+         'name': 'Image with automatic {replace_me} mount, supports Py2/3 and R,',
+         'mounts': mounts}
+    ]
+
+
+To make the user able to select between the available images, the following must be set.
+If this is not the case, the user will simply spawn an instance of the default image. i.e. dockerimages[0]
+
+.. code-block:: python
+
+    # Before the user can select which image to spawn,
+    # user_options has to be enabled
+    c.SwarmSpawner.use_user_options = True
+
+This enables an image select form in the users /hub/home url path when a notebook hasen't been spawned already.
+
 
 Bind a Host dir
 ---------------------
@@ -151,6 +179,26 @@ Mount an anonymous volume
 
         mounts = [{'type' : 'volume',
                 'target' : 'MountPointInsideTheContainer',}]
+
+
+SSHFS mount
+----------------
+
+It is also possible to mount a volume that is an sshfs mount to another host
+supports either passing ``{id_rsa}`` or ``{password}`` that should be used to authenticate,
+in addition the typical sshfs flags are supported, defaults to port 22
+
+.. code-block:: python
+
+
+    mounts = [{'type': 'volume',
+               'driver_config': 'rasmunk/sshfs:latest',
+               'driver_options': {'sshcmd': '{sshcmd}', 'id_rsa': '{id_rsa}',
+                                  'big_writes': '', 'allow_other': '',
+                                  'reconnect': '', 'port': '2222'},
+               'source': 'sshvolume-user-{username}',
+               'target': '/home/jovyan/work'
+               }]
 
 
 Resource_spec
