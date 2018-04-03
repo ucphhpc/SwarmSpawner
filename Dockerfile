@@ -9,7 +9,7 @@ ADD requirements SwarmSpawner/requirements
 ADD version.py SwarmSpawner/version.py
 
 RUN pip install jupyterhub-dummyauthenticator \
-    jhub_remote_user_auth_mig_mount==0.0.4
+    jhub_remote_user_auth_mig_mount==0.0.5
 
 RUN cd SwarmSpawner \
     && pip install -r requirements/base.txt \
