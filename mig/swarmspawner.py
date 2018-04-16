@@ -474,7 +474,10 @@ class SwarmSpawner(Spawner):
                 container_spec['mounts'].append(docker.types.Mount(**m))
 
             # some Envs are required by the single-user-image
-            container_spec['env'] = self.get_env()
+            if 'env' in container_spec:
+                container_spec['env'].update(self.get_env())
+            else:
+                container_spec['env'] = self.get_env()
 
             # Log mounts config
             self.log.debug("User: {} container_spec mounts: {}".format(
