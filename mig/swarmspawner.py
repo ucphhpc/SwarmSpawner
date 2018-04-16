@@ -559,7 +559,6 @@ class SwarmSpawner(Spawner):
                     return False
             yield gen.sleep(1)
 
-
     @gen.coroutine
     def removed_volume(self, name):
         result = False
