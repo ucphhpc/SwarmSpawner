@@ -224,6 +224,10 @@ class SwarmSpawner(Spawner):
             state['service_id'] = self.service_id
         return state
 
+    def clear_state(self):
+        super().clear_state()
+        self.service_id = ''
+
     def _env_keep_default(self):
         """it's called in traitlets. It's a special method name.
         Don't inherit any env from the parent process"""
@@ -285,7 +289,6 @@ class SwarmSpawner(Spawner):
         running_task = None
         for task in tasks:
             task_state = task['Status']['State']
-
             if task_state == 'running':
                 self.log.debug(
                     "Task %s of Docker service %s status: %s",
@@ -507,11 +510,12 @@ class SwarmSpawner(Spawner):
                                      task_tmpl,
                                      name=self.service_name,
                                      networks=networks)
-
             self.service_id = resp['ID']
             self.log.info("Created Docker service '%s' (id: %s) from image %s"
                           " for user %s", self.service_name,
                           self.service_id[:7], image, self.user)
+
+            yield self.service_is_running()
 
         else:
             self.log.info(
@@ -535,6 +539,26 @@ class SwarmSpawner(Spawner):
         # https://docs.docker.com/engine/swarm/networking/#use-swarm-mode-service-discovery
         # service_port is actually equal to 8888
         return (ip, port)
+
+    @gen.coroutine
+    def service_is_running(self):
+        running = False
+        while not running:
+            service = yield self.get_service()
+            task_filter = {'service': service['Spec']['Name']}
+            tasks = yield self.docker(
+                'tasks', task_filter
+            )
+            for task in tasks:
+                task_state = task['Status']['State']
+                self.log.info("Waiting for service: {} current task status: {}"
+                              .format(service['ID'], task_state))
+                if task_state == 'running':
+                    running = True
+                if task_state == 'rejected':
+                    return False
+            yield gen.sleep(1)
+
 
     @gen.coroutine
     def removed_volume(self, name):
