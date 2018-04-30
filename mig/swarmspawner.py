@@ -82,6 +82,9 @@ class SwarmSpawner(Spawner):
         if hasattr(self.user, 'mig_mount'):
             for di in self.dockerimages:
                 if '{replace_me}' in di['name']:
+                    self.log.debug("Replace_me in image name")
+                    self.log.debug("MOUNT_HOST value: {}".format(
+                        self.user.mig_mount['MOUNT_HOST']))
                     di['name'] = di['name'].replace('{replace_me}',
                                                     self.user.mig_mount[
                                                         'MOUNT_HOST'])

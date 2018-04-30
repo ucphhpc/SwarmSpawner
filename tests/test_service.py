@@ -71,7 +71,7 @@ def test_create_mig_service(mig_service, mig_mount_target):
         assert login_resp.status_code == 200
 
         spawn_form_resp = s.get(jhub_url + "/hub/spawn")
-        image = 'nielsbohr/base-notebook:latest'
+        image = 'nielsbohr/base-notebook:devel'
         assert spawn_form_resp.status_code == 200
         assert 'Select a notebook image' in spawn_form_resp.text
         payload = {
