@@ -82,9 +82,6 @@ class SwarmSpawner(Spawner):
         if hasattr(self.user, 'mig_mount'):
             for di in self.dockerimages:
                 if '{replace_me}' in di['name']:
-                    self.log.debug("Replace_me in image name")
-                    self.log.debug("MOUNT_HOST value: {}".format(
-                        self.user.mig_mount['MOUNT_HOST']))
                     di['name'] = di['name'].replace('{replace_me}',
                                                     self.user.mig_mount[
                                                         'MOUNT_HOST'])
@@ -276,6 +273,78 @@ class SwarmSpawner(Spawner):
         """
         return self.executor.submit(self._docker, method, *args, **kwargs)
 
+    def validate_mount(self, mount):
+        if 'driver_config' in mount \
+                and 'rasmunk/sshfs' in mount['driver_config']:
+            if not hasattr(self.user, 'mig_mount') or \
+                    self.user.mig_mount is None:
+                self.log.error("User: {} missing mig_mount "
+                               "attribute".format(self.user))
+                raise Exception("Can't start that particular "
+                                "notebook image, missing MiG mount"
+                                " authentication keys, "
+                                "try reinitializing them "
+                                "through the MiG interface")
+            else:
+                # Validate required dictionary keys
+                required_keys = ['MOUNT_HOST', 'SESSIONID',
+                                 'TARGET_MOUNT_ADDR',
+                                 'MOUNTSSHPRIVATEKEY']
+                missing_keys = [key for key in required_keys if
+                                key
+                                not in self.user.mig_mount]
+                if len(missing_keys) > 0:
+                    self.log.error(
+                        "User: {} missing mig_mount keys: {}"
+                            .format(self.user,
+                                    ",".join(missing_keys)))
+                    raise Exception(
+                        "MiG mount keys are available"
+                        " but "
+                        "missing the following items:"
+                        " {} try reinitialize them "
+                        "through the MiG interface"
+                        .format(",".join(missing_keys))
+                    )
+                else:
+                    self.log.debug(
+                        "User: {} mig_mount contains:"
+                        " {}"
+                            .format(self.user,
+                                    self.user.mig_mount))
+
+    def init_mount(self, mount):
+        # Volume name
+        if 'source' in mount:
+            mount['source'] = mount['source'].format(
+                username=self.service_owner)
+            self.log.info("Volume name: " + mount['source'])
+
+            # If a previous user volume is present, remove it
+            try:
+                yield self.docker('inspect_volume', m['source'])
+            except docker.errors.NotFound:
+                self.log.info("No volume named: " + m['source'])
+            else:
+                yield self.remove_volume(m['source'])
+
+        # Custom volume
+        if 'driver_config' in mount:
+            if 'sshcmd' in mount['driver_options']:
+                mount['driver_options']['sshcmd'] \
+                    = self.user.mig_mount['SESSIONID'] \
+                    + self.user.mig_mount['TARGET_MOUNT_ADDR']
+
+            # If the id_rsa flag is present, set key
+            if 'id_rsa' in mount['driver_options']:
+                mount['driver_options']['id_rsa'] = self.user.mig_mount[
+                    'MOUNTSSHPRIVATEKEY']
+
+                mount['driver_config'] = docker.types.DriverConfig(
+                    name=mount['driver_config'],
+                    options=mount['driver_options'])
+            del mount['driver_options']
+
     @gen.coroutine
     def poll(self):
         """Check for a task state like `docker service ps id`"""
@@ -370,49 +439,6 @@ class SwarmSpawner(Spawner):
                                 "to launch it, contact the admin to resolve "
                                 "this issue")
 
-            # If an image is using rasmunk/sshfs mounts
-            # ensure that the mig_mount attributes is set
-            for image in self.dockerimages:
-                if 'mounts' not in image or len(image['mounts']) < 1:
-                    break
-
-                for mount in image['mounts']:
-                    if 'driver_config' in mount \
-                            and 'rasmunk/sshfs' in mount['driver_config']:
-                        if not hasattr(self.user, 'mig_mount') or \
-                                self.user.mig_mount is None:
-                            self.log.error("User: {} missing mig_mount "
-                                           "attribute".format(self.user))
-                            raise Exception("Can't start that particular "
-                                            "notebook image, missing MiG mount"
-                                            " authentication keys, "
-                                            "try reinitializing them "
-                                            "through the MiG interface")
-                        else:
-                            # Validate required dictionary keys
-                            required_keys = ['MOUNT_HOST', 'SESSIONID',
-                                             'TARGET_MOUNT_ADDR',
-                                             'MOUNTSSHPRIVATEKEY']
-                            missing_keys = [key for key in required_keys if key
-                                            not in self.user.mig_mount]
-                            if len(missing_keys) > 0:
-                                self.log.error(
-                                    "User: {} missing mig_mount keys: {}"
-                                        .format(self.user,
-                                                ",".join(missing_keys)))
-                                raise Exception("MiG mount keys are available"
-                                                " but "
-                                                "missing the following items:"
-                                                " {} try reinitialize them "
-                                                "through the MiG interface"
-                                                .format(",".join(missing_keys))
-                                                )
-                            else:
-                                self.log.debug("User: {} mig_mount contains:"
-                                               " {}"
-                                               .format(self.user,
-                                                       self.user.mig_mount))
-
             # Setup Service #
             container_spec.update(user_options.get('container_spec', {}))
 
@@ -424,7 +450,7 @@ class SwarmSpawner(Spawner):
                     if di['image'] == uimage:
                         image_info = di
                 if image_info is None:
-                    err_msg = "User selected image: {} couldn't be found"\
+                    err_msg = "User selected image: {} couldn't be found" \
                         .format(uimage['image'])
                     self.log.error(err_msg)
                     raise Exception(err_msg)
@@ -443,37 +469,8 @@ class SwarmSpawner(Spawner):
             for mount in mounts:
                 self.log.info("mount: {}".format(mount))
                 m = dict(**mount)
-
-                # Volume name
-                if 'source' in m:
-                    m['source'] = m['source'].format(
-                        username=self.service_owner)
-                    self.log.info("Volume name: " + m['source'])
-
-                    # If a previous user volume is present, remove it
-                    try:
-                        yield self.docker('inspect_volume', m['source'])
-                    except docker.errors.NotFound:
-                        self.log.info("No volume named: " + m['source'])
-                    else:
-                        yield self.remove_volume(m['source'])
-
-                # Custom volume
-                if 'driver_config' in m:
-                    if 'sshcmd' in m['driver_options']:
-                        m['driver_options']['sshcmd'] \
-                            = self.user.mig_mount['SESSIONID'] \
-                            + self.user.mig_mount['TARGET_MOUNT_ADDR']
-
-                    # If the id_rsa flag is present, set key
-                    if 'id_rsa' in m['driver_options']:
-                        m['driver_options']['id_rsa'] = self.user.mig_mount[
-                            'MOUNTSSHPRIVATEKEY']
-
-                    m['driver_config'] = docker.types.DriverConfig(
-                        name=m['driver_config'], options=m['driver_options'])
-                    del m['driver_options']
-
+                self.validate_mount(m)
+                self.init_mount(m)
                 container_spec['mounts'].append(docker.types.Mount(**m))
 
             # some Envs are required by the single-user-image
@@ -611,7 +608,8 @@ class SwarmSpawner(Spawner):
         # lookup mounts before removing the service
         volumes = None
         if 'Mounts' in service['Spec']['TaskTemplate']['ContainerSpec']:
-            volumes = service['Spec']['TaskTemplate']['ContainerSpec']['Mounts']
+            volumes = service['Spec']['TaskTemplate']['ContainerSpec'][
+                'Mounts']
         # Even though it returns the service is gone
         # the underlying containers are still being removed
         removed_service = yield self.docker('remove_service', service['ID'])
