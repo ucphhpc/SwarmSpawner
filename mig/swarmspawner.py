@@ -274,6 +274,7 @@ class SwarmSpawner(Spawner):
         return self.executor.submit(self._docker, method, *args, **kwargs)
 
     def validate_mount(self, mount):
+        self.log.info("validate_mount: {}".format(mount))
         if 'driver_config' in mount \
                 and 'rasmunk/sshfs' in mount['driver_config']:
             if not hasattr(self.user, 'mig_mount') or \
@@ -314,6 +315,7 @@ class SwarmSpawner(Spawner):
                                     self.user.mig_mount))
 
     def init_mount(self, mount):
+        self.log.info("init_mount: {}".format(mount))
         # Volume name
         if 'source' in mount:
             mount['source'] = mount['source'].format(
@@ -322,9 +324,9 @@ class SwarmSpawner(Spawner):
 
             # If a previous user volume is present, remove it
             try:
-                yield self.docker('inspect_volume', m['source'])
+                yield self.docker('inspect_volume', mount['source'])
             except docker.errors.NotFound:
-                self.log.info("No volume named: " + m['source'])
+                self.log.info("No volume named: " + mount['source'])
             else:
                 yield self.remove_volume(m['source'])
 
