@@ -273,8 +273,8 @@ class SwarmSpawner(Spawner):
         """
         return self.executor.submit(self._docker, method, *args, **kwargs)
 
+    @gen.coroutine
     def validate_mount(self, mount):
-        self.log.info("validate_mount: {}".format(mount))
         if 'driver_config' in mount \
                 and 'rasmunk/sshfs' in mount['driver_config']:
             if not hasattr(self.user, 'mig_mount') or \
@@ -282,10 +282,10 @@ class SwarmSpawner(Spawner):
                 self.log.error("User: {} missing mig_mount "
                                "attribute".format(self.user))
                 raise Exception("Can't start that particular "
-                                "notebook image, missing MiG mount"
+                                "notebook image, missing mount"
                                 " authentication keys, "
-                                "try reinitializing them "
-                                "through the MiG interface")
+                                "try reinitializing them through the access "
+                                "gateway again")
             else:
                 # Validate required dictionary keys
                 required_keys = ['MOUNT_HOST', 'SESSIONID',
@@ -300,11 +300,11 @@ class SwarmSpawner(Spawner):
                             .format(self.user,
                                     ",".join(missing_keys)))
                     raise Exception(
-                        "MiG mount keys are available"
+                        "Mount keys are available"
                         " but "
                         "missing the following items:"
                         " {} try reinitialize them "
-                        "through the MiG interface"
+                        "through the access interface"
                         .format(",".join(missing_keys))
                     )
                 else:
@@ -314,6 +314,7 @@ class SwarmSpawner(Spawner):
                             .format(self.user,
                                     self.user.mig_mount))
 
+    @gen.coroutine
     def init_mount(self, mount):
         self.log.info("init_mount: {}".format(mount))
         # Volume name
@@ -328,7 +329,7 @@ class SwarmSpawner(Spawner):
             except docker.errors.NotFound:
                 self.log.info("No volume named: " + mount['source'])
             else:
-                yield self.remove_volume(m['source'])
+                yield self.remove_volume(mount['source'])
 
         # Custom volume
         if 'driver_config' in mount:
@@ -342,10 +343,11 @@ class SwarmSpawner(Spawner):
                 mount['driver_options']['id_rsa'] = self.user.mig_mount[
                     'MOUNTSSHPRIVATEKEY']
 
-                mount['driver_config'] = docker.types.DriverConfig(
-                    name=mount['driver_config'],
-                    options=mount['driver_options'])
+            mount['driver_config'] = docker.types.DriverConfig(
+                name=mount['driver_config'],
+                options=mount['driver_options'])
             del mount['driver_options']
+        self.log.info("End of init mount: {}".format(mount))
 
     @gen.coroutine
     def poll(self):
@@ -471,8 +473,9 @@ class SwarmSpawner(Spawner):
             for mount in mounts:
                 self.log.info("mount: {}".format(mount))
                 m = dict(**mount)
-                self.validate_mount(m)
-                self.init_mount(m)
+                yield self.validate_mount(m)
+                yield self.init_mount(m)
+                self.log.info("Before append: {}".format(m))
                 container_spec['mounts'].append(docker.types.Mount(**m))
 
             # some Envs are required by the single-user-image
@@ -511,6 +514,7 @@ class SwarmSpawner(Spawner):
                          'placement': placement
                          }
             task_tmpl = docker.types.TaskTemplate(**task_spec)
+            self.log.info("task temp: {}".format(task_tmpl))
             resp = yield self.docker('create_service',
                                      task_tmpl,
                                      name=self.service_name,
