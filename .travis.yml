@@ -26,3 +26,5 @@ deploy:
   on:
     tags: true
     branch: master
+notifications: 
+  slack: raz-s:se1PurXsQJv03nBZa9XWMOOS
