@@ -593,6 +593,9 @@ class SwarmSpawner(Spawner):
             if volumes is not None:
                 for volume in volumes:
                     name = str(volume['Source'])
+                    labels = volume.get('Labels', {})
+                    if 'mig.SwarmSpawner.keep' in labels:
+                        continue
                     yield self.remove_volume(name=name, max_attempts=15)
 
         self.clear_state()
