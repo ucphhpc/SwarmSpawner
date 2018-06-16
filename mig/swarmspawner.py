@@ -224,6 +224,10 @@ class SwarmSpawner(Spawner):
             state['service_id'] = self.service_id
         return state
 
+    def clear_state(self):
+        super().clear_state()
+        self.service_id = ''
+
     def _env_keep_default(self):
         """it's called in traitlets. It's a special method name.
         Don't inherit any env from the parent process"""
@@ -270,6 +274,82 @@ class SwarmSpawner(Spawner):
         return self.executor.submit(self._docker, method, *args, **kwargs)
 
     @gen.coroutine
+    def validate_mount(self, mount):
+        if 'driver_config' in mount \
+                and 'rasmunk/sshfs' in mount['driver_config']:
+            if not hasattr(self.user, 'mig_mount') or \
+                    self.user.mig_mount is None:
+                self.log.error("User: {} missing mig_mount "
+                               "attribute".format(self.user))
+                raise Exception("Can't start that particular "
+                                "notebook image, missing mount"
+                                " authentication keys, "
+                                "try reinitializing them through the access "
+                                "gateway again")
+            else:
+                # Validate required dictionary keys
+                required_keys = ['MOUNT_HOST', 'SESSIONID',
+                                 'TARGET_MOUNT_ADDR',
+                                 'MOUNTSSHPRIVATEKEY']
+                missing_keys = [key for key in required_keys if
+                                key
+                                not in self.user.mig_mount]
+                if len(missing_keys) > 0:
+                    self.log.error(
+                        "User: {} missing mig_mount keys: {}"
+                            .format(self.user,
+                                    ",".join(missing_keys)))
+                    raise Exception(
+                        "Mount keys are available"
+                        " but "
+                        "missing the following items:"
+                        " {} try reinitialize them "
+                        "through the access interface"
+                        .format(",".join(missing_keys))
+                    )
+                else:
+                    self.log.debug(
+                        "User: {} mig_mount contains:"
+                        " {}"
+                            .format(self.user,
+                                    self.user.mig_mount))
+
+    @gen.coroutine
+    def init_mount(self, mount):
+        self.log.info("init_mount: {}".format(mount))
+        # Volume name
+        if 'source' in mount:
+            mount['source'] = mount['source'].format(
+                username=self.service_owner)
+            self.log.info("Volume name: " + mount['source'])
+
+            # If a previous user volume is present, remove it
+            try:
+                yield self.docker('inspect_volume', mount['source'])
+            except docker.errors.NotFound:
+                self.log.info("No volume named: " + mount['source'])
+            else:
+                yield self.remove_volume(mount['source'])
+
+        # Custom volume
+        if 'driver_config' in mount:
+            if 'sshcmd' in mount['driver_options']:
+                mount['driver_options']['sshcmd'] \
+                    = self.user.mig_mount['SESSIONID'] \
+                    + self.user.mig_mount['TARGET_MOUNT_ADDR']
+
+            # If the id_rsa flag is present, set key
+            if 'id_rsa' in mount['driver_options']:
+                mount['driver_options']['id_rsa'] = self.user.mig_mount[
+                    'MOUNTSSHPRIVATEKEY']
+
+            mount['driver_config'] = docker.types.DriverConfig(
+                name=mount['driver_config'],
+                options=mount['driver_options'])
+            del mount['driver_options']
+        self.log.info("End of init mount: {}".format(mount))
+
+    @gen.coroutine
     def poll(self):
         """Check for a task state like `docker service ps id`"""
         service = yield self.get_service()
@@ -285,7 +365,6 @@ class SwarmSpawner(Spawner):
         running_task = None
         for task in tasks:
             task_state = task['Status']['State']
-
             if task_state == 'running':
                 self.log.debug(
                     "Task %s of Docker service %s status: %s",
@@ -364,49 +443,6 @@ class SwarmSpawner(Spawner):
                                 "to launch it, contact the admin to resolve "
                                 "this issue")
 
-            # If an image is using rasmunk/sshfs mounts
-            # ensure that the mig_mount attributes is set
-            for image in self.dockerimages:
-                if 'mounts' not in image or len(image['mounts']) < 1:
-                    break
-
-                for mount in image['mounts']:
-                    if 'driver_config' in mount \
-                            and 'rasmunk/sshfs' in mount['driver_config']:
-                        if not hasattr(self.user, 'mig_mount') or \
-                                self.user.mig_mount is None:
-                            self.log.error("User: {} missing mig_mount "
-                                           "attribute".format(self.user))
-                            raise Exception("Can't start that particular "
-                                            "notebook image, missing MiG mount"
-                                            " authentication keys, "
-                                            "try reinitializing them "
-                                            "through the MiG interface")
-                        else:
-                            # Validate required dictionary keys
-                            required_keys = ['MOUNT_HOST', 'SESSIONID',
-                                             'TARGET_MOUNT_ADDR',
-                                             'MOUNTSSHPRIVATEKEY']
-                            missing_keys = [key for key in required_keys if key
-                                            not in self.user.mig_mount]
-                            if len(missing_keys) > 0:
-                                self.log.error(
-                                    "User: {} missing mig_mount keys: {}"
-                                        .format(self.user,
-                                                ",".join(missing_keys)))
-                                raise Exception("MiG mount keys are available"
-                                                " but "
-                                                "missing the following items:"
-                                                " {} try reinitialize them "
-                                                "through the MiG interface"
-                                                .format(",".join(missing_keys))
-                                                )
-                            else:
-                                self.log.debug("User: {} mig_mount contains:"
-                                               " {}"
-                                               .format(self.user,
-                                                       self.user.mig_mount))
-
             # Setup Service #
             container_spec.update(user_options.get('container_spec', {}))
 
@@ -418,7 +454,7 @@ class SwarmSpawner(Spawner):
                     if di['image'] == uimage:
                         image_info = di
                 if image_info is None:
-                    err_msg = "User selected image: {} couldn't be found"\
+                    err_msg = "User selected image: {} couldn't be found" \
                         .format(uimage['image'])
                     self.log.error(err_msg)
                     raise Exception(err_msg)
@@ -437,41 +473,16 @@ class SwarmSpawner(Spawner):
             for mount in mounts:
                 self.log.info("mount: {}".format(mount))
                 m = dict(**mount)
-
-                # Volume name
-                if 'source' in m:
-                    m['source'] = m['source'].format(
-                        username=self.service_owner)
-                    self.log.info("Volume name: " + m['source'])
-
-                    # If a previous user volume is present, remove it
-                    try:
-                        yield self.docker('inspect_volume', m['source'])
-                    except docker.errors.NotFound:
-                        self.log.info("No volume named: " + m['source'])
-                    else:
-                        yield self.remove_volume(m['source'])
-
-                # Custom volume
-                if 'driver_config' in m:
-                    if 'sshcmd' in m['driver_options']:
-                        m['driver_options']['sshcmd'] \
-                            = self.user.mig_mount['SESSIONID'] \
-                            + self.user.mig_mount['TARGET_MOUNT_ADDR']
-
-                    # If the id_rsa flag is present, set key
-                    if 'id_rsa' in m['driver_options']:
-                        m['driver_options']['id_rsa'] = self.user.mig_mount[
-                            'MOUNTSSHPRIVATEKEY']
-
-                    m['driver_config'] = docker.types.DriverConfig(
-                        name=m['driver_config'], options=m['driver_options'])
-                    del m['driver_options']
-
+                yield self.validate_mount(m)
+                yield self.init_mount(m)
+                self.log.info("Before append: {}".format(m))
                 container_spec['mounts'].append(docker.types.Mount(**m))
 
             # some Envs are required by the single-user-image
-            container_spec['env'] = self.get_env()
+            if 'env' in container_spec:
+                container_spec['env'].update(self.get_env())
+            else:
+                container_spec['env'] = self.get_env()
 
             # Log mounts config
             self.log.debug("User: {} container_spec mounts: {}".format(
@@ -503,15 +514,17 @@ class SwarmSpawner(Spawner):
                          'placement': placement
                          }
             task_tmpl = docker.types.TaskTemplate(**task_spec)
+            self.log.info("task temp: {}".format(task_tmpl))
             resp = yield self.docker('create_service',
                                      task_tmpl,
                                      name=self.service_name,
                                      networks=networks)
-
             self.service_id = resp['ID']
             self.log.info("Created Docker service '%s' (id: %s) from image %s"
                           " for user %s", self.service_name,
                           self.service_id[:7], image, self.user)
+
+            yield self.service_is_running()
 
         else:
             self.log.info(
@@ -535,6 +548,25 @@ class SwarmSpawner(Spawner):
         # https://docs.docker.com/engine/swarm/networking/#use-swarm-mode-service-discovery
         # service_port is actually equal to 8888
         return (ip, port)
+
+    @gen.coroutine
+    def service_is_running(self):
+        running = False
+        while not running:
+            service = yield self.get_service()
+            task_filter = {'service': service['Spec']['Name']}
+            tasks = yield self.docker(
+                'tasks', task_filter
+            )
+            for task in tasks:
+                task_state = task['Status']['State']
+                self.log.info("Waiting for service: {} current task status: {}"
+                              .format(service['ID'], task_state))
+                if task_state == 'running':
+                    running = True
+                if task_state == 'rejected':
+                    return False
+            yield gen.sleep(1)
 
     @gen.coroutine
     def removed_volume(self, name):
@@ -582,7 +614,8 @@ class SwarmSpawner(Spawner):
         # lookup mounts before removing the service
         volumes = None
         if 'Mounts' in service['Spec']['TaskTemplate']['ContainerSpec']:
-            volumes = service['Spec']['TaskTemplate']['ContainerSpec']['Mounts']
+            volumes = service['Spec']['TaskTemplate']['ContainerSpec'][
+                'Mounts']
         # Even though it returns the service is gone
         # the underlying containers are still being removed
         removed_service = yield self.docker('remove_service', service['ID'])
