@@ -79,12 +79,12 @@ class SwarmSpawner(Spawner):
             return self.disabled_form
 
         # Support the use of dynamic string replacement
-        if hasattr(self.user, 'mig_mount'):
+        if hasattr(self.user, 'mount'):
             for di in self.dockerimages:
                 if '{replace_me}' in di['name']:
                     di['name'] = di['name'].replace('{replace_me}',
-                                                    self.user.mig_mount[
-                                                        'MOUNT_HOST'])
+                                                    self.user.mount[
+                                                        'HOST'])
         options = ''.join([
             self.option_template.format(image=di['image'], name=di['name'])
             for di in self.dockerimages
@@ -277,9 +277,9 @@ class SwarmSpawner(Spawner):
     def validate_mount(self, mount):
         if 'driver_config' in mount \
                 and 'rasmunk/sshfs' in mount['driver_config']:
-            if not hasattr(self.user, 'mig_mount') or \
-                    self.user.mig_mount is None:
-                self.log.error("User: {} missing mig_mount "
+            if not hasattr(self.user, 'mount') or \
+                    self.user.mount is None:
+                self.log.error("User: {} missing mount "
                                "attribute".format(self.user))
                 raise Exception("Can't start that particular "
                                 "notebook image, missing mount"
@@ -288,15 +288,13 @@ class SwarmSpawner(Spawner):
                                 "gateway again")
             else:
                 # Validate required dictionary keys
-                required_keys = ['MOUNT_HOST', 'SESSIONID',
-                                 'TARGET_MOUNT_ADDR',
-                                 'MOUNTSSHPRIVATEKEY']
+                required_keys = ['HOST', 'USER',
+                                 'PATH', 'PRIVATEKEY']
                 missing_keys = [key for key in required_keys if
-                                key
-                                not in self.user.mig_mount]
+                                key not in self.user.mount]
                 if len(missing_keys) > 0:
                     self.log.error(
-                        "User: {} missing mig_mount keys: {}"
+                        "User: {} missing mount keys: {}"
                             .format(self.user,
                                     ",".join(missing_keys)))
                     raise Exception(
@@ -305,14 +303,14 @@ class SwarmSpawner(Spawner):
                         "missing the following items:"
                         " {} try reinitialize them "
                         "through the access interface"
-                        .format(",".join(missing_keys))
+                            .format(",".join(missing_keys))
                     )
                 else:
                     self.log.debug(
-                        "User: {} mig_mount contains:"
+                        "User: {} mount contains:"
                         " {}"
                             .format(self.user,
-                                    self.user.mig_mount))
+                                    self.user.mount))
 
     @gen.coroutine
     def init_mount(self, mount):
@@ -335,13 +333,13 @@ class SwarmSpawner(Spawner):
         if 'driver_config' in mount:
             if 'sshcmd' in mount['driver_options']:
                 mount['driver_options']['sshcmd'] \
-                    = self.user.mig_mount['SESSIONID'] \
-                    + self.user.mig_mount['TARGET_MOUNT_ADDR']
+                    = self.user.mount['USER'] \
+                    + self.user.mount['PATH']
 
             # If the id_rsa flag is present, set key
             if 'id_rsa' in mount['driver_options']:
-                mount['driver_options']['id_rsa'] = self.user.mig_mount[
-                    'MOUNTSSHPRIVATEKEY']
+                mount['driver_options']['id_rsa'] = self.user.mount[
+                    'PRIVATEKEY']
 
             mount['driver_config'] = docker.types.DriverConfig(
                 name=mount['driver_config'],
