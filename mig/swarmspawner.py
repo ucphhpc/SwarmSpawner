@@ -303,7 +303,7 @@ class SwarmSpawner(Spawner):
                         "missing the following items:"
                         " {} try reinitialize them "
                         "through the access interface"
-                            .format(",".join(missing_keys))
+                        .format(",".join(missing_keys))
                     )
                 else:
                     self.log.debug(

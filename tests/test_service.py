@@ -20,7 +20,6 @@ network_config = {'name': NETWORK_NAME, 'driver': 'overlay',
                   'options': {'subnet': '192.168.0.0/20'},
                   'attachable': True}
 hub_config = join(dirname(realpath(__file__)), "jupyterhub_config.py")
-
 hub_service = {'image': HUB_IMAGE_TAG, 'name': HUB_SERVICE_NAME,
                'mounts': [
                    ':'.join(['/var/run/docker.sock', '/var/run/docker.sock', 'rw']),
@@ -29,7 +28,6 @@ hub_service = {'image': HUB_IMAGE_TAG, 'name': HUB_SERVICE_NAME,
                'networks': [NETWORK_NAME],
                'endpoint_spec': docker.types.EndpointSpec(ports={8000: 8000}),
                'command': ['jupyterhub', '-f', '/etc/jupyterhub/jupyterhub_config.py']}
-
 
 @pytest.mark.parametrize('image', [hub_image], indirect=['image'])
 @pytest.mark.parametrize('swarm', [swarm_config], indirect=['swarm'])
@@ -97,9 +95,26 @@ def test_creates_service(image, swarm, network, make_service):
         assert len((set(services_before_spawn) - set(services_after_remove))) \
             == 0
 
-
-# def test_create_mig_service(mig_service):
+# hub_config = join(dirname(realpath(__file__)), "mount_jupyterhub_config.py")
+# hub_sshfs_service = {'image': HUB_IMAGE_TAG, 'name': HUB_SERVICE_NAME,
+#                      'mounts': [
+#                          ':'.join(['/var/run/docker.sock', '/var/run/docker.sock', 'rw']),
+#                          ':'.join([hub_config, '/etc/jupyterhub/jupyterhub_config.py',
+#                                    'ro'])
+#                      ],
+#                      'networks': [NETWORK_NAME],
+#                      'endpoint_spec': docker.types.EndpointSpec(ports={8000: 8000}),
+#                      'command': ['jupyterhub', '-f',
+#                                  '/etc/jupyterhub/jupyterhub_config.py']}
+#
+#
+# @pytest.mark.parametrize('image', [hub_image], indirect=['image'])
+# @pytest.mark.parametrize('swarm', [swarm_config], indirect=['swarm'])
+# @pytest.mark.parametrize('network', [network_config], indirect=['network'])
+# def test_create_mig_service(image, swarm, network, make_service):
 #     """ Test that spawning a mig service works"""
+#
+#     make_service(hub_sshfs_service)
 #     client = docker.from_env()
 #     services_before_spawn = client.services.list()
 #
