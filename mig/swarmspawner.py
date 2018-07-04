@@ -193,7 +193,13 @@ class SwarmSpawner(Spawner):
         if self._service_owner is None:
             m = hashlib.md5()
             m.update(self.user.name.encode('utf-8'))
-            self._service_owner = m.hexdigest()
+            if hasattr(self.user, 'real_name'):
+                # Maximum 63 characters, 10 are comes from the underlying format
+                # i.e. prefix=jupyter-, postfix=-1
+                # get up to last 40 characters as service identifier
+                self._service_owner = self.user.real_name[-39:]
+            else:
+                self._service_owner = m.hexdigest()
         return self._service_owner
 
     @property
@@ -282,13 +288,11 @@ class SwarmSpawner(Spawner):
                 self.log.error("User: {} missing mount "
                                "attribute".format(self.user))
                 raise Exception("Can't start that particular "
-                                "notebook image, missing mount"
-                                " authentication keys, "
-                                "try reinitializing them through the access "
-                                "gateway again")
+                                "notebook image, missing mount values, try "
+                                "reinitializing them through the access gateway again")
             else:
                 # Validate required dictionary keys
-                required_keys = ['HOST', 'USER',
+                required_keys = ['HOST', 'USERNAME',
                                  'PATH', 'PRIVATEKEY']
                 missing_keys = [key for key in required_keys if
                                 key not in self.user.mount]
@@ -308,18 +312,16 @@ class SwarmSpawner(Spawner):
                 else:
                     self.log.debug(
                         "User: {} mount contains:"
-                        " {}"
-                            .format(self.user,
-                                    self.user.mount))
+                        " {}".format(self.user,
+                                     self.user.mount))
 
     @gen.coroutine
     def init_mount(self, mount):
-        self.log.info("init_mount: {}".format(mount))
+        self.log.debug("init_mount: {}".format(mount))
         # Volume name
         if 'source' in mount:
             mount['source'] = mount['source'].format(
                 username=self.service_owner)
-            self.log.info("Volume name: " + mount['source'])
 
             # If a previous user volume is present, remove it
             try:
@@ -333,7 +335,7 @@ class SwarmSpawner(Spawner):
         if 'driver_config' in mount:
             if 'sshcmd' in mount['driver_options']:
                 mount['driver_options']['sshcmd'] \
-                    = self.user.mount['USER'] \
+                    = self.user.mount['USERNAME'] \
                     + self.user.mount['PATH']
 
             # If the id_rsa flag is present, set key
@@ -345,7 +347,7 @@ class SwarmSpawner(Spawner):
                 name=mount['driver_config'],
                 options=mount['driver_options'])
             del mount['driver_options']
-        self.log.info("End of init mount: {}".format(mount))
+        self.log.debug("End of init mount: {}".format(mount))
 
     @gen.coroutine
     def poll(self):
@@ -416,7 +418,7 @@ class SwarmSpawner(Spawner):
         You can specify the params for the service through
         jupyterhub_config.py or using the user_options
         """
-        self.log.info("User: {}, Start swarmspawner".format(self.user))
+        self.log.info("User: {}, start spawn".format(self.user))
 
         # https://github.com/jupyterhub/jupyterhub
         # /blob/master/jupyterhub/user.py#L202
@@ -429,7 +431,7 @@ class SwarmSpawner(Spawner):
         service = yield self.get_service()
         if service is None:
 
-            # Validate State #
+            # Validate state
             if hasattr(self, 'container_spec') \
                     and self.container_spec is not None:
                 container_spec = dict(**self.container_spec)
@@ -441,7 +443,7 @@ class SwarmSpawner(Spawner):
                                 "to launch it, contact the admin to resolve "
                                 "this issue")
 
-            # Setup Service #
+            # Setup service
             container_spec.update(user_options.get('container_spec', {}))
 
             # Which image to spawn
@@ -460,8 +462,6 @@ class SwarmSpawner(Spawner):
                 # Default image
                 image_info = self.dockerimages[0]
 
-            self.log.info("Selected image info: {}".format(image_info))
-
             # Does the selected image have mounts associated
             container_spec['mounts'] = []
             mounts = []
@@ -473,10 +473,9 @@ class SwarmSpawner(Spawner):
                 m = dict(**mount)
                 yield self.validate_mount(m)
                 yield self.init_mount(m)
-                self.log.info("Before append: {}".format(m))
                 container_spec['mounts'].append(docker.types.Mount(**m))
 
-            # some Envs are required by the single-user-image
+            # Some envs are required by the single-user-image
             if 'env' in container_spec:
                 container_spec['env'].update(self.get_env())
             else:
@@ -501,8 +500,7 @@ class SwarmSpawner(Spawner):
                 placement = user_options.get('placement')
 
             image = image_info['image']
-            self.log.info("Spawning image: {}".format(image))
-            # create the service
+            # Create the service
             container_spec = docker.types.ContainerSpec(
                 image, **container_spec)
             resources = docker.types.Resources(**resource_spec)

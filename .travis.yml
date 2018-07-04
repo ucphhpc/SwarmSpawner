@@ -7,8 +7,6 @@ before_install:
 - sudo apt-get -y -o Dpkg::Options::="--force-confnew" install docker-ce
 install:
 - pip install -r requirements/tests.txt
-- docker pull jupyterhub/jupyterhub:0.8.1
-- docker pull nielsbohr/mig-mount-dummy:latest
 - docker plugin install rasmunk/sshfs --grant-all-permissions
 script:
 - python setup.py check -rms

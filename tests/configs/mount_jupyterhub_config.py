@@ -43,14 +43,12 @@ c.SwarmSpawner.dockerimages = [
     {'image': 'jupyter/base-notebook:30f16d52126f',
      'name': 'Minimal python notebook'},
     {'image': 'nielsbohr/base-notebook:devel',
-     'name': 'Image with automatic {replace_me} mount, supports Py2/3 and R,',
+     'name': 'Image with automatic {replace_me} mount, supports Py2/3 and R',
      'mounts': mounts}
 ]
 
 # Authenticator -> remote user header
-c.JupyterHub.authenticator_class = 'jhub_remote_user_auth_mig_mount' \
-                                   '.remote_user_auth' \
-                                   '.MIGMountRemoteUserAuthenticator'
+c.JupyterHub.authenticator_class = 'jhub_remote_auth_mount.MountRemoteUserAuthenticator'
 
 # Limit cpu/mem to 4 cores/8 GB mem
 # During congestion, kill random internal processes to limit
@@ -59,5 +57,9 @@ c.SwarmSpawner.resource_spec = {
     'cpu_limit': int(8 * 1e9),
     'mem_limit': int(8192 * 1e6),
     'cpu_reservation': int(1 * 1e9),
-    'mem_reservation': int(2048 * 1e6),
+    'mem_reservation': int(1024 * 1e6),
 }
+
+# API tokens
+c.JupyterHub.api_tokens = {"tetedfgd09dg09":
+                               "f5bt2rclf5jvipkoiexuypkoiexu6pkoijes6t2vhvherecl2djy6u4ylnmuxwk3lbnfweczdeojsxg4z5nvqws3caonsgm43gfzrw63i"}
