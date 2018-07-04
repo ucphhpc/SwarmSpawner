@@ -1,4 +1,5 @@
 import docker
+import time
 import requests
 import pytest
 from os.path import dirname, join, realpath
@@ -65,6 +66,19 @@ def test_creates_service(image, swarm, network, make_service):
         }
         spawn_resp = s.post(JHUB_URL + "/hub/spawn", data=payload)
         assert spawn_resp.status_code == 200
+
+        services = client.services.list()
+
+        # New services are there
+        assert len(services) > 0
+
+        for service in services:
+            while service.tasks() and \
+                            service.tasks()[0]["Status"][
+                                "State"] != "running":
+                time.sleep(1)
+                state = service.tasks()[0]["Status"]["State"]
+                assert state != 'failed'
 
         # wait for user home
         home_resp = s.get(JHUB_URL + "/user/{}/?redirects=1".format(user))
