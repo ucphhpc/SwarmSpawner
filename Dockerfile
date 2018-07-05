@@ -17,7 +17,7 @@ RUN git clone https://github.com/rasmunk/jhub_remote_auth_mount.git \
     && python setup.py install
 
 RUN cd SwarmSpawner \
-    && pip install -r requirements/base.txt \
+    && pip install -r requirements.txt \
     && touch README.rst \
     && python setup.py install
 

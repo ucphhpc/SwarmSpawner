@@ -6,7 +6,7 @@ before_install:
 - sudo apt-get update
 - sudo apt-get -y -o Dpkg::Options::="--force-confnew" install docker-ce
 install:
-- pip install -r requirements/tests.txt
+- pip install -r tests/requirements.txt
 - docker plugin install rasmunk/sshfs --grant-all-permissions
 script:
 - python setup.py check -rms
