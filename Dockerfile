@@ -1,7 +1,7 @@
 # This is the dockerfile that builds an image from this package that we
 # can use for testing.
 
-FROM jupyterhub/jupyterhub:0.9.0
+FROM jupyterhub/jupyterhub:0.9.1
 
 ADD mig SwarmSpawner/mig
 ADD setup.py SwarmSpawner/setup.py
@@ -10,7 +10,8 @@ ADD version.py SwarmSpawner/version.py
 
 RUN pip install jupyterhub-dummyauthenticator
 
-RUN git clone https://github.com/rasmunk/jhub_remote_auth_mount.git --single-branch --branch devel \
+RUN git clone https://github.com/rasmunk/jhub_remote_auth_mount.git \
+    --single-branch --branch devel \
     && cd jhub_remote_auth_mount \
     && pip install -r requirements.txt \
     && python setup.py install

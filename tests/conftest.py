@@ -46,7 +46,6 @@ def image(request):
     _image = client.images.build(**request.param)
     yield _image
 
-    # Remove image after test usage
     image_obj = _image[0]
     image_id = image_obj.id
     client.images.remove(image_obj.tags[0], force=True)
