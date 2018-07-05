@@ -5,7 +5,7 @@ FROM jupyterhub/jupyterhub:0.9.1
 
 ADD mig SwarmSpawner/mig
 ADD setup.py SwarmSpawner/setup.py
-ADD requirements SwarmSpawner/requirements
+ADD requirements.txt SwarmSpawner/requirements.txt
 ADD version.py SwarmSpawner/version.py
 
 RUN pip install jupyterhub-dummyauthenticator
