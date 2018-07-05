@@ -33,167 +33,167 @@ hub_service = {'image': HUB_IMAGE_TAG, 'name': HUB_SERVICE_NAME,
                'command': ['jupyterhub', '-f', '/etc/jupyterhub/jupyterhub_config.py']}
 
 
-# @pytest.mark.parametrize('image', [hub_image], indirect=['image'])
-# @pytest.mark.parametrize('swarm', [swarm_config], indirect=['swarm'])
-# @pytest.mark.parametrize('network', [network_config], indirect=['network'])
-# def test_creates_service(image, swarm, network, make_service):
-#     """Test that logging in as a new user creates a new docker service."""
-#     make_service(hub_service)
-#     client = docker.from_env()
-#     # jupyterhub service should be running at this point
-#     services_before_spawn = client.services.list()
-#
-#     with requests.Session() as s:
-#         ready = False
-#         while not ready:
-#             try:
-#                 s.get(JHUB_URL)
-#                 if s.get(JHUB_URL + "/hub/login").status_code == 200:
-#                     ready = True
-#             except requests.exceptions.ConnectionError:
-#                 pass
-#
-#         # login
-#         user = "a-new-user"
-#         login_response = s.post(JHUB_URL + "/hub/login?next=",
-#                                 data={"username": user,
-#                                       "password": "just magnets"})
-#         assert login_response.status_code == 200
-#         # Spawn a notebook
-#         spawn_form_resp = s.get(JHUB_URL + "/hub/spawn")
-#         assert spawn_form_resp.status_code == 200
-#         assert 'Select a notebook image' in spawn_form_resp.text
-#         payload = {
-#             'dockerimage': 'jupyter/base-notebook:9f9e5ca8fe5a'
-#         }
-#         spawn_resp = s.post(JHUB_URL + "/hub/spawn", data=payload)
-#         assert spawn_resp.status_code == 200
-#
-#         services = client.services.list()
-#         # New services are there
-#         assert len(services) > 0
-#
-#         for service in services:
-#             while service.tasks() and \
-#                     service.tasks()[0]["Status"]["State"] != "running":
-#                 time.sleep(1)
-#                 state = service.tasks()[0]["Status"]["State"]
-#                 assert state != 'failed'
-#
-#         # wait for user home
-#         home_resp = s.get(JHUB_URL + "/user/{}/?redirects=1".format(user))
-#         assert home_resp.status_code == 200
-#
-#         # New services are there
-#         services_after_spawn = set(client.services.list()) - set(services_before_spawn)
-#         assert len(services_after_spawn) > 0
-#
-#         # Remove via the web interface
-#         resp = s.delete(JHUB_URL + "/hub/api/users/{}/server".format(user),
-#                         headers={'Referer': '127.0.0.1:8000/hub/'})
-#         assert resp.status_code == 204
-#         # double check it is gone
-#         services_after_remove = client.services.list()
-#         assert len((set(services_before_spawn) - set(services_after_remove))) == 0
-#
-#
-# remote_hub_config = join(dirname(realpath(__file__)), 'configs',
-#                          'remote_auth_jupyterhub_config.py')
-# remote_hub_service = {'image': HUB_IMAGE_TAG, 'name': HUB_SERVICE_NAME,
-#                       'mounts': [
-#                           ':'.join(
-#                               ['/var/run/docker.sock', '/var/run/docker.sock', 'rw']),
-#                           ':'.join(
-#                               [remote_hub_config, '/etc/jupyterhub/jupyterhub_config.py',
-#                                'ro'])
-#                       ],
-#                       'networks': [NETWORK_NAME],
-#                       'endpoint_spec': docker.types.EndpointSpec(ports={8000: 8000}),
-#                       'command': ['jupyterhub', '-f',
-#                                   '/etc/jupyterhub/jupyterhub_config.py']}
-#
-#
-# @pytest.mark.parametrize('image', [hub_image], indirect=['image'])
-# @pytest.mark.parametrize('swarm', [swarm_config], indirect=['swarm'])
-# @pytest.mark.parametrize('network', [network_config], indirect=['network'])
-# def test_remote_auth_hub(image, swarm, network, make_service):
-#     """Test that logging in as a new user creates a new docker service."""
-#     make_service(remote_hub_service)
-#     client = docker.from_env()
-#     # Jupyterhub service should be running at this point
-#     services_before_spawn = client.services.list()
-#
-#     user_cert = '/C=DK/ST=NA/L=NA/O=NBI/OU=NA/CN=Name' \
-#                 '/emailAddress=mail@sdfsf.com'
-#     # Auth header
-#     headers = {'Remote-User': user_cert}
-#     with requests.Session() as s:
-#         ready = False
-#         while not ready:
-#             try:
-#                 s.get(JHUB_URL)
-#                 if s.get(JHUB_URL + "/hub/login").status_code == 401:
-#                     ready = True
-#             except requests.exceptions.ConnectionError:
-#                 pass
-#
-#         # Login
-#         login_response = s.post(JHUB_URL + "/hub/login", headers=headers)
-#         assert login_response.status_code == 200
-#         # Spawn a notebook
-#         spawn_form_resp = s.get(JHUB_URL + "/hub/spawn")
-#         assert spawn_form_resp.status_code == 200
-#         assert 'Select a notebook image' in spawn_form_resp.text
-#         payload = {
-#             'dockerimage': 'jupyter/base-notebook:30f16d52126f'
-#         }
-#         spawn_resp = s.post(JHUB_URL + "/hub/spawn", data=payload)
-#         assert spawn_resp.status_code == 200
-#
-#         # New services are there
-#         post_spawn_services = list(set(client.services.list()) -
-#                                    set(services_before_spawn))
-#         assert len(post_spawn_services) > 0
-#
-#         for service in post_spawn_services:
-#             while service.tasks() and \
-#                     service.tasks()[0]["Status"][
-#                         "State"] != "running":
-#                 time.sleep(1)
-#                 state = service.tasks()[0]["Status"]["State"]
-#                 assert state != 'failed'
-#
-#         # Notebook ids
-#         notebook_services = [service for service in post_spawn_services
-#                              if "jupyter-" in service.name]
-#
-#         # Wait for user home
-#         for notebook_service in notebook_services:
-#             envs = {}
-#             for env in notebook_service.attrs['Spec']['TaskTemplate'][
-#                     'ContainerSpec']['Env']:
-#                 key, value = env.split('=')
-#                 envs[key] = value
-#             jhub_user = envs['JUPYTERHUB_USER']
-#             home_resp = s.get(JHUB_URL + "/user/{}/?redirects=1".format(jhub_user))
-#             assert home_resp.status_code == 200
-#
-#             # Write to user home
-#             hub_api_url = "/user/{}/api/contents/".format(jhub_user)
-#             new_file = 'write_test.ipynb'
-#             data = json.dumps({'name': new_file})
-#             notebook_headers = {'X-XSRFToken': s.cookies['_xsrf']}
-#             resp = s.put(''.join([JHUB_URL, hub_api_url, new_file]), data=data,
-#                          headers=notebook_headers)
-#             assert resp.status_code == 201
-#
-#             # Remove via the web interface
-#             resp = s.delete(JHUB_URL + "/hub/api/users/{}/server".format(jhub_user),
-#                             headers={'Referer': '127.0.0.1:8000/hub/'})
-#             assert resp.status_code == 204
-#         # double check it is gone
-#         services_after_remove = client.services.list()
-#         assert len((set(services_before_spawn) - set(services_after_remove))) == 0
+@pytest.mark.parametrize('image', [hub_image], indirect=['image'])
+@pytest.mark.parametrize('swarm', [swarm_config], indirect=['swarm'])
+@pytest.mark.parametrize('network', [network_config], indirect=['network'])
+def test_creates_service(image, swarm, network, make_service):
+    """Test that logging in as a new user creates a new docker service."""
+    make_service(hub_service)
+    client = docker.from_env()
+    # jupyterhub service should be running at this point
+    services_before_spawn = client.services.list()
+
+    with requests.Session() as s:
+        ready = False
+        while not ready:
+            try:
+                s.get(JHUB_URL)
+                if s.get(JHUB_URL + "/hub/login").status_code == 200:
+                    ready = True
+            except requests.exceptions.ConnectionError:
+                pass
+
+        # login
+        user = "a-new-user"
+        login_response = s.post(JHUB_URL + "/hub/login?next=",
+                                data={"username": user,
+                                      "password": "just magnets"})
+        assert login_response.status_code == 200
+        # Spawn a notebook
+        spawn_form_resp = s.get(JHUB_URL + "/hub/spawn")
+        assert spawn_form_resp.status_code == 200
+        assert 'Select a notebook image' in spawn_form_resp.text
+        payload = {
+            'dockerimage': 'jupyter/base-notebook:9f9e5ca8fe5a'
+        }
+        spawn_resp = s.post(JHUB_URL + "/hub/spawn", data=payload)
+        assert spawn_resp.status_code == 200
+
+        services = client.services.list()
+        # New services are there
+        assert len(services) > 0
+
+        for service in services:
+            while service.tasks() and \
+                    service.tasks()[0]["Status"]["State"] != "running":
+                time.sleep(1)
+                state = service.tasks()[0]["Status"]["State"]
+                assert state != 'failed'
+
+        # wait for user home
+        home_resp = s.get(JHUB_URL + "/user/{}/?redirects=1".format(user))
+        assert home_resp.status_code == 200
+
+        # New services are there
+        services_after_spawn = set(client.services.list()) - set(services_before_spawn)
+        assert len(services_after_spawn) > 0
+
+        # Remove via the web interface
+        resp = s.delete(JHUB_URL + "/hub/api/users/{}/server".format(user),
+                        headers={'Referer': '127.0.0.1:8000/hub/'})
+        assert resp.status_code == 204
+        # double check it is gone
+        services_after_remove = client.services.list()
+        assert len((set(services_before_spawn) - set(services_after_remove))) == 0
+
+
+remote_hub_config = join(dirname(realpath(__file__)), 'configs',
+                         'remote_auth_jupyterhub_config.py')
+remote_hub_service = {'image': HUB_IMAGE_TAG, 'name': HUB_SERVICE_NAME,
+                      'mounts': [
+                          ':'.join(
+                              ['/var/run/docker.sock', '/var/run/docker.sock', 'rw']),
+                          ':'.join(
+                              [remote_hub_config, '/etc/jupyterhub/jupyterhub_config.py',
+                               'ro'])
+                      ],
+                      'networks': [NETWORK_NAME],
+                      'endpoint_spec': docker.types.EndpointSpec(ports={8000: 8000}),
+                      'command': ['jupyterhub', '-f',
+                                  '/etc/jupyterhub/jupyterhub_config.py']}
+
+
+@pytest.mark.parametrize('image', [hub_image], indirect=['image'])
+@pytest.mark.parametrize('swarm', [swarm_config], indirect=['swarm'])
+@pytest.mark.parametrize('network', [network_config], indirect=['network'])
+def test_remote_auth_hub(image, swarm, network, make_service):
+    """Test that logging in as a new user creates a new docker service."""
+    make_service(remote_hub_service)
+    client = docker.from_env()
+    # Jupyterhub service should be running at this point
+    services_before_spawn = client.services.list()
+
+    user_cert = '/C=DK/ST=NA/L=NA/O=NBI/OU=NA/CN=Name' \
+                '/emailAddress=mail@sdfsf.com'
+    # Auth header
+    headers = {'Remote-User': user_cert}
+    with requests.Session() as s:
+        ready = False
+        while not ready:
+            try:
+                s.get(JHUB_URL)
+                if s.get(JHUB_URL + "/hub/login").status_code == 401:
+                    ready = True
+            except requests.exceptions.ConnectionError:
+                pass
+
+        # Login
+        login_response = s.post(JHUB_URL + "/hub/login", headers=headers)
+        assert login_response.status_code == 200
+        # Spawn a notebook
+        spawn_form_resp = s.get(JHUB_URL + "/hub/spawn")
+        assert spawn_form_resp.status_code == 200
+        assert 'Select a notebook image' in spawn_form_resp.text
+        payload = {
+            'dockerimage': 'jupyter/base-notebook:30f16d52126f'
+        }
+        spawn_resp = s.post(JHUB_URL + "/hub/spawn", data=payload)
+        assert spawn_resp.status_code == 200
+
+        # New services are there
+        post_spawn_services = list(set(client.services.list()) -
+                                   set(services_before_spawn))
+        assert len(post_spawn_services) > 0
+
+        for service in post_spawn_services:
+            while service.tasks() and \
+                    service.tasks()[0]["Status"][
+                        "State"] != "running":
+                time.sleep(1)
+                state = service.tasks()[0]["Status"]["State"]
+                assert state != 'failed'
+
+        # Notebook ids
+        notebook_services = [service for service in post_spawn_services
+                             if "jupyter-" in service.name]
+
+        # Wait for user home
+        for notebook_service in notebook_services:
+            envs = {}
+            for env in notebook_service.attrs['Spec']['TaskTemplate'][
+                    'ContainerSpec']['Env']:
+                key, value = env.split('=')
+                envs[key] = value
+            jhub_user = envs['JUPYTERHUB_USER']
+            home_resp = s.get(JHUB_URL + "/user/{}/?redirects=1".format(jhub_user))
+            assert home_resp.status_code == 200
+
+            # Write to user home
+            hub_api_url = "/user/{}/api/contents/".format(jhub_user)
+            new_file = 'write_test.ipynb'
+            data = json.dumps({'name': new_file})
+            notebook_headers = {'X-XSRFToken': s.cookies['_xsrf']}
+            resp = s.put(''.join([JHUB_URL, hub_api_url, new_file]), data=data,
+                         headers=notebook_headers)
+            assert resp.status_code == 201
+
+            # Remove via the web interface
+            resp = s.delete(JHUB_URL + "/hub/api/users/{}/server".format(jhub_user),
+                            headers={'Referer': '127.0.0.1:8000/hub/'})
+            assert resp.status_code == 204
+        # double check it is gone
+        services_after_remove = client.services.list()
+        assert len((set(services_before_spawn) - set(services_after_remove))) == 0
 
 
 hub_config = join(dirname(realpath(__file__)), 'configs', 'mount_jupyterhub_config.py')

@@ -8,7 +8,7 @@ c.JupyterHub.spawner_class = 'mig.SwarmSpawner'
 # The name of the service that's running the hub
 c.SwarmSpawner.jupyterhub_service_name = "jupyterhub"
 
-c.SwarmSpawner.start_timeout = 60 * 5
+c.SwarmSpawner.start_timeout = 60 * 10
 
 # The name of the overlay network that everything's connected to
 c.SwarmSpawner.networks = ["jh_test"]
