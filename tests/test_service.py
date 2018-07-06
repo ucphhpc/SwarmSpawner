@@ -324,7 +324,6 @@ def test_sshfs_mount_hub(image, swarm, network, make_service):
                 key, value = env.split('=')
                 envs[key] = value
             jhub_user = envs['JUPYTERHUB_USER']
-            print("JHUB user {}".format(jhub_user))
             home_resp = s.get(JHUB_URL + "/user/{}/?redirects=1".format(jhub_user))
             assert home_resp.status_code == 200
 
