@@ -64,7 +64,7 @@ def test_creates_service(image, swarm, network, make_service):
         assert spawn_form_resp.status_code == 200
         assert 'Select a notebook image' in spawn_form_resp.text
         payload = {
-            'dockerimage': 'jupyter/base-notebook:9f9e5ca8fe5a'
+            'dockerimage': 'nielsbohr/base-notebook-devel:743fe46511dc'
         }
         spawn_resp = s.post(JHUB_URL + "/hub/spawn", data=payload)
         assert spawn_resp.status_code == 200
@@ -81,7 +81,7 @@ def test_creates_service(image, swarm, network, make_service):
                 assert state != 'failed'
 
         # wait for user home
-        home_resp = s.get(JHUB_URL + "/user/{}/?redirects=1".format(user))
+        home_resp = s.get(JHUB_URL + "/user/{}/tree?".format(user))
         assert home_resp.status_code == 200
 
         # New services are there
@@ -145,7 +145,7 @@ def test_remote_auth_hub(image, swarm, network, make_service):
         assert spawn_form_resp.status_code == 200
         assert 'Select a notebook image' in spawn_form_resp.text
         payload = {
-            'dockerimage': 'jupyter/base-notebook:30f16d52126f'
+            'dockerimage': 'nielsbohr/base-notebook-devel:743fe46511dc'
         }
         spawn_resp = s.post(JHUB_URL + "/hub/spawn", data=payload)
         assert spawn_resp.status_code == 200
@@ -174,12 +174,12 @@ def test_remote_auth_hub(image, swarm, network, make_service):
                     'ContainerSpec']['Env']:
                 key, value = env.split('=')
                 envs[key] = value
-            jhub_user = envs['JUPYTERHUB_USER']
-            home_resp = s.get(JHUB_URL + "/user/{}/?redirects=1".format(jhub_user))
+            service_prefix = envs['JUPYTERHUB_SERVICE_PREFIX']
+            home_resp = s.get(JHUB_URL + service_prefix)
             assert home_resp.status_code == 200
 
             # Write to user home
-            hub_api_url = "/user/{}/api/contents/".format(jhub_user)
+            hub_api_url = "{}/api/contents/".format(service_prefix)
             new_file = 'write_test.ipynb'
             data = json.dumps({'name': new_file})
             notebook_headers = {'X-XSRFToken': s.cookies['_xsrf']}
@@ -188,6 +188,7 @@ def test_remote_auth_hub(image, swarm, network, make_service):
             assert resp.status_code == 201
 
             # Remove via the web interface
+            jhub_user = envs['JUPYTERHUB_USER']
             resp = s.delete(JHUB_URL + "/hub/api/users/{}/server".format(jhub_user),
                             headers={'Referer': '127.0.0.1:8000/hub/'})
             assert resp.status_code == 204
@@ -265,9 +266,8 @@ def test_sshfs_mount_hub(image, swarm, network, make_service):
         spawn_form_resp = s.get(JHUB_URL + "/hub/spawn")
         assert spawn_form_resp.status_code == 200
         assert 'Select a notebook image' in spawn_form_resp.text
-        image = 'nielsbohr/base-notebook:devel'
         payload = {
-            'dockerimage': image
+            'dockerimage': 'nielsbohr/base-notebook-devel:743fe46511dc'
         }
 
         target_user = 'mountuser'
@@ -323,12 +323,12 @@ def test_sshfs_mount_hub(image, swarm, network, make_service):
                     'ContainerSpec']['Env']:
                 key, value = env.split('=')
                 envs[key] = value
-            jhub_user = envs['JUPYTERHUB_USER']
-            home_resp = s.get(JHUB_URL + "/user/{}/?redirects=1".format(jhub_user))
+            service_prefix = envs['JUPYTERHUB_SERVICE_PREFIX']
+            home_resp = s.get(JHUB_URL + service_prefix)
             assert home_resp.status_code == 200
 
             # Write to user home
-            hub_api_url = "/user/{}/api/contents/".format(jhub_user)
+            hub_api_url = "{}/api/contents/".format(service_prefix)
             new_file = 'write_test.ipynb'
             data = json.dumps({'name': new_file})
             notebook_headers = {'X-XSRFToken': s.cookies['_xsrf']}
@@ -337,6 +337,7 @@ def test_sshfs_mount_hub(image, swarm, network, make_service):
             assert resp.status_code == 201
 
             # Remove via the web interface
+            jhub_user = envs['JUPYTERHUB_USER']
             resp = s.delete(JHUB_URL + "/hub/api/users/{}/server".format(jhub_user),
                             headers={'Referer': '127.0.0.1:8000/hub/'})
             assert resp.status_code == 204
