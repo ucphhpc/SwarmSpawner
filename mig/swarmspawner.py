@@ -5,8 +5,8 @@ server in a separate Docker Service
 
 import hashlib
 import docker
-import asyncio
-from async_generator import async_generator, yield_, yield_from_
+from asyncio import sleep
+from async_generator import async_generator
 from textwrap import dedent
 from concurrent.futures import ThreadPoolExecutor
 from pprint import pformat
@@ -382,6 +382,7 @@ class SwarmSpawner(Spawner):
     async def progress(self):
         self.log.debug("Checking progress of {}".format(self.service_id[:7]))
 
+        await sleep(1)
 
     @gen.coroutine
     def removed_volume(self, name):
