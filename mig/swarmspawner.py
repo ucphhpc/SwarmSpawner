@@ -5,6 +5,8 @@ server in a separate Docker Service
 
 import hashlib
 import docker
+import asyncio
+from async_generator import async_generator, yield_, yield_from_
 from textwrap import dedent
 from concurrent.futures import ThreadPoolExecutor
 from pprint import pformat
@@ -280,40 +282,28 @@ class SwarmSpawner(Spawner):
         return self.executor.submit(self._docker, method, *args, **kwargs)
 
     @gen.coroutine
-    def validate_mount(self, mount):
-        if 'driver_config' in mount \
-                and 'rasmunk/sshfs' in mount['driver_config']:
-            if not hasattr(self.user, 'mount') or \
-                    self.user.mount is None:
-                self.log.error("User: {} missing mount "
-                               "attribute".format(self.user))
-                raise Exception("Can't start that particular "
-                                "notebook image, missing mount values, try "
-                                "reinitializing them through the access gateway again")
+    def get_service(self):
+        self.log.debug("Getting Docker service '%s' with id: '%s'",
+                       self.service_name, self.service_id)
+        try:
+            service = yield self.docker(
+                'inspect_service', self.service_name
+            )
+            self.service_id = service['ID']
+        except APIError as err:
+            if err.response.status_code == 404:
+                self.log.info("Docker service '%s' is gone", self.service_name)
+                service = None
+                # Docker service is gone, remove service id
+                self.service_id = ''
+            elif err.response.status_code == 500:
+                self.log.info("Docker Swarm Server error")
+                service = None
+                # Docker service is unhealthy, remove the service_id
+                self.service_id = ''
             else:
-                # Validate required dictionary keys
-                required_keys = ['HOST', 'USERNAME',
-                                 'PATH', 'PRIVATEKEY']
-                missing_keys = [key for key in required_keys if
-                                key not in self.user.mount]
-                if len(missing_keys) > 0:
-                    self.log.error(
-                        "User: {} missing mount keys: {}"
-                            .format(self.user,
-                                    ",".join(missing_keys)))
-                    raise Exception(
-                        "Mount keys are available"
-                        " but "
-                        "missing the following items:"
-                        " {} try reinitialize them "
-                        "through the access interface"
-                        .format(",".join(missing_keys))
-                    )
-                else:
-                    self.log.debug(
-                        "User: {} mount contains:"
-                        " {}".format(self.user,
-                                     self.user.mount))
+                raise
+        return service
 
     @gen.coroutine
     def init_mount(self, mount):
@@ -388,29 +378,58 @@ class SwarmSpawner(Spawner):
         else:
             return 0
 
+    @async_generator
+    async def progress(self):
+        self.log.debug("Checking progress of {}".format(self.service_id[:7]))
+
+
     @gen.coroutine
-    def get_service(self):
-        self.log.debug("Getting Docker service '%s' with id: '%s'",
-                       self.service_name, self.service_id)
+    def removed_volume(self, name):
+        result = False
         try:
-            service = yield self.docker(
-                'inspect_service', self.service_name
-            )
-            self.service_id = service['ID']
+            yield self.docker('remove_volume', name=name)
+            self.log.info("Removed volume %s", name)
+            result = True
         except APIError as err:
-            if err.response.status_code == 404:
-                self.log.info("Docker service '%s' is gone", self.service_name)
-                service = None
-                # Docker service is gone, remove service id
-                self.service_id = ''
-            elif err.response.status_code == 500:
-                self.log.info("Docker Swarm Server error")
-                service = None
-                # Docker service is unhealthy, remove the service_id
-                self.service_id = ''
-            else:
-                raise
-        return service
+            if err.response.status_code == 409:
+                self.log.info("Can't remove volume: %s yet", name),
+
+        return result
+
+    @gen.coroutine
+    def remove_volume(self, name, max_attempts=15):
+        attempt = 0
+        removed = False
+        # Volumes can only be removed after the service is gone
+        while not removed:
+            if attempt > max_attempts:
+                self.log.info("Failed to remove volume %s", name)
+                break
+            self.log.info("Removing volume %s", name)
+            removed = yield self.removed_volume(name=name)
+            yield gen.sleep(1)
+            attempt += 1
+
+        return removed
+
+    @gen.coroutine
+    def service_is_running(self):
+        running = False
+        while not running:
+            service = yield self.get_service()
+            task_filter = {'service': service['Spec']['Name']}
+            tasks = yield self.docker(
+                'tasks', task_filter
+            )
+            for task in tasks:
+                task_state = task['Status']['State']
+                self.log.info("Waiting for service: {} current task status: {}"
+                              .format(service['ID'], task_state))
+                if task_state == 'running':
+                    running = True
+                if task_state == 'rejected':
+                    return False
+            yield gen.sleep(1)
 
     @gen.coroutine
     def start(self):
@@ -546,54 +565,6 @@ class SwarmSpawner(Spawner):
         return (ip, port)
 
     @gen.coroutine
-    def service_is_running(self):
-        running = False
-        while not running:
-            service = yield self.get_service()
-            task_filter = {'service': service['Spec']['Name']}
-            tasks = yield self.docker(
-                'tasks', task_filter
-            )
-            for task in tasks:
-                task_state = task['Status']['State']
-                self.log.info("Waiting for service: {} current task status: {}"
-                              .format(service['ID'], task_state))
-                if task_state == 'running':
-                    running = True
-                if task_state == 'rejected':
-                    return False
-            yield gen.sleep(1)
-
-    @gen.coroutine
-    def removed_volume(self, name):
-        result = False
-        try:
-            yield self.docker('remove_volume', name=name)
-            self.log.info("Removed volume %s", name)
-            result = True
-        except APIError as err:
-            if err.response.status_code == 409:
-                self.log.info("Can't remove volume: %s yet", name),
-
-        return result
-
-    @gen.coroutine
-    def remove_volume(self, name, max_attempts=15):
-        attempt = 0
-        removed = False
-        # Volumes can only be removed after the service is gone
-        while not removed:
-            if attempt > max_attempts:
-                self.log.info("Failed to remove volume %s", name)
-                break
-            self.log.info("Removing volume %s", name)
-            removed = yield self.removed_volume(name=name)
-            yield gen.sleep(1)
-            attempt += 1
-
-        return removed
-
-    @gen.coroutine
     def stop(self, now=False):
         """Stop and remove the service
         Consider using stop/start when Docker adds support
@@ -625,3 +596,39 @@ class SwarmSpawner(Spawner):
                     yield self.remove_volume(name=name, max_attempts=15)
 
         self.clear_state()
+
+    @gen.coroutine
+    def validate_mount(self, mount):
+        if 'driver_config' in mount \
+                and 'rasmunk/sshfs' in mount['driver_config']:
+            if not hasattr(self.user, 'mount') or \
+                    self.user.mount is None:
+                self.log.error("User: {} missing mount "
+                               "attribute".format(self.user))
+                raise Exception("Can't start that particular "
+                                "notebook image, missing mount values, try "
+                                "reinitializing them through the access gateway again")
+            else:
+                # Validate required dictionary keys
+                required_keys = ['HOST', 'USERNAME',
+                                 'PATH', 'PRIVATEKEY']
+                missing_keys = [key for key in required_keys if
+                                key not in self.user.mount]
+                if len(missing_keys) > 0:
+                    self.log.error(
+                        "User: {} missing mount keys: {}"
+                            .format(self.user,
+                                    ",".join(missing_keys)))
+                    raise Exception(
+                        "Mount keys are available"
+                        " but "
+                        "missing the following items:"
+                        " {} try reinitialize them "
+                        "through the access interface"
+                        .format(",".join(missing_keys))
+                    )
+                else:
+                    self.log.debug(
+                        "User: {} mount contains:"
+                        " {}".format(self.user,
+                                     self.user.mount))
