@@ -282,6 +282,18 @@ class SwarmSpawner(Spawner):
         return self.executor.submit(self._docker, method, *args, **kwargs)
 
     @gen.coroutine
+    def get_tasks_status(self):
+        service = yield self.get_service()
+        task_filter = {'service': service['Spec']['Name']}
+        tasks = yield self.docker(
+            'tasks', task_filter
+        )
+
+        tasks_status = [{task['ID']: task['Status']['State']}
+                        for task in tasks]
+        return tasks_status
+
+    @gen.coroutine
     def get_service(self):
         self.log.debug("Getting Docker service '%s' with id: '%s'",
                        self.service_name, self.service_id)
@@ -382,9 +394,21 @@ class SwarmSpawner(Spawner):
     async def progress(self):
         self.log.debug("Checking progress of {}".format(self.service_id[:7]))
         await yield_({
-            "progress": 80,
-            "message": "About to spawn the server..."
+            'progress': 10,
+            'message': 'Spawning server...'
         })
+
+        tasks_status = yield self.get_tasks_status()
+        top_task = tasks_status[0]
+
+        for _id, status in top_task.items():
+            if status == 'preparing':
+                await yield_({'progress': 40,
+                              'message': 'Preparing your server'})
+            if status == 'running':
+                await yield_({'progress': 100,
+                              'message': 'Your server is now running '})
+
         await sleep(1)
 
     @gen.coroutine

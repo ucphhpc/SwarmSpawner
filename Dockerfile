@@ -11,9 +11,9 @@ ADD version.py SwarmSpawner/version.py
 
 RUN pip install jupyterhub-dummyauthenticator
 
-RUN git clone https://github.com/rasmunk/jhub_remote_auth_mount.git \
+RUN git clone https://github.com/rasmunk/jhub-authenticators.git \
     --single-branch --branch devel \
-    && cd jhub_remote_auth_mount \
+    && cd jhub-authenticators \
     && pip install -r requirements.txt \
     && python setup.py install
 

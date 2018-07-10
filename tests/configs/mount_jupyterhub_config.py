@@ -40,13 +40,13 @@ c.SwarmSpawner.use_user_options = True
 
 # Available docker images the user can spawn
 c.SwarmSpawner.dockerimages = [
-    {'image': 'nielsbohr/base-notebook-devel:743fe46511dc',
+    {'image': 'nielsbohr/base-notebook:devel',
      'name': 'Basic Python Notebook',
      'mounts': mounts}
 ]
 
 # Authenticator -> remote user header
-c.JupyterHub.authenticator_class = 'jhub_remote_auth_mount.MountRemoteUserAuthenticator'
+c.JupyterHub.authenticator_class = 'jhubauthenticators.MountRemoteUserAuthenticator'
 
 # Limit cpu/mem to 4 cores/8 GB mem
 # During congestion, kill random internal processes to limit

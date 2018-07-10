@@ -18,7 +18,7 @@ c.SwarmSpawner.networks = ["jh_test"]
 c.SwarmSpawner.use_user_options = True
 
 c.SwarmSpawner.dockerimages = [
-    {'image': 'nielsbohr/base-notebook-devel:743fe46511dc',
+    {'image': 'nielsbohr/base-notebook:devel',
      'name': 'Basic Python Notebook'}
 ]
 
@@ -27,5 +27,5 @@ c.SwarmSpawner.container_spec = {
     'env': {'JUPYTER_ENABLE_LAB': '1'}
 }
 
-c.JupyterHub.authenticator_class = 'dummyauthenticator.DummyAuthenticator'
+c.JupyterHub.authenticator_class = 'jhubauthenticators.DummyAuthenticator'
 c.DummyAuthenticator.password = "just magnets"
