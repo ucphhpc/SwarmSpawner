@@ -179,6 +179,8 @@ class SwarmSpawner(Spawner):
                                           """Name of the service running the JupyterHub
                                           """))
 
+    progress_checks = Int(0)
+
     @property
     def tls_client(self):
         """A tuple consisting of the TLS client certificate and key if they
@@ -221,6 +223,22 @@ class SwarmSpawner(Spawner):
                                  self.service_owner,
                                  server_name
                                  )
+
+    @property
+    def service_id(self):
+        return self._service_id
+
+    @service_id.setter
+    def service_id(self, service_id):
+        self._service_id = service_id
+
+    @property
+    def tasks(self):
+        return self._tasks
+
+    @tasks.setter
+    def tasks(self, tasks):
+        self._tasks = tasks
 
     def load_state(self, state):
         super().load_state(state)
@@ -281,17 +299,6 @@ class SwarmSpawner(Spawner):
         """
         return self.executor.submit(self._docker, method, *args, **kwargs)
 
-    @gen.coroutine
-    def get_tasks_status(self):
-        service = yield self.get_service()
-        task_filter = {'service': service['Spec']['Name']}
-        tasks = yield self.docker(
-            'tasks', task_filter
-        )
-
-        tasks_status = [{task['ID']: task['Status']['State']}
-                        for task in tasks]
-        return tasks_status
 
     @gen.coroutine
     def get_service(self):
@@ -360,12 +367,12 @@ class SwarmSpawner(Spawner):
             return 0
 
         task_filter = {'service': service['Spec']['Name']}
-        tasks = yield self.docker(
+        self.tasks = yield self.docker(
             'tasks', task_filter
         )
 
         running_task = None
-        for task in tasks:
+        for task in self.tasks:
             task_state = task['Status']['State']
             if task_state == 'running':
                 self.log.debug(
@@ -392,24 +399,24 @@ class SwarmSpawner(Spawner):
 
     @async_generator
     async def progress(self):
-        self.log.debug("Checking progress of {}".format(self.service_id[:7]))
-        await yield_({
-            'progress': 10,
-            'message': 'Spawning server...'
-        })
+        self.log.info("Checking progress of {}".format(self.service_id[:7]))
+        self.progress_checks += 1
+        top_task = self.tasks[0]
+        image = top_task['Spec']['ContainerSpec']['Image']
+        task_status = top_task['Status']['State']
 
-        tasks_status = yield self.get_tasks_status()
-        top_task = tasks_status[0]
+        if task_status == 'preparing':
+            details = self.docker('inspect_image', image=image).result()
+            self.log.info("Image details {}".format(details))
+            if self.progress_checks == 1:
+                await yield_({'progress': 50,
+                              'message': 'Preparing a server '
+                                         'with your requested image'})
 
-        for _id, status in top_task.items():
-            if status == 'preparing':
-                await yield_({'progress': 40,
-                              'message': 'Preparing your server'})
-            if status == 'running':
-                await yield_({'progress': 100,
-                              'message': 'Your server is now running '})
-
-        await sleep(1)
+            # if self.progress_checks > 1:
+            #     await yield_({'progress': 70,
+            #                   'message': 'A new version of your requested '
+            #                              'image is properly being downloaded'})
 
     @gen.coroutine
     def removed_volume(self, name):
@@ -439,25 +446,6 @@ class SwarmSpawner(Spawner):
             attempt += 1
 
         return removed
-
-    @gen.coroutine
-    def service_is_running(self):
-        running = False
-        while not running:
-            service = yield self.get_service()
-            task_filter = {'service': service['Spec']['Name']}
-            tasks = yield self.docker(
-                'tasks', task_filter
-            )
-            for task in tasks:
-                task_state = task['Status']['State']
-                self.log.info("Waiting for service: {} current task status: {}"
-                              .format(service['ID'], task_state))
-                if task_state == 'running':
-                    running = True
-                if task_state == 'rejected':
-                    return False
-            yield gen.sleep(1)
 
     @gen.coroutine
     def start(self):
@@ -567,7 +555,7 @@ class SwarmSpawner(Spawner):
                           " for user %s", self.service_name,
                           self.service_id[:7], image, self.user)
 
-            yield self.service_is_running()
+            yield self.wait_for_running_tasks()
 
         else:
             self.log.info(
@@ -660,3 +648,22 @@ class SwarmSpawner(Spawner):
                         "User: {} mount contains:"
                         " {}".format(self.user,
                                      self.user.mount))
+
+    @gen.coroutine
+    def wait_for_running_tasks(self):
+        running = False
+        while not running:
+            service = yield self.get_service()
+            task_filter = {'service': service['Spec']['Name']}
+            self.tasks = yield self.docker(
+                'tasks', task_filter
+            )
+            for task in self.tasks:
+                task_state = task['Status']['State']
+                self.log.info("Waiting for service: {} current task status: {}"
+                              .format(service['ID'], task_state))
+                if task_state == 'running':
+                    running = True
+                if task_state == 'rejected':
+                    return False
+            yield gen.sleep(1)
