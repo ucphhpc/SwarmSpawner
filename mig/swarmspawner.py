@@ -6,7 +6,7 @@ server in a separate Docker Service
 import hashlib
 import docker
 from asyncio import sleep
-from async_generator import async_generator
+from async_generator import async_generator, yield_
 from textwrap import dedent
 from concurrent.futures import ThreadPoolExecutor
 from pprint import pformat
@@ -381,7 +381,10 @@ class SwarmSpawner(Spawner):
     @async_generator
     async def progress(self):
         self.log.debug("Checking progress of {}".format(self.service_id[:7]))
-
+        await yield_({
+            "progress": 80,
+            "message": "About to spawn the server..."
+        })
         await sleep(1)
 
     @gen.coroutine
