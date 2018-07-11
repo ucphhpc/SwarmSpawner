@@ -179,8 +179,6 @@ class SwarmSpawner(Spawner):
                                           """Name of the service running the JupyterHub
                                           """))
 
-    progress_checks = Int(0)
-
     @property
     def tls_client(self):
         """A tuple consisting of the TLS client certificate and key if they
@@ -299,7 +297,6 @@ class SwarmSpawner(Spawner):
         """
         return self.executor.submit(self._docker, method, *args, **kwargs)
 
-
     @gen.coroutine
     def get_service(self):
         self.log.debug("Getting Docker service '%s' with id: '%s'",
@@ -397,26 +394,57 @@ class SwarmSpawner(Spawner):
         else:
             return 0
 
+    async def check_update(self, image, tag):
+        full_image = ''.join([image, ':', tag])
+        download_tracking = {}
+        initial_output = False
+        num_run, total_download, partial_download = 0, 0, 0
+        for download in self.client.pull(image, tag=tag, stream=True, decode=True):
+            if not initial_output:
+                await yield_({'progress': 70, 'message': 'Downloading new update '
+                                                         'for {}'.format(full_image)})
+                initial_output = True
+            if 'id' and 'progress' in download:
+                _id = download['id']
+                if _id not in download_tracking:
+                    del download['id']
+                    download_tracking[_id] = download
+                else:
+                    download_tracking[_id].update(download)
+
+                # Output every 20 MB
+                for _id, tracker in download_tracking.items():
+                    if tracker['progressDetail']['current'] \
+                            == tracker['progressDetail']['total']:
+                        total_download += (tracker['progressDetail']['total']
+                                           * pow(10, -6))
+                        await yield_({'progress': 80,
+                                      'message': 'Downloaded {} MB of {}'
+                                     .format(total_download, full_image)})
+                        # return to web processing
+                        await sleep(1)
+
+                # Remove completed
+                download_tracking = {_id: tracker for _id, tracker in
+                                     download_tracking.items() if
+                                     tracker['progressDetail']['current'] != tracker[
+                                         'progressDetail']['total']}
+
     @async_generator
     async def progress(self):
-        self.log.info("Checking progress of {}".format(self.service_id[:7]))
-        self.progress_checks += 1
         top_task = self.tasks[0]
         image = top_task['Spec']['ContainerSpec']['Image']
+        self.log.info("Spawning progress of {} with image".format(self.service_id))
         task_status = top_task['Status']['State']
-
+        _image, _tag = image.split(":")
         if task_status == 'preparing':
-            details = self.docker('inspect_image', image=image).result()
-            self.log.info("Image details {}".format(details))
-            if self.progress_checks == 1:
-                await yield_({'progress': 50,
-                              'message': 'Preparing a server '
-                                         'with your requested image'})
-
-            # if self.progress_checks > 1:
-            #     await yield_({'progress': 70,
-            #                   'message': 'A new version of your requested '
-            #                              'image is properly being downloaded'})
+            await yield_({'progress': 50,
+                          'message': 'Preparing a server '
+                                     'with {} the image'.format(image)})
+            await yield_({'progress': 60,
+                          'message': 'Checking for new version of {}'.format(image)})
+            await self.check_update(_image, _tag)
+            self.log.info("Finished progress from spawning {}".format(image))
 
     @gen.coroutine
     def removed_volume(self, name):
