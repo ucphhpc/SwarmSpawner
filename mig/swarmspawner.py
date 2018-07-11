@@ -398,7 +398,7 @@ class SwarmSpawner(Spawner):
         full_image = ''.join([image, ':', tag])
         download_tracking = {}
         initial_output = False
-        num_run, total_download, partial_download = 0, 0, 0
+        total_download = 0
         for download in self.client.pull(image, tag=tag, stream=True, decode=True):
             if not initial_output:
                 await yield_({'progress': 70, 'message': 'Downloading new update '
@@ -416,8 +416,8 @@ class SwarmSpawner(Spawner):
                 for _id, tracker in download_tracking.items():
                     if tracker['progressDetail']['current'] \
                             == tracker['progressDetail']['total']:
-                        total_download += (tracker['progressDetail']['total']
-                                           * pow(10, -6))
+                        total_download += (tracker['progressDetail']['total'] *
+                                           pow(10, -6))
                         await yield_({'progress': 80,
                                       'message': 'Downloaded {} MB of {}'
                                      .format(total_download, full_image)})
