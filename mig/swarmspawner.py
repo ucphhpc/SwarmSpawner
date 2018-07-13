@@ -223,14 +223,6 @@ class SwarmSpawner(Spawner):
                                  )
 
     @property
-    def service_id(self):
-        return self._service_id
-
-    @service_id.setter
-    def service_id(self, service_id):
-        self._service_id = service_id
-
-    @property
     def tasks(self):
         return self._tasks
 
@@ -638,8 +630,6 @@ class SwarmSpawner(Spawner):
                 for volume in volumes:
                     name = str(volume['Source'])
                     yield self.remove_volume(name=name, max_attempts=15)
-
-        self.clear_state()
 
     @gen.coroutine
     def validate_mount(self, mount):
