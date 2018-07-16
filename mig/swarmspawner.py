@@ -291,8 +291,8 @@ class SwarmSpawner(Spawner):
 
     @gen.coroutine
     def get_service(self):
-        self.log.debug("Getting Docker service '%s' with id: '%s'",
-                       self.service_name, self.service_id)
+        self.log.debug("Getting Docker service '{}' with id: '{}'".format(
+            self.service_name, self.service_id))
         try:
             service = yield self.docker(
                 'inspect_service', self.service_name
@@ -300,7 +300,7 @@ class SwarmSpawner(Spawner):
             self.service_id = service['ID']
         except APIError as err:
             if err.response.status_code == 404:
-                self.log.info("Docker service '%s' is gone", self.service_name)
+                self.log.info("Docker service '{}' is gone".format(self.service_name))
                 service = None
                 # Docker service is gone, remove service id
                 self.service_id = ''
@@ -365,10 +365,8 @@ class SwarmSpawner(Spawner):
             task_state = task['Status']['State']
             if task_state == 'running':
                 self.log.debug(
-                    "Task %s of Docker service %s status: %s",
-                    task['ID'][:7],
-                    self.service_id[:7],
-                    pformat(task_state),
+                    "Task {} of Docker service {} status: {}".format(
+                        task['ID'][:7], self.service_id[:7], pformat(task_state)),
                 )
                 # there should be at most one running task
                 running_task = task
@@ -443,11 +441,11 @@ class SwarmSpawner(Spawner):
         result = False
         try:
             yield self.docker('remove_volume', name=name)
-            self.log.info("Removed volume %s", name)
+            self.log.info("Removed volume: {}".format(name))
             result = True
         except APIError as err:
             if err.response.status_code == 409:
-                self.log.info("Can't remove volume: %s yet", name),
+                self.log.info("Can't remove volume: {} yet".format(name)),
 
         return result
 
@@ -458,9 +456,9 @@ class SwarmSpawner(Spawner):
         # Volumes can only be removed after the service is gone
         while not removed:
             if attempt > max_attempts:
-                self.log.info("Failed to remove volume %s", name)
+                self.log.info("Failed to remove volume {}".format(name))
                 break
-            self.log.info("Removing volume %s", name)
+            self.log.info("Removing volume {}".format(name))
             removed = yield self.removed_volume(name=name)
             yield gen.sleep(1)
             attempt += 1
@@ -572,16 +570,16 @@ class SwarmSpawner(Spawner):
                                      name=self.service_name,
                                      networks=networks)
             self.service_id = resp['ID']
-            self.log.info("Created Docker service '%s' (id: %s) from image %s"
-                          " for user %s", self.service_name,
-                          self.service_id[:7], image, self.user)
+            self.log.info("Created Docker service {} (id: {}) from image {}"
+                          " for user {}".format(self.service_name,
+                                                self.service_id[:7], image, self.user))
 
             yield self.wait_for_running_tasks()
 
         else:
             self.log.info(
-                "Found existing Docker service '%s' (id: %s)",
-                self.service_name, self.service_id[:7])
+                "Found existing Docker service '{}' (id: {})".format(
+                    self.service_name, self.service_id[:7]))
             # Handle re-using API token.
             # Get the API token from the environment variables
             # of the running service:
@@ -593,8 +591,8 @@ class SwarmSpawner(Spawner):
 
         ip = self.service_name
         port = self.service_port
-        self.log.debug("Active service: '%s' with user '%s'",
-                       self.service_name, self.user)
+        self.log.debug("Active service: '{}' with user '{}'".format(
+                       self.service_name, self.user))
 
         # we use service_name instead of ip
         # https://docs.docker.com/engine/swarm/networking/#use-swarm-mode-service-discovery
@@ -607,8 +605,8 @@ class SwarmSpawner(Spawner):
         Consider using stop/start when Docker adds support
         """
         self.log.info(
-            "Stopping and removing Docker service %s (id: %s)",
-            self.service_name, self.service_id[:7])
+            "Stopping and removing Docker service {} (id: {})".format(
+                self.service_name, self.service_id[:7]))
 
         service = yield self.get_service()
         if not service:
@@ -624,13 +622,18 @@ class SwarmSpawner(Spawner):
         # the underlying containers are still being removed
         removed_service = yield self.docker('remove_service', service['ID'])
         if removed_service:
-            self.log.info(
-                "Docker service %s (id: %s) removed",
-                self.service_name, self.service_id[:7])
+            self.log.info("Docker service {} (id: {}) removed".format(
+                self.service_name, self.service_id[:7]))
             if volumes is not None:
                 for volume in volumes:
-                    name = str(volume['Source'])
-                    yield self.remove_volume(name=name, max_attempts=15)
+                    # Validate the volume exists
+                    try:
+                        yield self.docker('inspect_volume',
+                                          name=volume['Name'])
+                        yield self.remove_volume(name=volume['Name'], max_attempts=15)
+                    except docker.errors.NotFound:
+                        self.log.info("Volume: {} is already gone".format(
+                            volume['Name']))
 
     @gen.coroutine
     def validate_mount(self, mount):
@@ -655,10 +658,9 @@ class SwarmSpawner(Spawner):
                             .format(self.user,
                                     ",".join(missing_keys)))
                     raise Exception(
-                        "Mount keys are available"
-                        " but "
-                        "missing the following items:"
-                        " {} try reinitialize them "
+                        "Mount keys are available "
+                        "but missing the following items: {} "
+                        "try reinitialize them "
                         "through the access interface"
                         .format(",".join(missing_keys))
                     )
