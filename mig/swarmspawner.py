@@ -520,6 +520,7 @@ class SwarmSpawner(Spawner):
             # Does the selected image have mounts associated
             container_spec['mounts'] = []
             mounts = []
+            self.log.debug("Image info: {}".format(image_info))
             if 'mounts' in image_info:
                 mounts = image_info['mounts']
 
