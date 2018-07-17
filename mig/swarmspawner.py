@@ -626,14 +626,14 @@ class SwarmSpawner(Spawner):
                 self.service_name, self.service_id[:7]))
             if volumes is not None:
                 for volume in volumes:
-                    # Validate the volume exists
-                    try:
-                        yield self.docker('inspect_volume',
-                                          name=volume['Name'])
-                        yield self.remove_volume(name=volume['Name'], max_attempts=15)
-                    except docker.errors.NotFound:
-                        self.log.info("Volume: {} is already gone".format(
-                            volume['Name']))
+                    if 'Source' in volume:
+                        # Validate the volume exists
+                        try:
+                            yield self.docker('inspect_volume', volume['Source'])
+                        except docker.errors.NotFound:
+                            self.log.info("No volume named: " + volume['Source'])
+                        else:
+                            yield self.remove_volume(volume['Source'])
 
     @gen.coroutine
     def validate_mount(self, mount):
