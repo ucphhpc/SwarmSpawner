@@ -154,7 +154,7 @@ class SwarmSpawner(Spawner):
         config=True,
         help=dedent(
             """Arguments to pass to docker TLS configuration.
-            Check for more info: 
+            Check for more info:
             http://docker-py.readthedocs.io/en/stable/tls.html
             """
         )
@@ -338,14 +338,14 @@ class SwarmSpawner(Spawner):
         # Custom volume
         if 'driver_config' in mount:
             if 'sshcmd' in mount['driver_options'] and mount[
-                 'driver_options'] != '':
+               'driver_options'] != '':
                 mount['driver_options']['sshcmd'] \
                     = self.user.mount['USERNAME'] \
                     + self.user.mount['PATH']
 
             # If the id_rsa flag is present, set key
             if 'id_rsa' in mount['driver_options'] and mount[
-                 'driver_options']['id_rsa'] != '':
+               'driver_options']['id_rsa'] != '':
                 mount['driver_options']['id_rsa'] = self.user.mount[
                     'PRIVATEKEY']
 
