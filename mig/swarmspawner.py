@@ -339,13 +339,13 @@ class SwarmSpawner(Spawner):
         if 'driver_config' in mount:
             # Replace if placeholder is present
             if 'sshcmd' in mount['driver_options'] and mount[
-               'driver_options']['sshcmd'] != '{sshcmd}':
+               'driver_options']['sshcmd'] == '{sshcmd}':
                 mount['driver_options']['sshcmd'] \
                     = self.user.mount['USERNAME'] \
                     + self.user.mount['PATH']
 
             if 'id_rsa' in mount['driver_options'] and mount[
-               'driver_options']['id_rsa'] != '{id_rsa}':
+               'driver_options']['id_rsa'] == '{id_rsa}':
                 mount['driver_options']['id_rsa'] = self.user.mount[
                     'PRIVATEKEY']
 
