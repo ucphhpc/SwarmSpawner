@@ -676,6 +676,7 @@ class SwarmSpawner(Spawner):
     def validate_mount(self, mount):
         # Whether to skip validation
         if 'skip_validation' in mount and mount['skip_validation']:
+            del mount['skip_validation']
             return
         if 'driver_config' in mount \
                 and 'rasmunk/sshfs' in mount['driver_config']:
