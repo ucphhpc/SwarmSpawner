@@ -338,16 +338,34 @@ class SwarmSpawner(Spawner):
         # Custom volume
         if 'driver_config' in mount:
             # Replace if placeholder is present
-            if 'sshcmd' in mount['driver_options'] and mount[
-               'driver_options']['sshcmd'] == '{sshcmd}':
-                mount['driver_options']['sshcmd'] \
-                    = self.user.mount['USERNAME'] \
-                    + self.user.mount['PATH']
+            if 'sshcmd' in mount['driver_options']:
+                if mount['driver_options']['sshcmd'] == '{sshcmd}':
+                    mount['driver_options']['sshcmd'] \
+                        = self.user.mount['USERNAME'] \
+                        + self.user.mount['PATH']
 
-            if 'id_rsa' in mount['driver_options'] and mount[
-               'driver_options']['id_rsa'] == '{id_rsa}':
-                mount['driver_options']['id_rsa'] = self.user.mount[
-                    'PRIVATEKEY']
+                elif mount['driver_options']['sshcmd'] == '':
+                    self.log.error(
+                        "User: {} has a misconfigured mount {}, missing "
+                        "sshcmd value".format(self.user, mount[
+                            'driver_options']))
+                    raise Exception("Mount is misconfigured, missing sshcmd")
+
+            if 'id_rsa' in mount['driver_options']:
+                if mount['driver_options']['id_rsa'] == '{id_rsa}':
+                    mount['driver_options']['id_rsa'] = self.user.mount[
+                        'PRIVATEKEY']
+
+                elif mount['driver_options']['id_rsa'] == '':
+                    if 'password' not in mount['driver_options'] or \
+                       mount['driver_options']['password'] == '':
+                        self.log.error(
+                                "User: {} has a misconfigured mount {},"
+                                " missing both id_rsa and password "
+                                "value".format(self.user, mount[
+                                    'driver_options']))
+                        raise Exception("Mount is misconfigured, "
+                                        "no authentication secret is available")
 
             mount['driver_config'] = DriverConfig(
                 name=mount['driver_config'],
