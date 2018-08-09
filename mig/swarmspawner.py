@@ -11,6 +11,9 @@ from textwrap import dedent
 from concurrent.futures import ThreadPoolExecutor
 from pprint import pformat
 from docker.errors import APIError
+from docker.tls import TLSConfig
+from docker.types import TaskTemplate, Resources, ContainerSpec, DriverConfig, \
+    Mount
 from docker.utils import kwargs_from_env
 from tornado import gen
 from jupyterhub.spawner import Spawner
@@ -127,7 +130,7 @@ class SwarmSpawner(Spawner):
         if cls._client is None:
             kwargs = {}
             if self.tls_config:
-                kwargs['tls'] = docker.tls.TLSConfig(**self.tls_config)
+                kwargs['tls'] = TLSConfig(**self.tls_config)
             kwargs.update(kwargs_from_env())
             client = docker.APIClient(version='auto', **kwargs)
 
@@ -151,7 +154,8 @@ class SwarmSpawner(Spawner):
         config=True,
         help=dedent(
             """Arguments to pass to docker TLS configuration.
-            Check for more info: http://docker-py.readthedocs.io/en/stable/tls.html
+            Check for more info: 
+            http://docker-py.readthedocs.io/en/stable/tls.html
             """
         )
     )
@@ -244,7 +248,8 @@ class SwarmSpawner(Spawner):
         super().clear_state()
         self.service_id = ''
 
-    def _env_keep_default(self):
+    @staticmethod
+    def _env_keep_default():
         """it's called in traitlets. It's a special method name.
         Don't inherit any env from the parent process"""
         return []
@@ -300,7 +305,8 @@ class SwarmSpawner(Spawner):
             self.service_id = service['ID']
         except APIError as err:
             if err.response.status_code == 404:
-                self.log.info("Docker service '{}' is gone".format(self.service_name))
+                self.log.info(
+                    "Docker service '{}' is gone".format(self.service_name))
                 service = None
                 # Docker service is gone, remove service id
                 self.service_id = ''
@@ -331,17 +337,19 @@ class SwarmSpawner(Spawner):
 
         # Custom volume
         if 'driver_config' in mount:
-            if 'sshcmd' in mount['driver_options']:
+            if 'sshcmd' in mount['driver_options'] and mount[
+                 'driver_options'] != '':
                 mount['driver_options']['sshcmd'] \
                     = self.user.mount['USERNAME'] \
                     + self.user.mount['PATH']
 
             # If the id_rsa flag is present, set key
-            if 'id_rsa' in mount['driver_options']:
+            if 'id_rsa' in mount['driver_options'] and mount[
+                 'driver_options']['id_rsa'] != '':
                 mount['driver_options']['id_rsa'] = self.user.mount[
                     'PRIVATEKEY']
 
-            mount['driver_config'] = docker.types.DriverConfig(
+            mount['driver_config'] = DriverConfig(
                 name=mount['driver_config'],
                 options=mount['driver_options'])
             del mount['driver_options']
@@ -366,7 +374,8 @@ class SwarmSpawner(Spawner):
             if task_state == 'running':
                 self.log.debug(
                     "Task {} of Docker service {} status: {}".format(
-                        task['ID'][:7], self.service_id[:7], pformat(task_state)),
+                        task['ID'][:7], self.service_id[:7],
+                        pformat(task_state)),
                 )
                 # there should be at most one running task
                 running_task = task
@@ -389,10 +398,12 @@ class SwarmSpawner(Spawner):
         download_tracking = {}
         initial_output = False
         total_download = 0
-        for download in self.client.pull(image, tag=tag, stream=True, decode=True):
+        for download in self.client.pull(image, tag=tag, stream=True,
+                                         decode=True):
             if not initial_output:
-                await yield_({'progress': 70, 'message': 'Downloading new update '
-                                                         'for {}'.format(full_image)})
+                await yield_(
+                    {'progress': 70, 'message': 'Downloading new update '
+                                                'for {}'.format(full_image)})
                 initial_output = True
             if 'id' and 'progress' in download:
                 _id = download['id']
@@ -417,14 +428,16 @@ class SwarmSpawner(Spawner):
                 # Remove completed
                 download_tracking = {_id: tracker for _id, tracker in
                                      download_tracking.items() if
-                                     tracker['progressDetail']['current'] != tracker[
+                                     tracker['progressDetail']['current'] !=
+                                     tracker[
                                          'progressDetail']['total']}
 
     @async_generator
     async def progress(self):
         top_task = self.tasks[0]
         image = top_task['Spec']['ContainerSpec']['Image']
-        self.log.info("Spawning progress of {} with image".format(self.service_id))
+        self.log.info(
+            "Spawning progress of {} with image".format(self.service_id))
         task_status = top_task['Status']['State']
         _image, _tag = image.split(":")
         if task_status == 'preparing':
@@ -432,7 +445,8 @@ class SwarmSpawner(Spawner):
                           'message': 'Preparing a server '
                                      'with {} the image'.format(image)})
             await yield_({'progress': 60,
-                          'message': 'Checking for new version of {}'.format(image)})
+                          'message': 'Checking for new version of {}'.format(
+                              image)})
             await self.check_update(_image, _tag)
             self.log.info("Finished progress from spawning {}".format(image))
 
@@ -527,7 +541,7 @@ class SwarmSpawner(Spawner):
                 m = dict(**mount)
                 yield self.validate_mount(m)
                 yield self.init_mount(m)
-                container_spec['mounts'].append(docker.types.Mount(**m))
+                container_spec['mounts'].append(Mount(**m))
 
             # Some envs are required by the single-user-image
             if 'env' in container_spec:
@@ -539,15 +553,18 @@ class SwarmSpawner(Spawner):
             self.log.debug("User: {} container_spec mounts: {}".format(
                 self.user, container_spec['mounts']))
 
+            resource_spec = {}
             if hasattr(self, 'resource_spec'):
                 resource_spec = self.resource_spec
             resource_spec.update(user_options.get('resource_spec', {}))
 
+            networks = None
             if hasattr(self, 'networks'):
                 networks = self.networks
             if user_options.get('networks') is not None:
                 networks = user_options.get('networks')
 
+            placement = None
             if hasattr(self, 'placement'):
                 placement = self.placement
             if user_options.get('placement') is not None:
@@ -555,15 +572,14 @@ class SwarmSpawner(Spawner):
 
             image = image_info['image']
             # Create the service
-            container_spec = docker.types.ContainerSpec(
-                image, **container_spec)
-            resources = docker.types.Resources(**resource_spec)
+            container_spec = ContainerSpec(image, **container_spec)
+            resources = Resources(**resource_spec)
 
             task_spec = {'container_spec': container_spec,
                          'resources': resources,
                          'placement': placement
                          }
-            task_tmpl = docker.types.TaskTemplate(**task_spec)
+            task_tmpl = TaskTemplate(**task_spec)
             self.log.info("task temp: {}".format(task_tmpl))
             resp = yield self.docker('create_service',
                                      task_tmpl,
@@ -572,7 +588,8 @@ class SwarmSpawner(Spawner):
             self.service_id = resp['ID']
             self.log.info("Created Docker service {} (id: {}) from image {}"
                           " for user {}".format(self.service_name,
-                                                self.service_id[:7], image, self.user))
+                                                self.service_id[:7], image,
+                                                self.user))
 
             yield self.wait_for_running_tasks()
 
@@ -592,12 +609,12 @@ class SwarmSpawner(Spawner):
         ip = self.service_name
         port = self.service_port
         self.log.debug("Active service: '{}' with user '{}'".format(
-                       self.service_name, self.user))
+            self.service_name, self.user))
 
         # we use service_name instead of ip
         # https://docs.docker.com/engine/swarm/networking/#use-swarm-mode-service-discovery
         # service_port is actually equal to 8888
-        return (ip, port)
+        return ip, port
 
     @gen.coroutine
     def stop(self, now=False):
@@ -629,14 +646,19 @@ class SwarmSpawner(Spawner):
                     if 'Source' in volume:
                         # Validate the volume exists
                         try:
-                            yield self.docker('inspect_volume', volume['Source'])
+                            yield self.docker('inspect_volume',
+                                              volume['Source'])
                         except docker.errors.NotFound:
-                            self.log.info("No volume named: " + volume['Source'])
+                            self.log.info(
+                                "No volume named: " + volume['Source'])
                         else:
                             yield self.remove_volume(volume['Source'])
 
     @gen.coroutine
     def validate_mount(self, mount):
+        # Whether to skip validation
+        if 'skip_validation' in mount and mount['skip_validation']:
+            return
         if 'driver_config' in mount \
                 and 'rasmunk/sshfs' in mount['driver_config']:
             if not hasattr(self.user, 'mount') or \
@@ -644,14 +666,16 @@ class SwarmSpawner(Spawner):
                 self.log.error("User: {} missing mount "
                                "attribute".format(self.user))
                 raise Exception("Can't start that particular "
-                                "notebook image, missing mount values, try "
-                                "reinitializing them through the access gateway again")
+                                "notebook image, missing mount values,"
+                                " try reinitializing them through the"
+                                " access gateway again")
             else:
                 # Validate required dictionary keys
                 required_keys = ['HOST', 'USERNAME',
                                  'PATH', 'PRIVATEKEY']
                 missing_keys = [key for key in required_keys if
                                 key not in self.user.mount]
+                # Skip validation if debug
                 if len(missing_keys) > 0:
                     self.log.error(
                         "User: {} missing mount keys: {}"
@@ -665,10 +689,9 @@ class SwarmSpawner(Spawner):
                         .format(",".join(missing_keys))
                     )
                 else:
-                    self.log.debug(
+                    self.log.info(
                         "User: {} mount contains:"
-                        " {}".format(self.user,
-                                     self.user.mount))
+                        " {}".format(self.user, self.user.mount))
 
     @gen.coroutine
     def wait_for_running_tasks(self):

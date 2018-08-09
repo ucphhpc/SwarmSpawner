@@ -1,2 +1,5 @@
 docker==3.4.1
 jupyterhub==0.9.1
+traitlets
+tornado
+async_generator
