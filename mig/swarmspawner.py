@@ -5,6 +5,7 @@ server in a separate Docker Service
 
 import hashlib
 import docker
+import copy
 from asyncio import sleep
 from async_generator import async_generator, yield_
 from textwrap import dedent
@@ -515,7 +516,6 @@ class SwarmSpawner(Spawner):
 
         service = yield self.get_service()
         if service is None:
-
             # Validate state
             if hasattr(self, 'container_spec') \
                     and self.container_spec is not None:
@@ -537,7 +537,7 @@ class SwarmSpawner(Spawner):
                 image_info = None
                 for di in self.dockerimages:
                     if di['image'] == uimage:
-                        image_info = di
+                        image_info = copy.deepcopy(di)
                 if image_info is None:
                     err_msg = "User selected image: {} couldn't be found" \
                         .format(uimage['image'])
