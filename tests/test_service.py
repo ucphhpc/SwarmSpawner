@@ -64,7 +64,7 @@ def test_creates_service(image, swarm, network, make_service):
         assert spawn_form_resp.status_code == 200
         assert 'Select a notebook image' in spawn_form_resp.text
         payload = {
-            'dockerimage': 'nielsbohr/base-notebook:devel'
+            'dockerimage': 'nielsbohr/base-notebook:latest'
         }
         spawn_resp = s.post(JHUB_URL + "/hub/spawn", data=payload)
         assert spawn_resp.status_code == 200
@@ -145,7 +145,7 @@ def test_remote_auth_hub(image, swarm, network, make_service):
         assert spawn_form_resp.status_code == 200
         assert 'Select a notebook image' in spawn_form_resp.text
         payload = {
-            'dockerimage': 'nielsbohr/base-notebook:devel'
+            'dockerimage': 'nielsbohr/base-notebook:latest'
         }
         spawn_resp = s.post(JHUB_URL + "/hub/spawn", data=payload)
         assert spawn_resp.status_code == 200
@@ -267,7 +267,7 @@ def test_sshfs_mount_hub(image, swarm, network, make_service):
         assert spawn_form_resp.status_code == 200
         assert 'Select a notebook image' in spawn_form_resp.text
         payload = {
-            'dockerimage': 'nielsbohr/base-notebook:devel'
+            'dockerimage': 'nielsbohr/base-notebook:latest'
         }
 
         target_user = 'mountuser'
