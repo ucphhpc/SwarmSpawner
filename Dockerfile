@@ -8,8 +8,7 @@ ADD setup.py SwarmSpawner/setup.py
 ADD requirements.txt SwarmSpawner/requirements.txt
 ADD version.py SwarmSpawner/version.py
 
-RUN pip install jupyterhub-dummyauthenticator \
-    jhub-authenticators
+RUN pip install jhub-authenticators
 
 RUN cd SwarmSpawner \
     && pip install -r requirements.txt \
