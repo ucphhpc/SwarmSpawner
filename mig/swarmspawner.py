@@ -361,10 +361,9 @@ class SwarmSpawner(Spawner):
                     if 'password' not in mount['driver_options'] or \
                        mount['driver_options']['password'] == '':
                         self.log.error(
-                                "User: {} has a misconfigured mount {},"
-                                " missing both id_rsa and password "
-                                "value".format(self.user, mount[
-                                    'driver_options']))
+                            "User: {} has a misconfigured mount {},"
+                            " missing both id_rsa and password "
+                            "value".format(self.user, mount['driver_options']))
                         raise Exception("Mount is misconfigured, "
                                         "no authentication secret is available")
 
