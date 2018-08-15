@@ -31,7 +31,7 @@ c.SwarmSpawner.use_user_options = True
 
 # Available docker images the user can spawn
 c.SwarmSpawner.dockerimages = [
-    {'image': 'nielsbohr/base-notebook:devel',
+    {'image': 'nielsbohr/base-notebook:latest',
      'name': 'Basic Python Notebook'}
 ]
 

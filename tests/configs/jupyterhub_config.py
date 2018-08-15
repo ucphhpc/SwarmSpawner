@@ -18,7 +18,7 @@ c.SwarmSpawner.networks = ["jh_test"]
 c.SwarmSpawner.use_user_options = True
 
 c.SwarmSpawner.dockerimages = [
-    {'image': 'nielsbohr/base-notebook:devel',
+    {'image': 'nielsbohr/base-notebook:latest',
      'name': 'Basic Python Notebook'}
 ]
 
