@@ -47,6 +47,7 @@ c.SwarmSpawner.dockerimages = [
 
 # Authenticator -> remote user header
 c.JupyterHub.authenticator_class = 'jhubauthenticators.MountRemoteUserAuthenticator'
+c.Authenticator.enable_auth_state = True
 
 # Limit cpu/mem to 4 cores/8 GB mem
 # During congestion, kill random internal processes to limit

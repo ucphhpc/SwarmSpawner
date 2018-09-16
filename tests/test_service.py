@@ -212,11 +212,11 @@ hub_sshfs_service = {'image': HUB_IMAGE_TAG, 'name': HUB_SERVICE_NAME,
                      ],
                      'networks': [NETWORK_NAME],
                      'endpoint_spec': docker.types.EndpointSpec(ports={8000: 8000}),
+                     'env': ['JUPYTERHUB_CRYPT_KEY=' + rand_key],
                      'command': ['jupyterhub', '-f',
                                  '/etc/jupyterhub/jupyterhub_config.py']}
 
 mount_service = {'image': MOUNT_IMAGE_TAG, 'name': MOUNT_SERVICE_NAME,
-                 'env': ['JUPYTERHUB_CRYPT_KEY=' + rand_key],
                  'endpoint_spec': docker.types.EndpointSpec(ports={2222: 22})}
 
 
