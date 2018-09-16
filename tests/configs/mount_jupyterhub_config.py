@@ -59,5 +59,6 @@ c.SwarmSpawner.resource_spec = {
 }
 
 # API tokens
-c.JupyterHub.api_tokens = {"tetedfgd09dg09":
-                               "f5bt2rclf5jvipkoiexuypkoiexu6pkoijes6t2vhvherecl2djy6u4ylnmuxwk3lbnfweczdeojsxg4z5nvqws3caonsgm43gfzrw63i"}
+c.JupyterHub.service_tokens = {"tetedfgd09dg09":
+                                   "f5bt2rclf5jvipkoiexuypkoiexu6pkoijes6t2vhvherecl2djy6"
+                                   "u4ylnmuxwk3lbnfweczdeojsxg4z5nvqws3caonsgm43gfzrw63i"}

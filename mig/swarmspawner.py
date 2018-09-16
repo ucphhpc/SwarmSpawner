@@ -200,7 +200,9 @@ class SwarmSpawner(Spawner):
         if self._service_owner is None:
             m = hashlib.md5()
             m.update(self.user.name.encode('utf-8'))
-            if hasattr(self.user, 'name'):
+            if hasattr(self.user, 'real_name'):
+                self._service_owner = self.user.real_name[-39:]
+            elif hasattr(self.user, 'name'):
                 # Maximum 63 characters, 10 are comes from the underlying format
                 # i.e. prefix=jupyter-, postfix=-1
                 # get up to last 40 characters as service identifier
