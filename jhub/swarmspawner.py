@@ -43,7 +43,7 @@ class SwarmSpawner(Spawner):
     Specify in the jupyterhub configuration file which are allowed:
     e.g.
 
-    c.JupyterHub.spawner_class = 'mig.SwarmSpawner'
+    c.JupyterHub.spawner_class = 'jhub.SwarmSpawner'
     # Available docker images the user can spawn
     c.SwarmSpawner.dockerimages = [
         {'image': 'jupyterhub/singleuser:0.8.1',

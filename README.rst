@@ -1,14 +1,13 @@
 ==============================
-SwarmSpawner
+jhub-SwarmSpawner
 ==============================
 
 .. image:: https://travis-ci.org/rasmunk/SwarmSpawner.svg?branch=master
     :target: https://travis-ci.org/rasmunk/SwarmSpawner
 
 
-**MiG SwarmSpawner** enables `JupyterHub <https://github
-.com/jupyterhub/jupyterhub>`_ to spawn jupyter notebooks that can interact
-with the MiG infrastructure.
+**jhub-SwarmSpawner** enables `JupyterHub <https://github
+.com/jupyterhub/jupyterhub>`_ to spawn jupyter notebooks across Docker Swarm cluster
 
 More info about Docker Services `here <https://docs.docker.com/engine/reference/commandline/service_create/>`_.
 
@@ -24,7 +23,7 @@ Installation
 
 .. code-block:: sh
 
-   pip install mig-swarmspawner
+   pip install jhub-swarmspawner
 
 Installation from GitHub
 ============================
@@ -48,7 +47,7 @@ Tell JupyterHub to use SwarmSpawner by adding the following lines to your `jupyt
 
 .. code-block:: python
 
-        c.JupyterHub.spawner_class = 'mig.SwarmSpawner'
+        c.JupyterHub.spawner_class = 'jhub.SwarmSpawner'
         c.JupyterHub.hub_ip = '0.0.0.0'
         # This should be the name of the jupyterhub service
         c.SwarmSpawner.jupyterhub_service_name = 'NameOfTheService'

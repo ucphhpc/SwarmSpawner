@@ -3,7 +3,7 @@ c = get_config()
 
 c.JupyterHub.hub_ip = '0.0.0.0'
 
-c.JupyterHub.spawner_class = 'mig.SwarmSpawner'
+c.JupyterHub.spawner_class = 'jhub.SwarmSpawner'
 
 # The name of the service that's running the hub
 c.SwarmSpawner.jupyterhub_service_name = "jupyterhub"

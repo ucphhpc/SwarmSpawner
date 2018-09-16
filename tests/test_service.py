@@ -224,7 +224,7 @@ mount_service = {'image': MOUNT_IMAGE_TAG, 'name': MOUNT_SERVICE_NAME,
 @pytest.mark.parametrize('swarm', [swarm_config], indirect=['swarm'])
 @pytest.mark.parametrize('network', [network_config], indirect=['network'])
 def test_sshfs_mount_hub(image, swarm, network, make_service):
-    """ Test that spawning a mig service works"""
+    """ Test that spawning a jhub service works"""
     make_service(hub_sshfs_service)
     mount_target = make_service(mount_service)
     client = docker.from_env()
