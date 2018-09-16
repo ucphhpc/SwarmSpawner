@@ -212,11 +212,11 @@ hub_sshfs_service = {'image': HUB_IMAGE_TAG, 'name': HUB_SERVICE_NAME,
                      ],
                      'networks': [NETWORK_NAME],
                      'endpoint_spec': docker.types.EndpointSpec(ports={8000: 8000}),
+                     'env': ['JUPYTERHUB_CRYPT_KEY=' + rand_key],
                      'command': ['jupyterhub', '-f',
                                  '/etc/jupyterhub/jupyterhub_config.py']}
 
 mount_service = {'image': MOUNT_IMAGE_TAG, 'name': MOUNT_SERVICE_NAME,
-                 'env': ['JUPYTERHUB_CRYPT_KEY=' + rand_key],
                  'endpoint_spec': docker.types.EndpointSpec(ports={2222: 22})}
 
 
@@ -224,7 +224,7 @@ mount_service = {'image': MOUNT_IMAGE_TAG, 'name': MOUNT_SERVICE_NAME,
 @pytest.mark.parametrize('swarm', [swarm_config], indirect=['swarm'])
 @pytest.mark.parametrize('network', [network_config], indirect=['network'])
 def test_sshfs_mount_hub(image, swarm, network, make_service):
-    """ Test that spawning a mig service works"""
+    """ Test that spawning a jhub service works"""
     make_service(hub_sshfs_service)
     mount_target = make_service(mount_service)
     client = docker.from_env()

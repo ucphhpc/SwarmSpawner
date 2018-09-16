@@ -3,7 +3,7 @@ import os
 c = get_config()
 pwd = os.path.dirname(__file__)
 
-c.JupyterHub.spawner_class = 'mig.SwarmSpawner'
+c.JupyterHub.spawner_class = 'jhub.SwarmSpawner'
 c.JupyterHub.ip = '0.0.0.0'
 c.JupyterHub.hub_ip = '0.0.0.0'
 
@@ -50,5 +50,6 @@ c.SwarmSpawner.resource_spec = {
 }
 
 # API tokens
-c.JupyterHub.api_tokens = {"tetedfgd09dg09":
-                               "f5bt2rclf5jvipkoiexuypkoiexu6pkoijes6t2vhvherecl2djy6u4ylnmuxwk3lbnfweczdeojsxg4z5nvqws3caonsgm43gfzrw63i"}
+c.JupyterHub.service_tokens = {"tetedfgd09dg09":
+                                   "f5bt2rclf5jvipkoiexuypkoiexu6pkoijes6t2vhvherecl2djy6"
+                                   "u4ylnmuxwk3lbnfweczdeojsxg4z5nvqws3caonsgm43gfzrw63i"}
