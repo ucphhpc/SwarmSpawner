@@ -4,6 +4,7 @@ import requests
 import json
 import socket
 import pytest
+from random import SystemRandom
 from os.path import dirname, join, realpath
 
 HUB_IMAGE_TAG = "hub:test"
@@ -13,6 +14,8 @@ HUB_SERVICE_NAME = "jupyterhub"
 MOUNT_SERVICE_NAME = 'mount_target'
 
 JHUB_URL = "http://127.0.0.1:8000"
+
+rand_key = ''.join(SystemRandom().choice("0123456789abcdef") for _ in range(32))
 
 # root dir
 hub_path = dirname(dirname(__file__))
@@ -109,6 +112,7 @@ remote_hub_service = {'image': HUB_IMAGE_TAG, 'name': HUB_SERVICE_NAME,
                       ],
                       'networks': [NETWORK_NAME],
                       'endpoint_spec': docker.types.EndpointSpec(ports={8000: 8000}),
+                      'env': ['JUPYTERHUB_CRYPT_KEY=' + rand_key],
                       'command': ['jupyterhub', '-f',
                                   '/etc/jupyterhub/jupyterhub_config.py']}
 
@@ -212,6 +216,7 @@ hub_sshfs_service = {'image': HUB_IMAGE_TAG, 'name': HUB_SERVICE_NAME,
                                  '/etc/jupyterhub/jupyterhub_config.py']}
 
 mount_service = {'image': MOUNT_IMAGE_TAG, 'name': MOUNT_SERVICE_NAME,
+                 'env': ['JUPYTERHUB_CRYPT_KEY=' + rand_key],
                  'endpoint_spec': docker.types.EndpointSpec(ports={2222: 22})}
 
 
