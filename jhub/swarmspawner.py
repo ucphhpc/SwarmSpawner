@@ -548,10 +548,17 @@ class SwarmSpawner(Spawner):
                 # Default image
                 image_info = self.dockerimages[0]
 
+            self.log.debug("Image info: {}".format(image_info))
+            # Does that image have restricted access
+            if 'access' in image_info and self.service_owner not in image_info['access']:
+                    self.log.error("User: {} tried to launch {} without access".format(
+                        self.service_owner, image_info['image']
+                    ))
+                    raise Exception("You don't have permission to launch that image")
+
             # Does the selected image have mounts associated
             container_spec['mounts'] = []
             mounts = []
-            self.log.debug("Image info: {}".format(image_info))
             if 'mounts' in image_info:
                 mounts = image_info['mounts']
 
