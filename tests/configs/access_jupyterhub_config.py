@@ -17,9 +17,12 @@ c.SwarmSpawner.networks = ["jh_test"]
 # user_options has to be enabled
 c.SwarmSpawner.use_user_options = True
 
+access_list = ['privileged-user']
+
 c.SwarmSpawner.dockerimages = [
     {'image': 'nielsbohr/base-notebook:devel',
-     'name': 'Basic Python Notebook'}
+     'name': 'Basic Python Notebook',
+     'access': access_list}
 ]
 
 c.SwarmSpawner.container_spec = {

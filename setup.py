@@ -11,12 +11,12 @@ with open(os.path.join(cur_dir, 'version.py')) as f:
 long_description = open('README.rst').read()
 
 setup(
-    name='mig-swarmspawner',
+    name='jhub-swarmspawner',
     version=version_ns['__version__'],
     long_description=long_description,
     description="""
-                MiG-SwarmSpawner enables JupyterHub to spawn jupyter
-                 notebooks that can interact with the MiG infrastructure.
+                 SwarmSpawner enables JupyterHub to spawn jupyter
+                 notebooks across a Docker Swarm cluster
                 """,
     url='https://github.com/rasmunk/SwarmSpawner',
     # Author details
@@ -37,6 +37,6 @@ setup(
     packages=find_packages(exclude=['contrib', 'docs', 'tests']),
     install_requires=[
         'docker>=3.4.1',
-        'jupyterhub>=0.9.1'
+        'jupyterhub>=0.9.2'
     ]
 )

@@ -43,7 +43,7 @@ class SwarmSpawner(Spawner):
     Specify in the jupyterhub configuration file which are allowed:
     e.g.
 
-    c.JupyterHub.spawner_class = 'mig.SwarmSpawner'
+    c.JupyterHub.spawner_class = 'jhub.SwarmSpawner'
     # Available docker images the user can spawn
     c.SwarmSpawner.dockerimages = [
         {'image': 'jupyterhub/singleuser:0.8.1',
@@ -200,10 +200,8 @@ class SwarmSpawner(Spawner):
         if self._service_owner is None:
             m = hashlib.md5()
             m.update(self.user.name.encode('utf-8'))
-            if hasattr(self.user, 'auth_state') and isinstance(
-                    self.user.auth_state, dict) and 'real_name' in \
-                    self.user.auth_state:
-                self._service_owner = self.user.auth_state['real_name']
+            if hasattr(self.user, 'real_name'):
+                self._service_owner = self.user.real_name[-39:]
             elif hasattr(self.user, 'name'):
                 # Maximum 63 characters, 10 are comes from the underlying format
                 # i.e. prefix=jupyter-, postfix=-1
@@ -550,10 +548,17 @@ class SwarmSpawner(Spawner):
                 # Default image
                 image_info = self.dockerimages[0]
 
+            self.log.debug("Image info: {}".format(image_info))
+            # Does that image have restricted access
+            if 'access' in image_info and self.service_owner not in image_info['access']:
+                    self.log.error("User: {} tried to launch {} without access".format(
+                        self.service_owner, image_info['image']
+                    ))
+                    raise Exception("You don't have permission to launch that image")
+
             # Does the selected image have mounts associated
             container_spec['mounts'] = []
             mounts = []
-            self.log.debug("Image info: {}".format(image_info))
             if 'mounts' in image_info:
                 mounts = image_info['mounts']
 

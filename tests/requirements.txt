@@ -1,5 +1,5 @@
 docker==3.4.1
-jupyterhub==0.9.1
+jupyterhub==0.9.2
 docutils
 pygments
 flake8
