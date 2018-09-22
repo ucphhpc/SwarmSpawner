@@ -200,7 +200,11 @@ class SwarmSpawner(Spawner):
         if self._service_owner is None:
             m = hashlib.md5()
             m.update(self.user.name.encode('utf-8'))
-            if hasattr(self.user, 'name'):
+            if hasattr(self.user, 'auth_state') and isinstance(
+                    self.user.auth_state, dict) and 'real_name' in \
+                    self.user.auth_state:
+                self._service_owner = self.user.auth_state['real_name']
+            elif hasattr(self.user, 'name'):
                 # Maximum 63 characters, 10 are comes from the underlying format
                 # i.e. prefix=jupyter-, postfix=-1
                 # get up to last 40 characters as service identifier
@@ -503,7 +507,7 @@ class SwarmSpawner(Spawner):
         You can specify the params for the service through
         jupyterhub_config.py or using the user_options
         """
-        self.log.info("User: {}, start spawn".format(self.user))
+        self.log.info("User: {}, start spawn".format(self.user.__dict__))
 
         # https://github.com/jupyterhub/jupyterhub
         # /blob/master/jupyterhub/user.py#L202

@@ -4,6 +4,7 @@ import requests
 import json
 import socket
 import pytest
+from random import SystemRandom
 from os.path import dirname, join, realpath
 
 HUB_IMAGE_TAG = "hub:test"
@@ -31,6 +32,8 @@ hub_service = {'image': HUB_IMAGE_TAG, 'name': HUB_SERVICE_NAME,
                'networks': [NETWORK_NAME],
                'endpoint_spec': docker.types.EndpointSpec(ports={8000: 8000}),
                'command': ['jupyterhub', '-f', '/etc/jupyterhub/jupyterhub_config.py']}
+
+rand_key = ''.join(SystemRandom().choice("0123456789abcdef") for _ in range(32))
 
 
 @pytest.mark.parametrize('image', [hub_image], indirect=['image'])
@@ -109,6 +112,7 @@ remote_hub_service = {'image': HUB_IMAGE_TAG, 'name': HUB_SERVICE_NAME,
                       ],
                       'networks': [NETWORK_NAME],
                       'endpoint_spec': docker.types.EndpointSpec(ports={8000: 8000}),
+                      'env': ['JUPYTERHUB_CRYPT_KEY=' + rand_key],
                       'command': ['jupyterhub', '-f',
                                   '/etc/jupyterhub/jupyterhub_config.py']}
 
