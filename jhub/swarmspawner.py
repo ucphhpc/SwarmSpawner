@@ -13,9 +13,9 @@ from concurrent.futures import ThreadPoolExecutor
 from pprint import pformat
 from docker.errors import APIError
 from docker.tls import TLSConfig
-from docker.types import TaskTemplate, Resources, ContainerSpec, DriverConfig, \
-    Mount
+from docker.types import TaskTemplate, Resources, ContainerSpec
 from docker.utils import kwargs_from_env
+from jhub.mount import Mounter, LocalVolumeMounter
 from tornado import gen
 from jupyterhub.spawner import Spawner
 from traitlets import (
@@ -25,6 +25,7 @@ from traitlets import (
     List,
     Bool,
     Int,
+    Type
 )
 
 
@@ -323,59 +324,6 @@ class SwarmSpawner(Spawner):
         return service
 
     @gen.coroutine
-    def init_mount(self, mount):
-        self.log.debug("init_mount: {}".format(mount))
-        # Volume name
-        if 'source' in mount:
-            mount['source'] = mount['source'].format(
-                username=self.service_owner)
-
-            # If a previous user volume is present, remove it
-            try:
-                yield self.docker('inspect_volume', mount['source'])
-            except docker.errors.NotFound:
-                self.log.info("No volume named: " + mount['source'])
-            else:
-                yield self.remove_volume(mount['source'])
-
-        # Custom volume
-        if 'driver_config' in mount:
-            # Replace if placeholder is present
-            if 'sshcmd' in mount['driver_options']:
-                if mount['driver_options']['sshcmd'] == '{sshcmd}':
-                    mount['driver_options']['sshcmd'] \
-                        = self.user.mount['USERNAME'] \
-                        + self.user.mount['PATH']
-
-                elif mount['driver_options']['sshcmd'] == '':
-                    self.log.error(
-                        "User: {} has a misconfigured mount {}, missing "
-                        "sshcmd value".format(self.user, mount[
-                            'driver_options']))
-                    raise Exception("Mount is misconfigured, missing sshcmd")
-
-            if 'id_rsa' in mount['driver_options']:
-                if mount['driver_options']['id_rsa'] == '{id_rsa}':
-                    mount['driver_options']['id_rsa'] = self.user.mount[
-                        'PRIVATEKEY']
-
-                elif mount['driver_options']['id_rsa'] == '':
-                    if 'password' not in mount['driver_options'] or \
-                       mount['driver_options']['password'] == '':
-                        self.log.error(
-                            "User: {} has a misconfigured mount {},"
-                            " missing both id_rsa and password "
-                            "value".format(self.user, mount['driver_options']))
-                        raise Exception("Mount is misconfigured, "
-                                        "no authentication secret is available")
-
-            mount['driver_config'] = DriverConfig(
-                name=mount['driver_config'],
-                options=mount['driver_options'])
-            del mount['driver_options']
-        self.log.debug("End of init mount: {}".format(mount))
-
-    @gen.coroutine
     def poll(self):
         """Check for a task state like `docker service ps id`"""
         service = yield self.get_service()
@@ -563,11 +511,13 @@ class SwarmSpawner(Spawner):
                 mounts = image_info['mounts']
 
             for mount in mounts:
-                self.log.info("mount: {}".format(mount))
-                m = dict(**mount)
-                yield self.validate_mount(m)
-                yield self.init_mount(m)
-                container_spec['mounts'].append(Mount(**m))
+                # Expects a mount_class that supports 'create'
+                if hasattr(self.user, 'data'):
+                    m = yield mount.create(self.user.data)
+                else:
+                    m = yield mount.create()
+
+                container_spec['mounts'].append(m)
 
             # Some envs are required by the single-user-image
             if 'env' in container_spec:
@@ -679,46 +629,6 @@ class SwarmSpawner(Spawner):
                                 "No volume named: " + volume['Source'])
                         else:
                             yield self.remove_volume(volume['Source'])
-
-    @gen.coroutine
-    def validate_mount(self, mount):
-        # Whether to skip validation
-        if 'skip_validation' in mount and mount['skip_validation']:
-            del mount['skip_validation']
-            return
-        if 'driver_config' in mount \
-                and 'rasmunk/sshfs' in mount['driver_config']:
-            if not hasattr(self.user, 'mount') or \
-                    self.user.mount is None:
-                self.log.error("User: {} missing mount "
-                               "attribute".format(self.user))
-                raise Exception("Can't start that particular "
-                                "notebook image, missing mount values,"
-                                " try reinitializing them through the"
-                                " access gateway again")
-            else:
-                # Validate required dictionary keys
-                required_keys = ['HOST', 'USERNAME',
-                                 'PATH', 'PRIVATEKEY']
-                missing_keys = [key for key in required_keys if
-                                key not in self.user.mount]
-                # Skip validation if debug
-                if len(missing_keys) > 0:
-                    self.log.error(
-                        "User: {} missing mount keys: {}"
-                            .format(self.user,
-                                    ",".join(missing_keys)))
-                    raise Exception(
-                        "Mount keys are available "
-                        "but missing the following items: {} "
-                        "try reinitialize them "
-                        "through the access interface"
-                        .format(",".join(missing_keys))
-                    )
-                else:
-                    self.log.info(
-                        "User: {} mount contains:"
-                        " {}".format(self.user, self.user.mount))
 
     @gen.coroutine
     def wait_for_running_tasks(self):

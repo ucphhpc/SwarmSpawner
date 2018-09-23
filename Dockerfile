@@ -8,7 +8,13 @@ ADD setup.py SwarmSpawner/setup.py
 ADD requirements.txt SwarmSpawner/requirements.txt
 ADD version.py SwarmSpawner/version.py
 
-RUN pip install jhub-authenticators
+RUN git clone https://github.com/rasmunk/jhub-authenticators.git \
+    --single-branch --branch devel \
+    && cd jhub-authenticators \
+    && pip install -r requirements.txt \
+    && python setup.py install \
+    && cd .. \
+    && rm -r jhub-authenticators
 
 RUN cd SwarmSpawner \
     && pip install -r requirements.txt \
