@@ -1,6 +1,7 @@
 from tornado import gen
 from traitlets.config import LoggingConfigurable, Config
 from docker.types import DriverConfig
+from flatten_dict import flatten
 
 
 class Mounter(LoggingConfigurable):
@@ -49,8 +50,8 @@ class SSHFSMounter(Mounter):
                 and 'password' not in self.config['driver_options'] \
                 or 'id_rsa' in self.config['driver_options'] \
                 and 'password' in self.config['driver_options']:
-            err_msg.append("create_mount requires either a 'id_rsa' or 'password' "
-                           "driver_options key")
+            err_msg.append("create_mount requires either a 'id_rsa'"
+                           " or 'password' driver_options key")
             err = True
 
         if 'id_rsa' in self.config['driver_options'] \
@@ -66,36 +67,41 @@ class SSHFSMounter(Mounter):
             raise Exception("An error occurred during mount creation")
 
         mount = {'driver_config': self.config['driver_config'],
-                 'driver_options': {}.update(self.config['driver_options'])}
+                 'driver_options': {}}
+        mount['driver_options'].update(self.config['driver_options'])
 
         # Dynamic mount target
         if self.config['driver_options']['sshcmd'] == '{sshcmd}':
             # Validate that the proper values are present
-            username = yield self.get_from_data('USERNAME')
-            path = yield self.get_from_data('PATH')
+            username = yield self.get_from('USERNAME', data)
+            path = yield self.get_from('PATH', data)
             mount['driver_options']['sshcmd'] = username + path
 
         if self.config['driver_options']['id_rsa'] == '{id_rsa}':
-            key = yield self.get_from_data('PRIVATEKEY')
+            key = yield self.get_from('PRIVATEKEY', data)
             mount['driver_options']['id_rsa'] = key
-
-        return DriverConfig(name=mount['driver_config'], options=mount['driver_options'])
+        return DriverConfig(name=mount['driver_config'],
+                            options=mount['driver_options'])
 
     @gen.coroutine
     def validate_config(self):
         self.log.debug("validate_config")
         required_config_keys = ['type', 'driver_config',
                                 'driver_options', 'source', 'target']
-        missing_keys = [key for key in required_config_keys if key not in self.config]
+        missing_keys = [key for key in required_config_keys
+                        if key not in self.config]
 
         if missing_keys:
-            self.log.error("Missing configure keys {}".format(','.join(missing_keys)))
+            self.log.error("Missing configure keys {}".format(
+                ','.join(missing_keys)))
             raise Exception("A mount configuration error was encountered, "
                             "due to missing keys")
 
-        empty_values = [key for key in required_config_keys if not self.config[key]]
+        empty_values = [key for key in required_config_keys
+                        if not self.config[key]]
         if empty_values:
-            self.log.error("Missing configuring values {}".format(','.join(empty_values)))
+            self.log.error("Missing configuring values {}".format(
+                ','.join(empty_values)))
             raise Exception("A mount configuration error was encountered, "
                             "due to missing values")
 
@@ -103,15 +109,25 @@ class SSHFSMounter(Mounter):
         for key, val in self.config.items():
             if key == 'driver_options':
                 if not isinstance(val, dict):
-                    raise Exception("{} is expected to be of a {} type".format(key, dict))
+                    raise Exception("{} is expected to be of a {} type".format(
+                        key, dict))
             else:
                 if not isinstance(val, str):
-                    raise Exception("{} is expected to be of {} type".format(key, str))
+                    raise Exception("{} is expected to be of {} type".format(
+                        key, str))
 
     @gen.coroutine
-    def get_from_data(self, data):
-        pass
+    def get_from(self, key, data):
+        if data is None or not isinstance(data, dict):
+            self.log.error("validate_data {} is not valid".format(data))
+            raise Exception("Missing information to mount the host in question "
+                            "with. Try to reinitialize them")
 
+        flatten_data = flatten(data, reducer='tuple')
+        for f_key, f_val in flatten_data.items():
+            if key in f_key:
+                return f_val
+        return None
 
     # @gen.coroutine
     # def validate_data(self, data):
