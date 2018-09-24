@@ -15,7 +15,6 @@ from docker.errors import APIError
 from docker.tls import TLSConfig
 from docker.types import TaskTemplate, Resources, ContainerSpec
 from docker.utils import kwargs_from_env
-from jhub.mount import Mounter, LocalVolumeMounter
 from tornado import gen
 from jupyterhub.spawner import Spawner
 from traitlets import (
@@ -24,8 +23,7 @@ from traitlets import (
     Unicode,
     List,
     Bool,
-    Int,
-    Type
+    Int
 )
 
 
@@ -105,12 +103,12 @@ class SwarmSpawner(Spawner):
         if not self.use_user_options:
             return form_data
 
-        default = self.dockerimages[0]
+        i_default = self.dockerimages[0]
         # formdata looks like {'dockerimage': ['jupyterhub/singleuser']}"""
-        image = form_data.get('dockerimage', [default])[0]
+        image = form_data.get('dockerimage', [i_default])[0]
         # Don't allow users to input their own images
         if image not in [image['image'] for image in self.dockerimages]:
-            image = default
+            image = i_default
         options = {'user_selected_image': image}
         return options
 

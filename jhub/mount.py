@@ -163,7 +163,8 @@ class SSHFSMounter(Mounter):
     #
     #     empty_values = [val for key, val in data.items() if not data[key]]
     #     if empty_values:
-    #         self.log.error("Missing mount data values {}".format(','.join(empty_values)))
+    #         self.log.error("Missing mount data values {}".format(
+    # ','.join(empty_values)))
     #         raise Exception("A mount configuration error was encountered, "
     #                         "due to empty data values")
 
@@ -179,7 +180,6 @@ class SSHFSMounter(Mounter):
         yield self.validate_config()
         mount = yield self.create_mount(data)
         return mount
-
 
     @gen.coroutine
     def remove(self):
