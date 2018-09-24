@@ -96,6 +96,25 @@ The notebook server command should not be the ENTRYPOINT, so generally use ``arg
 
 See this `issue <https://github.com/cassinyio/SwarmSpawner/issues/6>`_  for more info.
 
+Placement__
+---------------------
+__ https://docs.docker.com/engine/swarm/services/#control-service-placement
+
+The spawner supports Docker Swarm service placement configurations to be imposed on the
+spawned services. This includes the option to specify
+`constraints <https://docs.docker.com/engine/reference/commandline/service_create/#specify-service-constraints---constraint>`_
+and `preferences <https://docs.docker
+.com/engine/reference/commandline/service_create/#specify-service-placement-preferences
+---placement-pref>`_
+These can be imposed as a placement policy to all services being spawned. E.g.
+
+.. code-block:: python
+
+    c.SwarmSpawner.placement = {
+        'constraints': ['node.hostname==worker1'],
+        'preferences': ['spread=node.labels.datacenter']
+    }
+
 Dockerimages
 ---------------------
 
@@ -114,7 +133,36 @@ The individual dictionaries also makes it possible to define whether the image s
     ]
 
 
-To make the user able to select between the available images, the following must be set.
+
+It is also possible to specify individual placement policies for each image.
+E.g.
+
+.. code-block:: python
+
+    # Available docker images the user can spawn
+    c.SwarmSpawner.dockerimages = [
+        {'image': 'jupyter/base-notebook:30f16d52126f',
+         'name': 'Minimal python notebook',
+         'placement': {'constraint': ['node.hostname==worker1']}},
+    ]
+
+
+Beyond placement policy, it is also possible to specify a 'whitelist' of users who have
+permission to start a specific image via the 'access' key. Such that only mentioned
+usernames are able to spawn that particular image.
+
+.. code-block:: python
+
+    # Available docker images the user can spawn
+    c.SwarmSpawner.dockerimages = [
+        {'image': 'jupyter/base-notebook:30f16d52126f',
+         'name': 'Minimal python notebook',
+         'access': ['admin']},
+    ]
+
+
+To make the user able to select between multiple available images, the following must be
+set.
 If this is not the case, the user will simply spawn an instance of the default image. i.e. dockerimages[0]
 
 .. code-block:: python
@@ -189,15 +237,17 @@ in addition the typical sshfs flags are supported, defaults to port 22
 
 .. code-block:: python
 
+        from jhub.mount import SSHFSMounter
 
-    mounts = [{'type': 'volume',
-               'driver_config': 'rasmunk/sshfs:latest',
-               'driver_options': {'sshcmd': '{sshcmd}', 'id_rsa': '{id_rsa}',
-                                  'big_writes': '', 'allow_other': '',
-                                  'reconnect': '', 'port': '2222'},
-               'source': 'sshvolume-user-{username}',
-               'target': '/home/jovyan/work'
-               }]
+        mounts = [SSHFSMounter({
+                    'type': 'volume',
+                    'driver_config': 'rasmunk/sshfs:latest',
+                    'driver_options': {'sshcmd': '{sshcmd}', 'id_rsa': '{id_rsa}',
+                                       'one_time': 'True',
+                                       'big_writes': '', 'allow_other': '',
+                                       'reconnect': '', 'port': '2222'},
+                    'source': 'sshvolume-user-{username}',
+                    'target': '/home/jovyan/work'})]
 
 
 Resource_spec
@@ -254,8 +304,8 @@ The spawner expect a dict with these keys:
                                 # (int) – Memory reservation in bytes
                                 'mem_reservation': int(512 * 1e6),
                                 },
-                        # list of constrains
-                        'placement' : [],
+                        # dict of constraints
+                        'placement' : {'constraints': []},
                         # list of networks
                         'network' : [],
                         # name of service

@@ -41,6 +41,24 @@ def network(request):
 
 
 @pytest.fixture(scope='function')
+def pull_image(request):
+    client = docker.from_env()
+    _image = client.images.pull(**request.param)
+    yield _image
+
+    image_obj = _image[0]
+    image_id = image_obj.id
+    client.images.remove(image_obj.tags[0], force=True)
+
+    removed = False
+    while not removed:
+        try:
+            client.images.get(image_id)
+        except NotFound:
+            removed = True
+
+
+@pytest.fixture(scope='function')
 def image(request):
     client = docker.from_env()
     _image = client.images.build(**request.param)
