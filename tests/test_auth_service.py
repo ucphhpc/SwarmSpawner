@@ -28,7 +28,7 @@ network_config = {'name': NETWORK_NAME, 'driver': 'overlay',
                   'options': {'subnet': '192.168.0.0/20'},
                   'attachable': True}
 hub_config = join(dirname(realpath(__file__)), 'configs', 'jupyterhub_config.py')
-hub_service = {'image': 'nielsbohr/jupyterhub:devel', 'name': HUB_SERVICE_NAME,
+hub_service = {'image': HUB_IMAGE_TAG, 'name': HUB_SERVICE_NAME,
                'mounts': [
                    ':'.join(['/var/run/docker.sock', '/var/run/docker.sock', 'rw']),
                    ':'.join([hub_config, '/etc/jupyterhub/jupyterhub_config.py', 'ro'])
@@ -86,7 +86,7 @@ def test_remote_auth_hub(image, swarm, network, make_service):
         assert spawn_form_resp.status_code == 200
         assert 'Select a notebook image' in spawn_form_resp.text
         payload = {
-            'dockerimage': 'nielsbohr/base-notebook:devel'
+            'dockerimage': 'nielsbohr/base-notebook:latest'
         }
         spawn_resp = s.post(JHUB_URL + "/hub/spawn", data=payload)
         assert spawn_resp.status_code == 200

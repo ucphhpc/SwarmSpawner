@@ -100,7 +100,7 @@ def test_sshfs_mount_hub(image, swarm, network, make_service):
         assert spawn_form_resp.status_code == 200
         assert 'Select a notebook image' in spawn_form_resp.text
         payload = {
-            'dockerimage': 'nielsbohr/base-notebook:devel'
+            'dockerimage': 'nielsbohr/base-notebook:latest'
         }
 
         target_user = 'mountuser'
