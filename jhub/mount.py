@@ -103,7 +103,9 @@ class SSHFSMounter(Mounter):
             raise Exception("A mount configuration error was encountered, "
                             "due to missing keys")
 
-        empty_values = [key for key in required_config_keys
+        required_config_values = ['type', 'driver_config',
+                                  'driver_options', 'target']
+        empty_values = [key for key in required_config_values
                         if not self.config[key]]
         if empty_values:
             self.log.error("Missing configuring values {}".format(

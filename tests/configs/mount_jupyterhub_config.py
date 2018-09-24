@@ -25,6 +25,7 @@ sshfs_mount = SSHFSMounter({
             'type': 'volume',
             'driver_config': 'rasmunk/sshfs:latest',
             'driver_options': {'sshcmd': '{sshcmd}', 'id_rsa': '{id_rsa}',
+                               'one_time': 'True',
                                'big_writes': '', 'allow_other': '',
                                'reconnect': '', 'port': '2222'},
             'source': 'sshvolume-user-{username}',
@@ -50,6 +51,7 @@ c.SwarmSpawner.dockerimages = [
 # Authenticator -> remote user header
 c.JupyterHub.authenticator_class = 'jhubauthenticators.DataRemoteUserAuthenticator'
 c.DataRemoteUserAuthenticator.data_headers = ['Mount']
+c.Authenticator.enable_auth_state = True
 
 # Limit cpu/mem to 4 cores/8 GB mem
 # During congestion, kill random internal processes to limit
