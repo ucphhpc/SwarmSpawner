@@ -1,6 +1,6 @@
 from tornado import gen
 from traitlets.config import LoggingConfigurable, Config
-from docker.types import DriverConfig
+from docker.types import DriverConfig, Mount
 from flatten_dict import flatten
 
 
@@ -66,22 +66,28 @@ class SSHFSMounter(Mounter):
             self.log.error("create_mount failed: {}".format(','.join(err_msg)))
             raise Exception("An error occurred during mount creation")
 
-        mount = {'driver_config': self.config['driver_config'],
-                 'driver_options': {}}
-        mount['driver_options'].update(self.config['driver_options'])
+        driver = {'driver_config': self.config['driver_config'],
+                  'driver_options': {}}
+        driver['driver_options'].update(self.config['driver_options'])
+        del self.config['driver_options']
 
-        # Dynamic mount target
-        if self.config['driver_options']['sshcmd'] == '{sshcmd}':
+        # Setup driver
+        if driver['driver_options']['sshcmd'] == '{sshcmd}':
             # Validate that the proper values are present
             username = yield self.get_from('USERNAME', data)
             path = yield self.get_from('PATH', data)
-            mount['driver_options']['sshcmd'] = username + path
+            driver['driver_options']['sshcmd'] = username + path
 
-        if self.config['driver_options']['id_rsa'] == '{id_rsa}':
+        if driver['driver_options']['id_rsa'] == '{id_rsa}':
             key = yield self.get_from('PRIVATEKEY', data)
-            mount['driver_options']['id_rsa'] = key
-        return DriverConfig(name=mount['driver_config'],
-                            options=mount['driver_options'])
+            driver['driver_options']['id_rsa'] = key
+
+        mount = {}
+        mount.update(self.config)
+        mount['driver_config'] = DriverConfig(
+            name=driver['driver_config'],
+            options=driver['driver_options'])
+        return Mount(**mount)
 
     @gen.coroutine
     def validate_config(self):
@@ -162,8 +168,19 @@ class SSHFSMounter(Mounter):
     #                         "due to empty data values")
 
     @gen.coroutine
-    def create(self, data=None):
+    def create(self, data=None, owner=None):
         self.log.info("Creating a new mount {}".format(data))
+        # Check if username specfic source is expected
+        if 'source' in self.config and owner is not None:
+            self.config['source'] = self.config['source'].format(
+                username=owner
+            )
+
         yield self.validate_config()
         mount = yield self.create_mount(data)
         return mount
+
+
+    @gen.coroutine
+    def remove(self):
+        pass

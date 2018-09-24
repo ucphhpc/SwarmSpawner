@@ -1,5 +1,6 @@
 docker==3.4.1
 jupyterhub==0.9.2
+flatten-dict
 docutils
 pygments
 flake8

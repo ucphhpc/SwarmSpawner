@@ -513,9 +513,9 @@ class SwarmSpawner(Spawner):
             for mount in mounts:
                 # Expects a mount_class that supports 'create'
                 if hasattr(self.user, 'data'):
-                    m = yield mount.create(self.user.data)
+                    m = yield mount.create(self.user.data, owner=self.service_owner)
                 else:
-                    m = yield mount.create()
+                    m = yield mount.create(owner=self.service_owner)
 
                 container_spec['mounts'].append(m)
 
