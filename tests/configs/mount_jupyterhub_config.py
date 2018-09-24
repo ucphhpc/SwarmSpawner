@@ -42,18 +42,13 @@ c.SwarmSpawner.container_spec = {
 c.SwarmSpawner.use_user_options = True
 
 # Available docker images the user can spawn
-# Additional settings include,
-# access
+# Additional settings including, access, mounts, placement
 c.SwarmSpawner.dockerimages = [
     {'image': 'nielsbohr/base-notebook:devel',
      'name': 'Basic Python Notebook',
      'mounts': sshfs_mount,
-     },
-    {'image': 'nielsbohr/base-notebook:devel',
-     'name': 'Basic Python Notebook',
-     'mounts': sshfs_mount,
-     'placement': []
-     },
+     'placement': {'constraints': []}
+     }
 ]
 
 # Authenticator -> remote user header

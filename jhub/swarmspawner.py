@@ -164,7 +164,7 @@ class SwarmSpawner(Spawner):
     resource_spec = Dict(
         {}, config=True, help="Params about cpu and memory limits")
 
-    placement = List([], config=True,
+    placement = Dict({}, config=True,
                      help=dedent(
                          """List of placement constraints into the swarm
                          """))
@@ -544,10 +544,12 @@ class SwarmSpawner(Spawner):
             if user_options.get('placement') is not None:
                 placement = user_options.get('placement')
 
-            # Image specific placement
+            # Image to spawn
             image = image_info['image']
-            if placement is None and 'placement' in image:
-                placement = image['placement']
+
+            # Placement of image
+            if 'placement' in image_info:
+                placement = image_info['placement']
 
             # Create the service
             container_spec = ContainerSpec(image, **container_spec)
