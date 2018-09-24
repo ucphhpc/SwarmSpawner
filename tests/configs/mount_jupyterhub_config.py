@@ -21,7 +21,7 @@ c.SwarmSpawner.networks = ["jh_test"]
 notebook_dir = os.environ.get('NOTEBOOK_DIR') or '/home/jovyan/work/'
 c.SwarmSpawner.notebook_dir = notebook_dir
 
-sshfs_mount = SSHFSMounter({
+sshfs_mount = [SSHFSMounter({
             'type': 'volume',
             'driver_config': 'rasmunk/sshfs:latest',
             'driver_options': {'sshcmd': '{sshcmd}', 'id_rsa': '{id_rsa}',
@@ -29,7 +29,7 @@ sshfs_mount = SSHFSMounter({
                                'big_writes': '', 'allow_other': '',
                                'reconnect': '', 'port': '2222'},
             'source': 'sshvolume-user-{username}',
-            'target': '/home/jovyan/work'})
+            'target': '/home/jovyan/work'})]
 
 # 'args' is the command to run inside the service
 # These are run inside every service
@@ -42,10 +42,13 @@ c.SwarmSpawner.container_spec = {
 c.SwarmSpawner.use_user_options = True
 
 # Available docker images the user can spawn
+# Additional settings include,
+# access
 c.SwarmSpawner.dockerimages = [
     {'image': 'nielsbohr/base-notebook:devel',
      'name': 'Basic Python Notebook',
-     'mounts': [sshfs_mount]}
+     'mounts': sshfs_mount,
+     },
 ]
 
 # Authenticator -> remote user header

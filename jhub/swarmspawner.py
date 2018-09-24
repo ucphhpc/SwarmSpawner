@@ -514,7 +514,6 @@ class SwarmSpawner(Spawner):
                     m = yield mount.create(self.user.data, owner=self.service_owner)
                 else:
                     m = yield mount.create(owner=self.service_owner)
-
                 container_spec['mounts'].append(m)
 
             # Some envs are required by the single-user-image
