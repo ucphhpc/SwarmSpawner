@@ -49,6 +49,11 @@ c.SwarmSpawner.dockerimages = [
      'name': 'Basic Python Notebook',
      'mounts': sshfs_mount,
      },
+    {'image': 'nielsbohr/base-notebook:devel',
+     'name': 'Basic Python Notebook',
+     'mounts': sshfs_mount,
+     'placement': []
+     },
 ]
 
 # Authenticator -> remote user header

@@ -13,7 +13,7 @@ from concurrent.futures import ThreadPoolExecutor
 from pprint import pformat
 from docker.errors import APIError
 from docker.tls import TLSConfig
-from docker.types import TaskTemplate, Resources, ContainerSpec
+from docker.types import TaskTemplate, Resources, ContainerSpec, Placement
 from docker.utils import kwargs_from_env
 from tornado import gen
 from jupyterhub.spawner import Spawner
@@ -537,16 +537,22 @@ class SwarmSpawner(Spawner):
             if user_options.get('networks') is not None:
                 networks = user_options.get('networks')
 
+            # Global placement
             placement = None
             if hasattr(self, 'placement'):
                 placement = self.placement
             if user_options.get('placement') is not None:
                 placement = user_options.get('placement')
 
+            # Image specific placement
             image = image_info['image']
+            if placement is None and 'placement' in image:
+                placement = image['placement']
+
             # Create the service
             container_spec = ContainerSpec(image, **container_spec)
             resources = Resources(**resource_spec)
+            placement = Placement(**placement)
 
             task_spec = {'container_spec': container_spec,
                          'resources': resources,

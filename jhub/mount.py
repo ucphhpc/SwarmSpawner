@@ -137,39 +137,6 @@ class SSHFSMounter(Mounter):
                 return f_val
         return None
 
-    # @gen.coroutine
-    # def validate_data(self, data):
-    #     self.log.debug("validate_data: {}".format(data))
-    #     if data is None:
-    #         self.log.error("validate_data {} has not been set".format(data))
-    #         raise Exception("Missing information to mount the host in question with."
-    #                         "Try to reinitialize them")
-    #
-    #     if not isinstance(data, dict):
-    #         self.log.error("validate_data {} is expected to be of a {} type".format(
-    #             data, dict))
-    #         raise Exception("The data required for mounting a specific host is "
-    #                         "incorrectly formatted")
-    #
-    #     # Validate required dictionary keys
-    #     required_keys = ['HOST', 'USERNAME', 'PATH', 'PRIVATEKEY']
-    #     missing_keys = [key for key in required_keys
-    #                     for d_key, d_val in data.items()
-    #                     if key not in data and key not in d_val]
-    #
-    #     # Skip validation if debug
-    #     if missing_keys:
-    #         self.log.error("Missing mount keys: {}".format(",".join(missing_keys)))
-    #         raise Exception("The data required for mounting a specific host is not "
-    #                         "present, Try to reinitialize them")
-    #
-    #     empty_values = [val for key, val in data.items() if not data[key]]
-    #     if empty_values:
-    #         self.log.error("Missing mount data values {}".format(
-    # ','.join(empty_values)))
-    #         raise Exception("A mount configuration error was encountered, "
-    #                         "due to empty data values")
-
     @gen.coroutine
     def create(self, data=None, owner=None):
         self.log.info("Creating a new mount {}".format(data))
