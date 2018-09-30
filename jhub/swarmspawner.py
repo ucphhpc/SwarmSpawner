@@ -526,6 +526,7 @@ class SwarmSpawner(Spawner):
             self.log.debug("User: {} container_spec mounts: {}".format(
                 self.user, container_spec['mounts']))
 
+            # Global resource_spec
             resource_spec = {}
             if hasattr(self, 'resource_spec'):
                 resource_spec = self.resource_spec
@@ -546,6 +547,10 @@ class SwarmSpawner(Spawner):
 
             # Image to spawn
             image = image_info['image']
+
+            # Image resources
+            if 'resource_spec' in image_info:
+                resource_spec = image_info['resource_spec']
 
             # Placement of image
             if 'placement' in image_info:

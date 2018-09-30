@@ -37,6 +37,10 @@ setup(
     packages=find_packages(exclude=['contrib', 'docs', 'tests']),
     install_requires=[
         'docker>=3.4.1',
-        'jupyterhub>=0.9.2'
+        'jupyterhub>=0.9.2',
+        'flatten-dict',
+        'traitlets',
+        'tornado',
+        'async_generator'
     ]
 )
