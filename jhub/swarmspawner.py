@@ -631,6 +631,9 @@ class SwarmSpawner(Spawner):
             if volumes is not None:
                 for volume in volumes:
                     if 'Source' in volume:
+                        labels = volume.get('Labels', {})
+                        if 'jhub.SwarmSpawner.keep' in labels:
+                            continue
                         # Validate the volume exists
                         try:
                             yield self.docker('inspect_volume',
