@@ -6,16 +6,12 @@ before_install:
 - sudo apt-get update
 - sudo apt-get -y -o Dpkg::Options::="--force-confnew" install docker-ce
 install:
-- pip install -r requirements/tests.txt
-- docker pull jupyterhub/jupyterhub:0.8.1
-- docker pull jupyter/base-notebook:30f16d52126f
-- docker pull nielsbohr/mig-mount-dummy:latest
-- docker pull nielsbohr/base-notebook:latest
+- pip install -r tests/requirements.txt
 - docker plugin install rasmunk/sshfs --grant-all-permissions
 script:
 - python setup.py check -rms
 - flake8
-- pytest -s -v tests/
+- travis_wait pytest -s -v tests/
 deploy:
   skip_cleanup: true
   distributions: sdist bdist_wheel

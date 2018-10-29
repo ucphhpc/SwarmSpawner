@@ -5,10 +5,15 @@ server in a separate Docker Service
 
 import hashlib
 import docker
+import copy
+from asyncio import sleep
+from async_generator import async_generator, yield_
 from textwrap import dedent
 from concurrent.futures import ThreadPoolExecutor
 from pprint import pformat
 from docker.errors import APIError
+from docker.tls import TLSConfig
+from docker.types import TaskTemplate, Resources, ContainerSpec, Placement
 from docker.utils import kwargs_from_env
 from tornado import gen
 from jupyterhub.spawner import Spawner
@@ -18,7 +23,7 @@ from traitlets import (
     Unicode,
     List,
     Bool,
-    Int,
+    Int
 )
 
 
@@ -37,7 +42,7 @@ class SwarmSpawner(Spawner):
     Specify in the jupyterhub configuration file which are allowed:
     e.g.
 
-    c.JupyterHub.spawner_class = 'mig.SwarmSpawner'
+    c.JupyterHub.spawner_class = 'jhub.SwarmSpawner'
     # Available docker images the user can spawn
     c.SwarmSpawner.dockerimages = [
         {'image': 'jupyterhub/singleuser:0.8.1',
@@ -79,12 +84,12 @@ class SwarmSpawner(Spawner):
             return self.disabled_form
 
         # Support the use of dynamic string replacement
-        if hasattr(self.user, 'mig_mount'):
+        if hasattr(self.user, 'mount'):
             for di in self.dockerimages:
                 if '{replace_me}' in di['name']:
                     di['name'] = di['name'].replace('{replace_me}',
-                                                    self.user.mig_mount[
-                                                        'MOUNT_HOST'])
+                                                    self.user.mount[
+                                                        'HOST'])
         options = ''.join([
             self.option_template.format(image=di['image'], name=di['name'])
             for di in self.dockerimages
@@ -98,12 +103,12 @@ class SwarmSpawner(Spawner):
         if not self.use_user_options:
             return form_data
 
-        default = self.dockerimages[0]
+        i_default = self.dockerimages[0]
         # formdata looks like {'dockerimage': ['jupyterhub/singleuser']}"""
-        image = form_data.get('dockerimage', [default])[0]
+        image = form_data.get('dockerimage', [i_default])[0]
         # Don't allow users to input their own images
         if image not in [image['image'] for image in self.dockerimages]:
-            image = default
+            image = i_default
         options = {'user_selected_image': image}
         return options
 
@@ -125,7 +130,7 @@ class SwarmSpawner(Spawner):
         if cls._client is None:
             kwargs = {}
             if self.tls_config:
-                kwargs['tls'] = docker.tls.TLSConfig(**self.tls_config)
+                kwargs['tls'] = TLSConfig(**self.tls_config)
             kwargs.update(kwargs_from_env())
             client = docker.APIClient(version='auto', **kwargs)
 
@@ -149,7 +154,8 @@ class SwarmSpawner(Spawner):
         config=True,
         help=dedent(
             """Arguments to pass to docker TLS configuration.
-            Check for more info: http://docker-py.readthedocs.io/en/stable/tls.html
+            Check for more info:
+            http://docker-py.readthedocs.io/en/stable/tls.html
             """
         )
     )
@@ -158,7 +164,7 @@ class SwarmSpawner(Spawner):
     resource_spec = Dict(
         {}, config=True, help="Params about cpu and memory limits")
 
-    placement = List([], config=True,
+    placement = Dict({}, config=True,
                      help=dedent(
                          """List of placement constraints into the swarm
                          """))
@@ -193,7 +199,15 @@ class SwarmSpawner(Spawner):
         if self._service_owner is None:
             m = hashlib.md5()
             m.update(self.user.name.encode('utf-8'))
-            self._service_owner = m.hexdigest()
+            if hasattr(self.user, 'real_name'):
+                self._service_owner = self.user.real_name[-39:]
+            elif hasattr(self.user, 'name'):
+                # Maximum 63 characters, 10 are comes from the underlying format
+                # i.e. prefix=jupyter-, postfix=-1
+                # get up to last 40 characters as service identifier
+                self._service_owner = self.user.name[-39:]
+            else:
+                self._service_owner = m.hexdigest()
         return self._service_owner
 
     @property
@@ -214,6 +228,14 @@ class SwarmSpawner(Spawner):
                                  server_name
                                  )
 
+    @property
+    def tasks(self):
+        return self._tasks
+
+    @tasks.setter
+    def tasks(self, tasks):
+        self._tasks = tasks
+
     def load_state(self, state):
         super().load_state(state)
         self.service_id = state.get('service_id', '')
@@ -224,7 +246,12 @@ class SwarmSpawner(Spawner):
             state['service_id'] = self.service_id
         return state
 
-    def _env_keep_default(self):
+    def clear_state(self):
+        super().clear_state()
+        self.service_id = ''
+
+    @staticmethod
+    def _env_keep_default():
         """it's called in traitlets. It's a special method name.
         Don't inherit any env from the parent process"""
         return []
@@ -270,6 +297,31 @@ class SwarmSpawner(Spawner):
         return self.executor.submit(self._docker, method, *args, **kwargs)
 
     @gen.coroutine
+    def get_service(self):
+        self.log.debug("Getting Docker service '{}' with id: '{}'".format(
+            self.service_name, self.service_id))
+        try:
+            service = yield self.docker(
+                'inspect_service', self.service_name
+            )
+            self.service_id = service['ID']
+        except APIError as err:
+            if err.response.status_code == 404:
+                self.log.info(
+                    "Docker service '{}' is gone".format(self.service_name))
+                service = None
+                # Docker service is gone, remove service id
+                self.service_id = ''
+            elif err.response.status_code == 500:
+                self.log.info("Docker Swarm Server error")
+                service = None
+                # Docker service is unhealthy, remove the service_id
+                self.service_id = ''
+            else:
+                raise
+        return service
+
+    @gen.coroutine
     def poll(self):
         """Check for a task state like `docker service ps id`"""
         service = yield self.get_service()
@@ -278,20 +330,18 @@ class SwarmSpawner(Spawner):
             return 0
 
         task_filter = {'service': service['Spec']['Name']}
-        tasks = yield self.docker(
+        self.tasks = yield self.docker(
             'tasks', task_filter
         )
 
         running_task = None
-        for task in tasks:
+        for task in self.tasks:
             task_state = task['Status']['State']
-
             if task_state == 'running':
                 self.log.debug(
-                    "Task %s of Docker service %s status: %s",
-                    task['ID'][:7],
-                    self.service_id[:7],
-                    pformat(task_state),
+                    "Task {} of Docker service {} status: {}".format(
+                        task['ID'][:7], self.service_id[:7],
+                        pformat(task_state)),
                 )
                 # there should be at most one running task
                 running_task = task
@@ -309,29 +359,91 @@ class SwarmSpawner(Spawner):
         else:
             return 0
 
+    async def check_update(self, image, tag):
+        full_image = ''.join([image, ':', tag])
+        download_tracking = {}
+        initial_output = False
+        total_download = 0
+        for download in self.client.pull(image, tag=tag, stream=True,
+                                         decode=True):
+            if not initial_output:
+                await yield_(
+                    {'progress': 70, 'message': 'Downloading new update '
+                                                'for {}'.format(full_image)})
+                initial_output = True
+            if 'id' and 'progress' in download:
+                _id = download['id']
+                if _id not in download_tracking:
+                    del download['id']
+                    download_tracking[_id] = download
+                else:
+                    download_tracking[_id].update(download)
+
+                # Output every 20 MB
+                for _id, tracker in download_tracking.items():
+                    if tracker['progressDetail']['current'] \
+                            == tracker['progressDetail']['total']:
+                        total_download += (tracker['progressDetail']['total'] *
+                                           pow(10, -6))
+                        await yield_({'progress': 80,
+                                      'message': 'Downloaded {} MB of {}'
+                                     .format(total_download, full_image)})
+                        # return to web processing
+                        await sleep(1)
+
+                # Remove completed
+                download_tracking = {_id: tracker for _id, tracker in
+                                     download_tracking.items() if
+                                     tracker['progressDetail']['current'] !=
+                                     tracker[
+                                         'progressDetail']['total']}
+
+    @async_generator
+    async def progress(self):
+        top_task = self.tasks[0]
+        image = top_task['Spec']['ContainerSpec']['Image']
+        self.log.info(
+            "Spawning progress of {} with image".format(self.service_id))
+        task_status = top_task['Status']['State']
+        _image, _tag = image.split(":")
+        if task_status == 'preparing':
+            await yield_({'progress': 50,
+                          'message': 'Preparing a server '
+                                     'with {} the image'.format(image)})
+            await yield_({'progress': 60,
+                          'message': 'Checking for new version of {}'.format(
+                              image)})
+            await self.check_update(_image, _tag)
+            self.log.info("Finished progress from spawning {}".format(image))
+
     @gen.coroutine
-    def get_service(self):
-        self.log.debug("Getting Docker service '%s' with id: '%s'",
-                       self.service_name, self.service_id)
+    def removed_volume(self, name):
+        result = False
         try:
-            service = yield self.docker(
-                'inspect_service', self.service_name
-            )
-            self.service_id = service['ID']
+            yield self.docker('remove_volume', name=name)
+            self.log.info("Removed volume: {}".format(name))
+            result = True
         except APIError as err:
-            if err.response.status_code == 404:
-                self.log.info("Docker service '%s' is gone", self.service_name)
-                service = None
-                # Docker service is gone, remove service id
-                self.service_id = ''
-            elif err.response.status_code == 500:
-                self.log.info("Docker Swarm Server error")
-                service = None
-                # Docker service is unhealthy, remove the service_id
-                self.service_id = ''
-            else:
-                raise
-        return service
+            if err.response.status_code == 409:
+                self.log.info("Can't remove volume: {} yet".format(name)),
+
+        return result
+
+    @gen.coroutine
+    def remove_volume(self, name, max_attempts=15):
+        attempt = 0
+        removed = False
+        # Volumes can only be removed after the service is gone
+        while not removed:
+            if attempt > max_attempts:
+                self.log.info("Failed to remove volume {}".format(name))
+                break
+            self.log.info("Removing volume {}".format(name))
+            removed = yield self.removed_volume(name=name)
+            yield gen.sleep(1)
+            attempt += 1
+
+        return removed
 
     @gen.coroutine
     def start(self):
@@ -339,7 +451,7 @@ class SwarmSpawner(Spawner):
         You can specify the params for the service through
         jupyterhub_config.py or using the user_options
         """
-        self.log.info("User: {}, Start swarmspawner".format(self.user))
+        self.log.info("User: {}, start spawn".format(self.user.__dict__))
 
         # https://github.com/jupyterhub/jupyterhub
         # /blob/master/jupyterhub/user.py#L202
@@ -351,8 +463,7 @@ class SwarmSpawner(Spawner):
 
         service = yield self.get_service()
         if service is None:
-
-            # Validate State #
+            # Validate state
             if hasattr(self, 'container_spec') \
                     and self.container_spec is not None:
                 container_spec = dict(**self.container_spec)
@@ -364,50 +475,7 @@ class SwarmSpawner(Spawner):
                                 "to launch it, contact the admin to resolve "
                                 "this issue")
 
-            # If an image is using rasmunk/sshfs mounts
-            # ensure that the mig_mount attributes is set
-            for image in self.dockerimages:
-                if 'mounts' not in image or len(image['mounts']) < 1:
-                    break
-
-                for mount in image['mounts']:
-                    if 'driver_config' in mount \
-                            and 'rasmunk/sshfs' in mount['driver_config']:
-                        if not hasattr(self.user, 'mig_mount') or \
-                                self.user.mig_mount is None:
-                            self.log.error("User: {} missing mig_mount "
-                                           "attribute".format(self.user))
-                            raise Exception("Can't start that particular "
-                                            "notebook image, missing MiG mount"
-                                            " authentication keys, "
-                                            "try reinitializing them "
-                                            "through the MiG interface")
-                        else:
-                            # Validate required dictionary keys
-                            required_keys = ['MOUNT_HOST', 'SESSIONID',
-                                             'TARGET_MOUNT_ADDR',
-                                             'MOUNTSSHPRIVATEKEY']
-                            missing_keys = [key for key in required_keys if key
-                                            not in self.user.mig_mount]
-                            if len(missing_keys) > 0:
-                                self.log.error(
-                                    "User: {} missing mig_mount keys: {}"
-                                        .format(self.user,
-                                                ",".join(missing_keys)))
-                                raise Exception("MiG mount keys are available"
-                                                " but "
-                                                "missing the following items:"
-                                                " {} try reinitialize them "
-                                                "through the MiG interface"
-                                                .format(",".join(missing_keys))
-                                                )
-                            else:
-                                self.log.debug("User: {} mig_mount contains:"
-                                               " {}"
-                                               .format(self.user,
-                                                       self.user.mig_mount))
-
-            # Setup Service #
+            # Setup service
             container_spec.update(user_options.get('container_spec', {}))
 
             # Which image to spawn
@@ -416,9 +484,9 @@ class SwarmSpawner(Spawner):
                 image_info = None
                 for di in self.dockerimages:
                     if di['image'] == uimage:
-                        image_info = di
+                        image_info = copy.deepcopy(di)
                 if image_info is None:
-                    err_msg = "User selected image: {} couldn't be found"\
+                    err_msg = "User selected image: {} couldn't be found" \
                         .format(uimage['image'])
                     self.log.error(err_msg)
                     raise Exception(err_msg)
@@ -426,7 +494,13 @@ class SwarmSpawner(Spawner):
                 # Default image
                 image_info = self.dockerimages[0]
 
-            self.log.info("Selected image info: {}".format(image_info))
+            self.log.debug("Image info: {}".format(image_info))
+            # Does that image have restricted access
+            if 'access' in image_info and self.service_owner not in image_info['access']:
+                    self.log.error("User: {} tried to launch {} without access".format(
+                        self.service_owner, image_info['image']
+                    ))
+                    raise Exception("You don't have permission to launch that image")
 
             # Does the selected image have mounts associated
             container_spec['mounts'] = []
@@ -435,88 +509,80 @@ class SwarmSpawner(Spawner):
                 mounts = image_info['mounts']
 
             for mount in mounts:
-                self.log.info("mount: {}".format(mount))
-                m = dict(**mount)
+                # Expects a mount_class that supports 'create'
+                if hasattr(self.user, 'data'):
+                    m = yield mount.create(self.user.data, owner=self.service_owner)
+                else:
+                    m = yield mount.create(owner=self.service_owner)
+                container_spec['mounts'].append(m)
 
-                # Volume name
-                if 'source' in m:
-                    m['source'] = m['source'].format(
-                        username=self.service_owner)
-                    self.log.info("Volume name: " + m['source'])
-
-                    # If a previous user volume is present, remove it
-                    try:
-                        yield self.docker('inspect_volume', m['source'])
-                    except docker.errors.NotFound:
-                        self.log.info("No volume named: " + m['source'])
-                    else:
-                        yield self.remove_volume(m['source'])
-
-                # Custom volume
-                if 'driver_config' in m:
-                    if 'sshcmd' in m['driver_options']:
-                        m['driver_options']['sshcmd'] \
-                            = self.user.mig_mount['SESSIONID'] \
-                            + self.user.mig_mount['TARGET_MOUNT_ADDR']
-
-                    # If the id_rsa flag is present, set key
-                    if 'id_rsa' in m['driver_options']:
-                        m['driver_options']['id_rsa'] = self.user.mig_mount[
-                            'MOUNTSSHPRIVATEKEY']
-
-                    m['driver_config'] = docker.types.DriverConfig(
-                        name=m['driver_config'], options=m['driver_options'])
-                    del m['driver_options']
-
-                container_spec['mounts'].append(docker.types.Mount(**m))
-
-            # some Envs are required by the single-user-image
-            container_spec['env'] = self.get_env()
+            # Some envs are required by the single-user-image
+            if 'env' in container_spec:
+                container_spec['env'].update(self.get_env())
+            else:
+                container_spec['env'] = self.get_env()
 
             # Log mounts config
             self.log.debug("User: {} container_spec mounts: {}".format(
                 self.user, container_spec['mounts']))
 
+            # Global resource_spec
+            resource_spec = {}
             if hasattr(self, 'resource_spec'):
                 resource_spec = self.resource_spec
             resource_spec.update(user_options.get('resource_spec', {}))
 
+            networks = None
             if hasattr(self, 'networks'):
                 networks = self.networks
             if user_options.get('networks') is not None:
                 networks = user_options.get('networks')
 
+            # Global placement
+            placement = None
             if hasattr(self, 'placement'):
                 placement = self.placement
             if user_options.get('placement') is not None:
                 placement = user_options.get('placement')
 
+            # Image to spawn
             image = image_info['image']
-            self.log.info("Spawning image: {}".format(image))
-            # create the service
-            container_spec = docker.types.ContainerSpec(
-                image, **container_spec)
-            resources = docker.types.Resources(**resource_spec)
+
+            # Image resources
+            if 'resource_spec' in image_info:
+                resource_spec = image_info['resource_spec']
+
+            # Placement of image
+            if 'placement' in image_info:
+                placement = image_info['placement']
+
+            # Create the service
+            container_spec = ContainerSpec(image, **container_spec)
+            resources = Resources(**resource_spec)
+            placement = Placement(**placement)
 
             task_spec = {'container_spec': container_spec,
                          'resources': resources,
                          'placement': placement
                          }
-            task_tmpl = docker.types.TaskTemplate(**task_spec)
+            task_tmpl = TaskTemplate(**task_spec)
+            self.log.info("task temp: {}".format(task_tmpl))
             resp = yield self.docker('create_service',
                                      task_tmpl,
                                      name=self.service_name,
                                      networks=networks)
-
             self.service_id = resp['ID']
-            self.log.info("Created Docker service '%s' (id: %s) from image %s"
-                          " for user %s", self.service_name,
-                          self.service_id[:7], image, self.user)
+            self.log.info("Created Docker service {} (id: {}) from image {}"
+                          " for user {}".format(self.service_name,
+                                                self.service_id[:7], image,
+                                                self.user))
+
+            yield self.wait_for_running_tasks()
 
         else:
             self.log.info(
-                "Found existing Docker service '%s' (id: %s)",
-                self.service_name, self.service_id[:7])
+                "Found existing Docker service '{}' (id: {})".format(
+                    self.service_name, self.service_id[:7]))
             # Handle re-using API token.
             # Get the API token from the environment variables
             # of the running service:
@@ -528,42 +594,13 @@ class SwarmSpawner(Spawner):
 
         ip = self.service_name
         port = self.service_port
-        self.log.debug("Active service: '%s' with user '%s'",
-                       self.service_name, self.user)
+        self.log.debug("Active service: '{}' with user '{}'".format(
+            self.service_name, self.user))
 
         # we use service_name instead of ip
         # https://docs.docker.com/engine/swarm/networking/#use-swarm-mode-service-discovery
         # service_port is actually equal to 8888
-        return (ip, port)
-
-    @gen.coroutine
-    def removed_volume(self, name):
-        result = False
-        try:
-            yield self.docker('remove_volume', name=name)
-            self.log.info("Removed volume %s", name)
-            result = True
-        except APIError as err:
-            if err.response.status_code == 409:
-                self.log.info("Can't remove volume: %s yet", name),
-
-        return result
-
-    @gen.coroutine
-    def remove_volume(self, name, max_attempts=15):
-        attempt = 0
-        removed = False
-        # Volumes can only be removed after the service is gone
-        while not removed:
-            if attempt > max_attempts:
-                self.log.info("Failed to remove volume %s", name)
-                break
-            self.log.info("Removing volume %s", name)
-            removed = yield self.removed_volume(name=name)
-            yield gen.sleep(1)
-            attempt += 1
-
-        return removed
+        return ip, port
 
     @gen.coroutine
     def stop(self, now=False):
@@ -571,8 +608,8 @@ class SwarmSpawner(Spawner):
         Consider using stop/start when Docker adds support
         """
         self.log.info(
-            "Stopping and removing Docker service %s (id: %s)",
-            self.service_name, self.service_id[:7])
+            "Stopping and removing Docker service {} (id: {})".format(
+                self.service_name, self.service_id[:7]))
 
         service = yield self.get_service()
         if not service:
@@ -582,20 +619,45 @@ class SwarmSpawner(Spawner):
         # lookup mounts before removing the service
         volumes = None
         if 'Mounts' in service['Spec']['TaskTemplate']['ContainerSpec']:
-            volumes = service['Spec']['TaskTemplate']['ContainerSpec']['Mounts']
+            volumes = service['Spec']['TaskTemplate']['ContainerSpec'][
+                'Mounts']
         # Even though it returns the service is gone
         # the underlying containers are still being removed
         removed_service = yield self.docker('remove_service', service['ID'])
         if removed_service:
-            self.log.info(
-                "Docker service %s (id: %s) removed",
-                self.service_name, self.service_id[:7])
+            self.log.info("Docker service {} (id: {}) removed".format(
+                self.service_name, self.service_id[:7]))
             if volumes is not None:
                 for volume in volumes:
-                    name = str(volume['Source'])
-                    labels = volume.get('Labels', {})
-                    if 'mig.SwarmSpawner.keep' in labels:
-                        continue
-                    yield self.remove_volume(name=name, max_attempts=15)
+                    if 'Source' in volume:
+                        labels = volume.get('Labels', {})
+                        if 'jhub.SwarmSpawner.keep' in labels:
+                            continue
+                        # Validate the volume exists
+                        try:
+                            yield self.docker('inspect_volume',
+                                              volume['Source'])
+                        except docker.errors.NotFound:
+                            self.log.info(
+                                "No volume named: " + volume['Source'])
+                        else:
+                            yield self.remove_volume(volume['Source'])
 
-        self.clear_state()
+    @gen.coroutine
+    def wait_for_running_tasks(self):
+        running = False
+        while not running:
+            service = yield self.get_service()
+            task_filter = {'service': service['Spec']['Name']}
+            self.tasks = yield self.docker(
+                'tasks', task_filter
+            )
+            for task in self.tasks:
+                task_state = task['Status']['State']
+                self.log.info("Waiting for service: {} current task status: {}"
+                              .format(service['ID'], task_state))
+                if task_state == 'running':
+                    running = True
+                if task_state == 'rejected':
+                    return False
+            yield gen.sleep(1)
