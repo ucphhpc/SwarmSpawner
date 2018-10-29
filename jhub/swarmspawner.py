@@ -384,7 +384,7 @@ class SwarmSpawner(Spawner):
                     if tracker['progressDetail']['current'] \
                             == tracker['progressDetail']['total']:
                         total_download += (tracker['progressDetail'][
-                                               'total'] * pow(10, -6))
+                            'total'] * pow(10, -6))
                         await yield_({'progress': 80,
                                       'message': 'Downloaded {} MB of {}'
                                      .format(total_download, full_image)})
