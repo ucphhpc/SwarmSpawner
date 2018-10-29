@@ -383,8 +383,8 @@ class SwarmSpawner(Spawner):
                 for _id, tracker in download_tracking.items():
                     if tracker['progressDetail']['current'] \
                             == tracker['progressDetail']['total']:
-                        total_download += (tracker['progressDetail']['total'] *
-                                           pow(10, -6))
+                        total_download += (tracker['progressDetail'][
+                                               'total'] * pow(10, -6))
                         await yield_({'progress': 80,
                                       'message': 'Downloaded {} MB of {}'
                                      .format(total_download, full_image)})
@@ -392,11 +392,12 @@ class SwarmSpawner(Spawner):
                         await sleep(1)
 
                 # Remove completed
-                download_tracking = {_id: tracker for _id, tracker in
-                                     download_tracking.items() if
-                                     tracker['progressDetail']['current'] !=
-                                     tracker[
-                                         'progressDetail']['total']}
+                download_tracking = {
+                    _id: tracker for _id, tracker in
+                    download_tracking.items()
+                    if tracker['progressDetail']['current'] != tracker[
+                        'progressDetail']['total']
+                }
 
     @async_generator
     async def progress(self):

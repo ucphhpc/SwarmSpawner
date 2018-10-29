@@ -92,8 +92,8 @@ def test_remote_auth_hub(image, swarm, network, make_service):
         assert spawn_resp.status_code == 200
 
         # New services are there
-        post_spawn_services = list(set(client.services.list()) -
-                                   set(services_before_spawn))
+        post_spawn_services = list(set(client.services.list()) - set(
+            services_before_spawn))
         assert len(post_spawn_services) > 0
 
         for service in post_spawn_services:

@@ -114,8 +114,8 @@ def test_sshfs_mount_hub(image, swarm, network, make_service):
         spawn_resp = s.post(JHUB_URL + "/hub/spawn", data=payload, headers=headers)
         assert spawn_resp.status_code == 200
 
-        post_spawn_services = list(set(client.services.list()) -
-                                   set(services_before_spawn))
+        post_spawn_services = list(set(client.services.list()) - set(
+            services_before_spawn))
         # New services are there
         assert len(post_spawn_services) > 0
 
