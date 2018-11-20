@@ -645,8 +645,9 @@ class SwarmSpawner(Spawner):
                             yield self.remove_volume(volume['Source'])
 
     @gen.coroutine
-    def wait_for_running_tasks(self):
+    def wait_for_running_tasks(self, max_attempts=20):
         running = False
+        attempt = 0
         while not running:
             service = yield self.get_service()
             task_filter = {'service': service['Spec']['Name']}
@@ -659,6 +660,7 @@ class SwarmSpawner(Spawner):
                               .format(service['ID'], task_state))
                 if task_state == 'running':
                     running = True
-                if task_state == 'rejected':
+                if task_state == 'rejected' or attempt > max_attempts:
                     return False
+            attempt += 1
             yield gen.sleep(1)
