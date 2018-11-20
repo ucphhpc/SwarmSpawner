@@ -646,7 +646,7 @@ class SwarmSpawner(Spawner):
 
     @gen.coroutine
     def wait_for_running_tasks(self, max_attempts=20):
-        running = False
+        preparing, running = False, False
         attempt = 0
         while not running:
             service = yield self.get_service()
@@ -654,13 +654,17 @@ class SwarmSpawner(Spawner):
             self.tasks = yield self.docker(
                 'tasks', task_filter
             )
+            preparing = False
             for task in self.tasks:
                 task_state = task['Status']['State']
                 self.log.info("Waiting for service: {} current task status: {}"
                               .format(service['ID'], task_state))
                 if task_state == 'running':
                     running = True
+                if task_state == 'preparing':
+                    preparing = True
                 if task_state == 'rejected' or attempt > max_attempts:
                     return False
-            attempt += 1
+            if not preparing:
+                attempt += 1
             yield gen.sleep(1)
