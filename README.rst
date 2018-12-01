@@ -225,6 +225,7 @@ Mount an anonymous volume
 .. code-block:: python
 
         mounts = [{'type' : 'volume',
+                'source': '',
                 'target' : 'MountPointInsideTheContainer',}]
 
 
@@ -248,6 +249,22 @@ in addition the typical sshfs flags are supported, defaults to port 22
                                        'reconnect': '', 'port': '2222'},
                     'source': 'sshvolume-user-{username}',
                     'target': '/home/jovyan/work'})]
+
+
+Automatic removal of Volumes
+--------------------------------
+
+To enact that a volume should be removed when the service is being terminated, there
+are two options available, either use a ``anonymous`` volume as shown above, which will
+remove the volume when the owning sevice is removed. Or set the default volume label
+bool flag called ``keep`` to false, e.g.
+
+.. code-block:: python
+
+        mounts = [{'type' : 'volume',
+                'source' : 'jupyterhub-user-{username}',
+                'target' : 'MountPointInsideTheContainer',
+                'label': {'keep': 'False'}}]
 
 
 Resource_spec

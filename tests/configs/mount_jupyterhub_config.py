@@ -29,7 +29,8 @@ sshfs_mount = [SSHFSMounter({
                                'big_writes': '', 'allow_other': '',
                                'reconnect': '', 'port': '2222'},
             'source': 'sshvolume-user-{username}',
-            'target': '/home/jovyan/work'})]
+            'target': '/home/jovyan/work',
+            'labels': {'keep': 'False'}})]
 
 # 'args' is the command to run inside the service
 # These are run inside every service

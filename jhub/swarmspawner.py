@@ -25,6 +25,7 @@ from traitlets import (
     Bool,
     Int
 )
+from jhub.mount import VolumeMounter
 
 
 class UnicodeOrFalse(Unicode):
@@ -45,8 +46,8 @@ class SwarmSpawner(Spawner):
     c.JupyterHub.spawner_class = 'jhub.SwarmSpawner'
     # Available docker images the user can spawn
     c.SwarmSpawner.dockerimages = [
-        {'image': 'jupyterhub/singleuser:0.8.1',
-        'name': 'Default jupyterhub singleuser notebook'}
+        {'image': 'nielsbohr/base-notebook:latest',
+        'name': 'Default jupyter notebook'}
 
     ]
 
@@ -55,8 +56,8 @@ class SwarmSpawner(Spawner):
 
     dockerimages = List(
         trait=Dict(),
-        default_value=[{'image': 'jupyterhub/singleuser:0.8.1',
-                        'name': 'Default jupyterhub singleuser notebook'}],
+        default_value=[{'image': 'nielsbohr/base-notebook:latest',
+                        'name': 'Default jupyter notebook'}],
         minlen=1,
         config=True,
         help="Docker images that are available to the user of the host"
@@ -503,18 +504,29 @@ class SwarmSpawner(Spawner):
                     ))
                     raise Exception("You don't have permission to launch that image")
 
-            # Does the selected image have mounts associated
-            container_spec['mounts'] = []
+            self.log.debug("Container spec: {}".format(container_spec))
+
+            # Setup mounts
             mounts = []
+            # Global mounts
+            if 'mounts' in container_spec:
+                mounts.extend(container_spec['mounts'])
+            container_spec['mounts'] = []
+
+            # Image mounts
             if 'mounts' in image_info:
-                mounts = image_info['mounts']
+                mounts.extend(image_info['mounts'])
 
             for mount in mounts:
-                # Expects a mount_class that supports 'create'
-                if hasattr(self.user, 'data'):
-                    m = yield mount.create(self.user.data, owner=self.service_owner)
+                if isinstance(mount, dict):
+                    m = VolumeMounter(mount)
+                    m = yield m.create(owner=self.service_owner)
                 else:
-                    m = yield mount.create(owner=self.service_owner)
+                    # Expects a mount_class that supports 'create'
+                    if hasattr(self.user, 'data'):
+                        m = yield mount.create(self.user.data, owner=self.service_owner)
+                    else:
+                        m = yield mount.create(owner=self.service_owner)
                 container_spec['mounts'].append(m)
 
             # Some envs are required by the single-user-image
@@ -630,19 +642,22 @@ class SwarmSpawner(Spawner):
                 self.service_name, self.service_id[:7]))
             if volumes is not None:
                 for volume in volumes:
-                    if 'Source' in volume:
-                        labels = volume.get('Labels', {})
-                        if 'jhub.SwarmSpawner.keep' in labels:
-                            continue
-                        # Validate the volume exists
-                        try:
-                            yield self.docker('inspect_volume',
-                                              volume['Source'])
-                        except docker.errors.NotFound:
-                            self.log.info(
-                                "No volume named: " + volume['Source'])
+                    labels = volume.get('VolumeOptions', {}).get('Labels', {})
+                    # Whether the volume should be kept
+                    if 'keep' in labels and labels['keep'] != 'True':
+                        self.log.info("Volume {} should not be kept".format(volume))
+                        if 'Source' in volume:
+                            # Validate the volume exists
+                            try:
+                                yield self.docker('inspect_volume', volume['Source'])
+                            except docker.errors.NotFound:
+                                self.log.info(
+                                    "No volume named: " + volume['Source'])
+                            else:
+                                yield self.remove_volume(volume['Source'])
                         else:
-                            yield self.remove_volume(volume['Source'])
+                            self.log.error("Volume {} didn't have a Source key so it "
+                                           "can't be removed".format(volume))
 
     @gen.coroutine
     def wait_for_running_tasks(self, max_attempts=20):

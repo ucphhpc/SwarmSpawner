@@ -15,18 +15,79 @@ class Mounter(LoggingConfigurable):
         self.config = Config(config)
 
     @gen.coroutine
-    def create(self, data=None):
-        return None
+    def init(self, owner=None, keep=True):
+        # Check if username specific source is expected
+        if 'source' in self.config and owner is not None:
+            self.config['source'] = self.config['source'].format(
+                username=owner
+            )
+        # Labels are only allowed in volume types
+        if self.config['type'] != 'volume':
+            return None
 
-
-class LocalVolumeMounter(Mounter):
-
-    def __init__(self, config):
-        super(Mounter).__init__(config)
+        if 'labels' not in self.config:
+            self.config['labels'] = {'keep': str(keep)}
+        elif not isinstance(self.config['labels'], dict):
+            raise TypeError("labels volume config key must be a dict")
+        elif 'keep' not in self.config['labels']:
+            self.config['labels'] = {'keep': str(keep)}
 
     @gen.coroutine
-    def create(self, data=None):
-        return None
+    def create(self, data=None, owner=None, keep=True):
+        pass
+
+
+class VolumeMounter(Mounter):
+
+    def __init__(self, config):
+        Mounter.__init__(self, config)
+
+    @gen.coroutine
+    def create_mount(self):
+        mount = {}
+        mount.update(self.config)
+        return Mount(**mount)
+
+    @gen.coroutine
+    def create(self, data=None, owner=None, keep=True):
+        self.log.info("Creating mount {}".format(data))
+        yield self.validate_config()
+        yield self.init(owner, keep)
+        mount = yield self.create_mount()
+        return mount
+
+    @gen.coroutine
+    def validate_config(self):
+        self.log.debug("validate_config")
+        required_config_keys = ['type', 'source', 'target']
+        missing_keys = [key for key in required_config_keys
+                        if key not in self.config]
+
+        if missing_keys:
+            self.log.error("Missing configure keys {}".format(
+                ','.join(missing_keys)))
+            raise KeyError("A mount configuration error was encountered, "
+                           "due to missing keys")
+
+        required_config_values = ['type', 'target']
+        empty_values = [key for key in required_config_values
+                        if not self.config[key]]
+        if empty_values:
+            self.log.error("Missing configuring values {}".format(
+                ','.join(empty_values)))
+            raise ValueError("A mount configuration error was encountered, "
+                             "due to missing values")
+
+        # validate types
+        for key, val in self.config.items():
+            if key == 'labels':
+                if not isinstance(val, dict):
+                    raise TypeError("{} is expected to be of a {} type".format(
+                        key, dict))
+            else:
+                if not isinstance(val, str):
+                    raise TypeError("{} is expected to be of {} type".format(
+                        key, str))
 
 
 class SSHFSMounter(Mounter):
@@ -100,8 +161,8 @@ class SSHFSMounter(Mounter):
         if missing_keys:
             self.log.error("Missing configure keys {}".format(
                 ','.join(missing_keys)))
-            raise Exception("A mount configuration error was encountered, "
-                            "due to missing keys")
+            raise KeyError("A mount configuration error was encountered, "
+                           "due to missing keys")
 
         required_config_values = ['type', 'driver_config',
                                   'driver_options', 'target']
@@ -110,18 +171,18 @@ class SSHFSMounter(Mounter):
         if empty_values:
             self.log.error("Missing configuring values {}".format(
                 ','.join(empty_values)))
-            raise Exception("A mount configuration error was encountered, "
-                            "due to missing values")
+            raise ValueError("A mount configuration error was encountered, "
+                             "due to missing values")
 
         # validate types
         for key, val in self.config.items():
-            if key == 'driver_options':
+            if key == 'driver_options' or key == 'labels':
                 if not isinstance(val, dict):
-                    raise Exception("{} is expected to be of a {} type".format(
+                    raise TypeError("{} is expected to be of a {} type".format(
                         key, dict))
             else:
                 if not isinstance(val, str):
-                    raise Exception("{} is expected to be of {} type".format(
+                    raise TypeError("{} is expected to be of {} type".format(
                         key, str))
 
     @gen.coroutine
@@ -138,18 +199,9 @@ class SSHFSMounter(Mounter):
         return None
 
     @gen.coroutine
-    def create(self, data=None, owner=None):
-        self.log.info("Creating a new mount {}".format(data))
-        # Check if username specfic source is expected
-        if 'source' in self.config and owner is not None:
-            self.config['source'] = self.config['source'].format(
-                username=owner
-            )
-
+    def create(self, data=None, owner=None, keep=True):
+        self.log.info("Creating mount {}".format(data))
+        yield self.init(owner, keep)
         yield self.validate_config()
         mount = yield self.create_mount(data)
         return mount
-
-    @gen.coroutine
-    def remove(self):
-        pass
