@@ -5,12 +5,12 @@ version: '3.7'
 
 services:
   jupyterhub:
-    image: rasmunk/swarmspawner:latest
+    image: rasmunk/swarmspawner:edge
     container_name: jupyterhub
     ports:
       - "80:8000/tcp"
     volumes:
-      - ./examples/jupyter_config_basic.py:/srv/jupyterhub/jupyter_config.py:ro
+      - ./examples/jupyter_config_configs.py:/srv/jupyterhub/jupyter_config.py:ro
       - /var/run/docker.sock:/var/run/docker.sock:rw
     command: jupyterhub -f /srv/jupyterhub/jupyter_config.py
 
