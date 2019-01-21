@@ -13,7 +13,8 @@ from concurrent.futures import ThreadPoolExecutor
 from pprint import pformat
 from docker.errors import APIError
 from docker.tls import TLSConfig
-from docker.types import TaskTemplate, Resources, ContainerSpec, Placement, ConfigReference
+from docker.types import TaskTemplate, Resources, ContainerSpec, Placement, \
+    ConfigReference
 from docker.utils import kwargs_from_env
 from tornado import gen
 from jupyterhub.spawner import Spawner
@@ -391,7 +392,7 @@ class SwarmSpawner(Spawner):
                             'total'] * pow(10, -6))
                         await yield_({'progress': 80,
                                       'message': 'Downloaded {} MB of {}'
-                                     .format(total_download, full_image)})
+                                      .format(total_download, full_image)})
                         # return to web processing
                         await sleep(1)
 
@@ -579,7 +580,6 @@ class SwarmSpawner(Spawner):
             if 'placement' in image_info:
                 placement = image_info['placement']
 
-
             # Configs attached to image
             if 'configs' in image_info and isinstance(image_info['configs'], list):
                 for c in image_info['configs']:
@@ -590,16 +590,19 @@ class SwarmSpawner(Spawner):
                 # Check that the supplied configs already exists
                 current_configs = yield self.docker('configs')
                 config_error_msg = "The server has a misconfigured config, " \
-                                        "please contact an administrator to resolve this"
+                    "please contact an administrator to resolve this"
 
                 for c in self.configs:
                     if 'config_name' not in c:
                         self.log.error(
-                            "Config: {} does not have a required config_name key".format(c))
+                            "Config: {} does not have a "
+                            "required config_name key".format(c))
                         raise Exception(config_error_msg)
                     if 'config_id' not in c:
                         # Find the id from the supplied name
-                        config_ids = [cc['ID'] for cc in current_configs if cc['Spec']['Name'] == c['config_name']]
+                        config_ids = [
+                            cc['ID'] for cc in current_configs
+                            if cc['Spec']['Name'] == c['config_name']]
                         if not config_ids:
                             self.log.error("A config with name {} could not be found")
                             raise Exception(config_error_msg)
@@ -612,7 +615,7 @@ class SwarmSpawner(Spawner):
             container_spec = ContainerSpec(image, **container_spec)
             resources = Resources(**resource_spec)
             placement = Placement(**placement)
-            
+
             task_spec = {'container_spec': container_spec,
                          'resources': resources,
                          'placement': placement}
