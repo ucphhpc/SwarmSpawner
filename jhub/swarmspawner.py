@@ -546,6 +546,10 @@ class SwarmSpawner(Spawner):
             else:
                 container_spec['env'] = self.get_env()
 
+            # Args of image
+            if 'args' in image_info and isinstance(image_info['args'], list):
+                container_spec.update({'args': image_info['args']})
+
             # Log mounts config
             self.log.debug("User: {} container_spec mounts: {}".format(
                 self.user, container_spec['mounts']))
