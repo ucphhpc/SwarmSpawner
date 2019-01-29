@@ -20,9 +20,6 @@ c.SwarmSpawner.jupyterhub_service_name = 'jupyterhub'
 
 c.SwarmSpawner.networks = ["jupyterhub_default"]
 
-notebook_dir = os.environ.get('NOTEBOOK_DIR') or '/home/jovyan/work'
-c.SwarmSpawner.notebook_dir = notebook_dir
-
 c.SwarmSpawner.container_spec = {
     'args': ['/usr/local/bin/start-singleuser.sh',
              '--NotebookApp.ip=0.0.0.0',
