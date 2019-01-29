@@ -29,10 +29,8 @@ c.SwarmSpawner.container_spec = {
              '--NotebookApp.port=8888',
              '--NotebookApp.allow_origin=http://127.0.0.1'],
     'env': {'JUPYTER_ENABLE_LAB': '1',
-            'TZ': 'Europe/Copenhagen',
-            'OMP_NUM_THREADS': '8'}
+            'TZ': 'Europe/Copenhagen'}
 }
-
 
 c.SwarmSpawner.use_user_options = True
 

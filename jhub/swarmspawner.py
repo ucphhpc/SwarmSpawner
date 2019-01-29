@@ -279,11 +279,7 @@ class SwarmSpawner(Spawner):
             JPY_HUB_PREFIX=self.hub.server.base_url
         ))
 
-        if self.notebook_dir:
-            env['NOTEBOOK_DIR'] = self.notebook_dir
-
         env['JPY_HUB_API_URL'] = self._public_hub_api_url()
-
         return env
 
     def _docker(self, method, *args, **kwargs):
