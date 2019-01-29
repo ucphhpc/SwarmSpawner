@@ -10,7 +10,7 @@ services:
     ports:
       - "80:8000/tcp"
     volumes:
-      - ./examples/jupyter_config_volume_mounts.py:/srv/jupyterhub/jupyter_config.py:ro
+      - ./examples/jupyter_config_image_env.py:/srv/jupyterhub/jupyter_config.py:ro
       - /var/run/docker.sock:/var/run/docker.sock:rw
     command: jupyterhub -f /srv/jupyterhub/jupyter_config.py
 
