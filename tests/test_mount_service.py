@@ -175,6 +175,11 @@ def test_sshfs_mount_hub(image, swarm, network, make_service):
                             headers={'Referer': '127.0.0.1:8000/hub/'})
             assert resp.status_code == 204
         # double check it is gone
+        notebook_volumes_after = [volume for volume in client.volumes.list()
+                                  for service in notebook_services
+                                  if volume.name.strip('sshvolume-user-')
+                                  in service.name.strip('jupyter-')]
+
         services_after_remove = client.services.list()
         assert len((set(services_before_spawn) - set(services_after_remove))) == 0
-        assert len(client.volumes.list()) == 0
+        assert len(notebook_volumes_after) == 0
