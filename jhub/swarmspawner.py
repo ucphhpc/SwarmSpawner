@@ -544,7 +544,7 @@ class SwarmSpawner(Spawner):
 
             # Env of image
             if 'env' in image_info and isinstance(image_info['env'], dict):
-                container_spec['env'].update({'env': image_info['env']})
+                container_spec.update({'env': image_info['env']})
 
             # Args of image
             if 'args' in image_info and isinstance(image_info['args'], list):
