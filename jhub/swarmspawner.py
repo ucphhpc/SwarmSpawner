@@ -544,11 +544,15 @@ class SwarmSpawner(Spawner):
 
             # Env of image
             if 'env' in image_info and isinstance(image_info['env'], dict):
-                container_spec.update({'env': image_info['env']})
+                container_spec['env'].update(image_info['env'])
 
             # Args of image
             if 'args' in image_info and isinstance(image_info['args'], list):
                 container_spec.update({'args': image_info['args']})
+
+            if 'command' in image_info and isinstance(image_info['command'], list)\
+                    or isinstance(image_info['command'], str):
+                container_spec.update({'command': image_info['command']})
 
             # Log mounts config
             self.log.debug("User: {} container_spec mounts: {}".format(

@@ -22,16 +22,19 @@ c.SwarmSpawner.networks = ["jupyterhub_default"]
 
 c.SwarmSpawner.container_spec = {
     'env': {'JUPYTER_ENABLE_LAB': '1',
-            'TZ': 'Europe/Copenhagen',
-            'NOTEBOOK_DIR': '/home/jovyan/work'}
+            'TZ': 'Europe/Copenhagen'}
 }
 
 c.SwarmSpawner.use_user_options = True
 
+mounts = [{'type': 'bind',
+           'source': '/tmp',
+           'target': '/home/jovyan/tmpdir1'}]
+
 c.SwarmSpawner.dockerimages = [
     {'image': 'nielsbohr/slurm-notebook:latest',
-     'name': 'Default jupyter notebook'},
-    {'image': 'nielsbohr/hpc-notebook:2a7ae95cafb2',
-     'name': 'HPC Notebook',
-     'env': {'NOTEBOOK_DIR': '/home/jovyan'}}
+     'name': 'Default jupyter notebook',
+     'command': "/bin/bash -c 'mkdir -p /home/jovyan/{tmpdir1,tempdir2}; "
+     "/usr/bin/supervisord'",
+     'mounts': mounts}
 ]
