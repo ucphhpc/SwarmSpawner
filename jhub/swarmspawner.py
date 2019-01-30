@@ -506,10 +506,10 @@ class SwarmSpawner(Spawner):
             self.log.debug("Image info: {}".format(image_info))
             # Does that image have restricted access
             if 'access' in image_info and self.service_owner not in image_info['access']:
-                    self.log.error("User: {} tried to launch {} without access".format(
-                        self.service_owner, image_info['image']
-                    ))
-                    raise Exception("You don't have permission to launch that image")
+                self.log.error("User: {} tried to launch {} without access".format(
+                    self.service_owner, image_info['image']
+                ))
+                raise Exception("You don't have permission to launch that image")
 
             self.log.debug("Container spec: {}".format(container_spec))
 
@@ -551,7 +551,8 @@ class SwarmSpawner(Spawner):
                 container_spec.update({'args': image_info['args']})
 
             if 'command' in image_info and isinstance(image_info['command'], list)\
-                    or isinstance(image_info['command'], str):
+                    or 'command' in image_info and \
+                    isinstance(image_info['command'], str):
                 container_spec.update({'command': image_info['command']})
 
             # Log mounts config
