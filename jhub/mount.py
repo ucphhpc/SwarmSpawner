@@ -145,17 +145,20 @@ class SSHFSMounter(Mounter):
             # Validate that the proper values are present
             username = yield self.get_from('USERNAME', data)
             path = yield self.get_from('PATH', data)
-            driver['driver_options']['sshcmd'] = username + path
+            if username and path:
+                driver['driver_options']['sshcmd'] = username + path
 
         if 'id_rsa' in driver['driver_options'] \
                 and driver['driver_options']['id_rsa'] == '{id_rsa}':
             key = yield self.get_from('PRIVATEKEY', data)
-            driver['driver_options']['id_rsa'] = key
+            if key:
+                driver['driver_options']['id_rsa'] = key
 
         if 'port' in driver['driver_options'] \
                 and driver['driver_options']['port'] == '{port}':
             port = yield self.get_from('PORT', data)
-            driver['driver_options']['port'] = port
+            if port:
+                driver['driver_options']['port'] = port
 
         mount = {}
         mount.update(self.config)
