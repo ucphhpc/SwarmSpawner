@@ -133,6 +133,14 @@ class SSHFSMounter(Mounter):
         del self.config['driver_options']
 
         # Setup driver
+        # look for values that should be dynamically assigned from data
+        for option_key, option_value in driver['driver_options'].items():
+            if option_value == "{" + option_key + "}":
+                dyn_value = yield self.get_from(option_key, data)
+                if dyn_value:
+                    driver['driver_options'][option_key] = dyn_value
+
+        # Legacy options that will be deprecated
         if driver['driver_options']['sshcmd'] == '{sshcmd}':
             # Validate that the proper values are present
             username = yield self.get_from('USERNAME', data)
@@ -142,6 +150,10 @@ class SSHFSMounter(Mounter):
         if driver['driver_options']['id_rsa'] == '{id_rsa}':
             key = yield self.get_from('PRIVATEKEY', data)
             driver['driver_options']['id_rsa'] = key
+
+        if driver['driver_options']['port'] == '{port}':
+            port = yield self.get_from('PORT', data)
+            driver['driver_options']['port'] = port
 
         mount = {}
         mount.update(self.config)
