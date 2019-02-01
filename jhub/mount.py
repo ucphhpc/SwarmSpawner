@@ -147,11 +147,13 @@ class SSHFSMounter(Mounter):
             path = yield self.get_from('PATH', data)
             driver['driver_options']['sshcmd'] = username + path
 
-        if driver['driver_options']['id_rsa'] == '{id_rsa}':
+        if 'id_rsa' in driver['driver_options'] \
+                and driver['driver_options']['id_rsa'] == '{id_rsa}':
             key = yield self.get_from('PRIVATEKEY', data)
             driver['driver_options']['id_rsa'] = key
 
-        if driver['driver_options']['port'] == '{port}':
+        if 'port' in driver['driver_options'] \
+                and driver['driver_options']['port'] == '{port}':
             port = yield self.get_from('PORT', data)
             driver['driver_options']['port'] = port
 
