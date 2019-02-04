@@ -159,6 +159,8 @@ class SSHFSMounter(Mounter):
             port = yield self.get_from('PORT', data)
             if port:
                 driver['driver_options']['port'] = port
+            else:
+                driver['driver_options']['port'] = '22'
 
         mount = {}
         mount.update(self.config)
