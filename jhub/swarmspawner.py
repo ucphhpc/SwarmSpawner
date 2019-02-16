@@ -531,7 +531,8 @@ class SwarmSpawner(Spawner):
                 else:
                     # Expects a mount_class that supports 'create'
                     if hasattr(self.user, 'data'):
-                        m = yield mount.create(self.user.data, owner=self.service_owner)
+                        m = yield mount.create(self.user.data,
+                                               owner=self.service_owner)
                     else:
                         m = yield mount.create(owner=self.service_owner)
                 container_spec['mounts'].append(m)
@@ -619,6 +620,41 @@ class SwarmSpawner(Spawner):
 
                 container_spec.update(
                     {'configs': [ConfigReference(**c) for c in self.configs]})
+
+            # Global container user
+            uid_gid = None
+            if 'uid_gid' in container_spec:
+                uid_gid = copy.deepcopy(container_spec['uid_gid'])
+                del container_spec['uid_gid']
+
+            # Image user
+            if 'uid_gid' in image_info:
+                uid_gid = image_info['uid_gid']
+
+            self.log.info("gid info {}".format(uid_gid))
+            if isinstance(uid_gid, str):
+                if ":" in uid_gid:
+                    uid, gid = uid_gid.split(":")
+                else:
+                    uid, gid = uid_gid, None
+
+                if uid == '{uid}' and hasattr(self.user, 'uid') \
+                        and self.user.uid is not None:
+                    uid = self.user.uid
+
+                if gid is not None and gid == '{gid}' \
+                        and hasattr(self.user, 'gid') \
+                        and self.user.gid is not None:
+                    gid = self.user.gid
+
+                if uid:
+                    container_spec.update(
+                        {'user': str(uid)}
+                    )
+                if uid and gid:
+                    container_spec.update(
+                        {'user': str(uid) + ":" + str(gid)}
+                    )
 
             # Create the service
             container_spec = ContainerSpec(image, **container_spec)
