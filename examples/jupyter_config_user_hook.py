@@ -69,6 +69,6 @@ c.SwarmSpawner.dockerimages = [
             'CHOWN_HOME': 'yes',
             'CHOWN_HOME_OPTS': '-R',
             'GRANT_SUDO': 'no'},
-    'uid_gid': 'root'
+     'uid_gid': 'root'
     }
 ]
