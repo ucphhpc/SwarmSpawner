@@ -52,8 +52,6 @@ c.SwarmSpawner.networks = ["jupyterhub_default"]
 
 c.SwarmSpawner.use_user_options = True
 
-#c.SwarmSpawner.notebook_dir = "/home/$NB_USER"
-
 c.SwarmSpawner.container_spec = {
     # The command to run inside the service
     'env': {'JUPYTER_ENABLE_LAB': '1'}
