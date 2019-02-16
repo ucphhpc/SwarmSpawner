@@ -62,10 +62,10 @@ c.SwarmSpawner.pre_spawn_hook = simple_user_id
 c.SwarmSpawner.dockerimages = [
     {'name': 'Slurm Notebook',
      'image': 'nielsbohr/slurm-notebook:edge',
-     'env': {'NB_USER': '{service_owner}',
+     'env': {'NB_USER': '{UNIX_NAME}',
             'NB_UID': '{uid}',
             'NB_GID': '100',
-            'HOME': '{service_owner}',
+            'HOME': '{UNIX_NAME}',
             'CHOWN_HOME': 'yes',
             'CHOWN_HOME_OPTS': '-R',
             'GRANT_SUDO': 'no'},

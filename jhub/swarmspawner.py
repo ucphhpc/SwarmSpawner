@@ -547,6 +547,7 @@ class SwarmSpawner(Spawner):
             if 'env' in image_info and isinstance(image_info['env'], dict):
                 container_spec['env'].update(image_info['env'])
 
+            # Dynamic update of env values
             for env_key, env_value in container_spec['env'].items():
                 stripped_value = env_value.lstrip('{').rstrip('}')
                 if hasattr(self, stripped_value) \
@@ -555,6 +556,9 @@ class SwarmSpawner(Spawner):
                 if hasattr(self.user, stripped_value) \
                         and isinstance(getattr(self.user, stripped_value), str):
                     container_spec['env'][env_key] = getattr(self.user, stripped_value)
+                if 'data' in self.user and hasattr(self.user.data, stripped_value) \
+                        and isinstance(getattr(self.user.data, stripped_value), str):
+                    container_spec['env'][env_key] = getattr(self.user.data, stripped_value)
 
             # Args of image
             if 'args' in image_info and isinstance(image_info['args'], list):
