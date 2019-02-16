@@ -549,9 +549,11 @@ class SwarmSpawner(Spawner):
 
             for env_key, env_value in container_spec['env'].items():
                 stripped_value = env_value.lstrip('{').rstrip('}')
-                if hasattr(self, stripped_value) and isinstance(getattr(self, stripped_value), str):
+                if hasattr(self, stripped_value) \
+                        and isinstance(getattr(self, stripped_value), str):
                     container_spec['env'][env_key] = getattr(self, stripped_value)
-                if hasattr(self.user, stripped_value) and isinstance(getattr(self.user, stripped_value), str):
+                if hasattr(self.user, stripped_value) \
+                        and isinstance(getattr(self.user, stripped_value), str):
                     container_spec['env'][env_key] = getattr(self.user, stripped_value)
 
             # Args of image
