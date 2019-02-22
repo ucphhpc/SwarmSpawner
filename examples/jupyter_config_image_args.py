@@ -17,9 +17,24 @@ c.JupyterHub.cleanup_servers = False
 c.SwarmSpawner.start_timeout = 60 * 5
 
 c.SwarmSpawner.jupyterhub_service_name = 'jupyterhub'
+
 c.SwarmSpawner.networks = ["jupyterhub_default"]
 
 c.SwarmSpawner.container_spec = {
-    # The command to run inside the service
-    'env': {'JUPYTER_ENABLE_LAB': '1'}
+    'args': ['/usr/local/bin/start-singleuser.sh',
+             '--NotebookApp.ip=0.0.0.0',
+             '--NotebookApp.port=8888',
+             '--NotebookApp.allow_origin=http://127.0.0.1'],
+    'env': {'JUPYTER_ENABLE_LAB': '1',
+            'TZ': 'Europe/Copenhagen'}
 }
+
+c.SwarmSpawner.use_user_options = True
+
+c.SwarmSpawner.dockerimages = [
+    {'image': 'nielsbohr/slurm-notebook:edge',
+     'name': 'Default jupyter notebook'},
+    {'image': 'nielsbohr/hpc-notebook',
+     'name': 'HPC Notebook',
+     'args': ['/usr/bin/supervisord']}
+]

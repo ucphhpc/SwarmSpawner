@@ -17,9 +17,24 @@ c.JupyterHub.cleanup_servers = False
 c.SwarmSpawner.start_timeout = 60 * 5
 
 c.SwarmSpawner.jupyterhub_service_name = 'jupyterhub'
+
 c.SwarmSpawner.networks = ["jupyterhub_default"]
 
 c.SwarmSpawner.container_spec = {
-    # The command to run inside the service
-    'env': {'JUPYTER_ENABLE_LAB': '1'}
+    'env': {'JUPYTER_ENABLE_LAB': '1',
+            'TZ': 'Europe/Copenhagen'}
 }
+
+c.SwarmSpawner.use_user_options = True
+
+mounts = [{'type': 'bind',
+           'source': '/tmp',
+           'target': '/home/jovyan/tmpdir1'}]
+
+c.SwarmSpawner.dockerimages = [
+    {'image': 'nielsbohr/slurm-notebook:latest',
+     'name': 'Default jupyter notebook',
+     'command': "/bin/bash -c 'mkdir -p /home/jovyan/{tmpdir1,tempdir2}; "
+     "/usr/bin/supervisord'",
+     'mounts': mounts}
+]

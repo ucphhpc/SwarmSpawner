@@ -13,7 +13,8 @@ from concurrent.futures import ThreadPoolExecutor
 from pprint import pformat
 from docker.errors import APIError
 from docker.tls import TLSConfig
-from docker.types import TaskTemplate, Resources, ContainerSpec, Placement
+from docker.types import TaskTemplate, Resources, ContainerSpec, Placement, \
+    ConfigReference
 from docker.utils import kwargs_from_env
 from tornado import gen
 from jupyterhub.spawner import Spawner
@@ -174,6 +175,9 @@ class SwarmSpawner(Spawner):
                     help=dedent(
                         """Additional args to create_host_config for service create
                         """))
+    configs = List(trait=Dict(),
+                   config=True, help=dedent("""Configs to attach to the service"""))
+
     use_user_options = Bool(False, config=True,
                             help=dedent(
                                 """the spawner will use the dict passed through the form
@@ -275,11 +279,7 @@ class SwarmSpawner(Spawner):
             JPY_HUB_PREFIX=self.hub.server.base_url
         ))
 
-        if self.notebook_dir:
-            env['NOTEBOOK_DIR'] = self.notebook_dir
-
         env['JPY_HUB_API_URL'] = self._public_hub_api_url()
-
         return env
 
     def _docker(self, method, *args, **kwargs):
@@ -360,7 +360,7 @@ class SwarmSpawner(Spawner):
         else:
             return 0
 
-    async def check_update(self, image, tag):
+    async def check_update(self, image, tag='latest'):
         full_image = ''.join([image, ':', tag])
         download_tracking = {}
         initial_output = False
@@ -388,7 +388,7 @@ class SwarmSpawner(Spawner):
                             'total'] * pow(10, -6))
                         await yield_({'progress': 80,
                                       'message': 'Downloaded {} MB of {}'
-                                     .format(total_download, full_image)})
+                                      .format(total_download, full_image)})
                         # return to web processing
                         await sleep(1)
 
@@ -407,7 +407,11 @@ class SwarmSpawner(Spawner):
         self.log.info(
             "Spawning progress of {} with image".format(self.service_id))
         task_status = top_task['Status']['State']
-        _image, _tag = image.split(":")
+        _tag = None
+        if ":" in image:
+            _image, _tag = image.split(":")
+        else:
+            _image = image
         if task_status == 'preparing':
             await yield_({'progress': 50,
                           'message': 'Preparing a server '
@@ -415,7 +419,10 @@ class SwarmSpawner(Spawner):
             await yield_({'progress': 60,
                           'message': 'Checking for new version of {}'.format(
                               image)})
-            await self.check_update(_image, _tag)
+            if _tag is not None:
+                await self.check_update(_image, _tag)
+            else:
+                await self.check_update(_image)
             self.log.info("Finished progress from spawning {}".format(image))
 
     @gen.coroutine
@@ -499,10 +506,10 @@ class SwarmSpawner(Spawner):
             self.log.debug("Image info: {}".format(image_info))
             # Does that image have restricted access
             if 'access' in image_info and self.service_owner not in image_info['access']:
-                    self.log.error("User: {} tried to launch {} without access".format(
-                        self.service_owner, image_info['image']
-                    ))
-                    raise Exception("You don't have permission to launch that image")
+                self.log.error("User: {} tried to launch {} without access".format(
+                    self.service_owner, image_info['image']
+                ))
+                raise Exception("You don't have permission to launch that image")
 
             self.log.debug("Container spec: {}".format(container_spec))
 
@@ -524,7 +531,8 @@ class SwarmSpawner(Spawner):
                 else:
                     # Expects a mount_class that supports 'create'
                     if hasattr(self.user, 'data'):
-                        m = yield mount.create(self.user.data, owner=self.service_owner)
+                        m = yield mount.create(self.user.data,
+                                               owner=self.service_owner)
                     else:
                         m = yield mount.create(owner=self.service_owner)
                 container_spec['mounts'].append(m)
@@ -534,6 +542,32 @@ class SwarmSpawner(Spawner):
                 container_spec['env'].update(self.get_env())
             else:
                 container_spec['env'] = self.get_env()
+
+            # Env of image
+            if 'env' in image_info and isinstance(image_info['env'], dict):
+                container_spec['env'].update(image_info['env'])
+
+            # Dynamic update of env values
+            for env_key, env_value in container_spec['env'].items():
+                stripped_value = env_value.lstrip('{').rstrip('}')
+                if hasattr(self, stripped_value) \
+                        and isinstance(getattr(self, stripped_value), str):
+                    container_spec['env'][env_key] = getattr(self, stripped_value)
+                if hasattr(self.user, stripped_value) \
+                        and isinstance(getattr(self.user, stripped_value), str):
+                    container_spec['env'][env_key] = getattr(self.user, stripped_value)
+                if 'data' in self.user and hasattr(self.user.data, stripped_value) \
+                        and isinstance(getattr(self.user.data, stripped_value), str):
+                    container_spec['env'][env_key] = getattr(self.user.data, stripped_value)
+
+            # Args of image
+            if 'args' in image_info and isinstance(image_info['args'], list):
+                container_spec.update({'args': image_info['args']})
+
+            if 'command' in image_info and isinstance(image_info['command'], list)\
+                    or 'command' in image_info and \
+                    isinstance(image_info['command'], str):
+                container_spec.update({'command': image_info['command']})
 
             # Log mounts config
             self.log.debug("User: {} container_spec mounts: {}".format(
@@ -569,6 +603,72 @@ class SwarmSpawner(Spawner):
             if 'placement' in image_info:
                 placement = image_info['placement']
 
+            # Configs attached to image
+            if 'configs' in image_info and isinstance(image_info['configs'], list):
+                for c in image_info['configs']:
+                    if isinstance(c, dict):
+                        self.configs.append(c)
+
+            if self.configs:
+                # Check that the supplied configs already exists
+                current_configs = yield self.docker('configs')
+                config_error_msg = "The server has a misconfigured config, " \
+                    "please contact an administrator to resolve this"
+
+                for c in self.configs:
+                    if 'config_name' not in c:
+                        self.log.error(
+                            "Config: {} does not have a "
+                            "required config_name key".format(c))
+                        raise Exception(config_error_msg)
+                    if 'config_id' not in c:
+                        # Find the id from the supplied name
+                        config_ids = [
+                            cc['ID'] for cc in current_configs
+                            if cc['Spec']['Name'] == c['config_name']]
+                        if not config_ids:
+                            self.log.error("A config with name {} could not be found")
+                            raise Exception(config_error_msg)
+                        c['config_id'] = config_ids[0]
+
+                container_spec.update(
+                    {'configs': [ConfigReference(**c) for c in self.configs]})
+
+            # Global container user
+            uid_gid = None
+            if 'uid_gid' in container_spec:
+                uid_gid = copy.deepcopy(container_spec['uid_gid'])
+                del container_spec['uid_gid']
+
+            # Image user
+            if 'uid_gid' in image_info:
+                uid_gid = image_info['uid_gid']
+
+            self.log.info("gid info {}".format(uid_gid))
+            if isinstance(uid_gid, str):
+                if ":" in uid_gid:
+                    uid, gid = uid_gid.split(":")
+                else:
+                    uid, gid = uid_gid, None
+
+                if uid == '{uid}' and hasattr(self.user, 'uid') \
+                        and self.user.uid is not None:
+                    uid = self.user.uid
+
+                if gid is not None and gid == '{gid}' \
+                        and hasattr(self.user, 'gid') \
+                        and self.user.gid is not None:
+                    gid = self.user.gid
+
+                if uid:
+                    container_spec.update(
+                        {'user': str(uid)}
+                    )
+                if uid and gid:
+                    container_spec.update(
+                        {'user': str(uid) + ":" + str(gid)}
+                    )
+
             # Create the service
             container_spec = ContainerSpec(image, **container_spec)
             resources = Resources(**resource_spec)
@@ -576,8 +676,8 @@ class SwarmSpawner(Spawner):
 
             task_spec = {'container_spec': container_spec,
                          'resources': resources,
-                         'placement': placement
-                         }
+                         'placement': placement}
+
             task_tmpl = TaskTemplate(**task_spec)
             self.log.info("task temp: {}".format(task_tmpl))
             resp = yield self.docker('create_service',
