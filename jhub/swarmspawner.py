@@ -556,7 +556,7 @@ class SwarmSpawner(Spawner):
                 if hasattr(self.user, stripped_value) \
                         and isinstance(getattr(self.user, stripped_value), str):
                     container_spec['env'][env_key] = getattr(self.user, stripped_value)
-                if 'data' in self.user and hasattr(self.user.data, stripped_value) \
+                if hasattr(self.user, 'data') and hasattr(self.user.data, stripped_value) \
                         and isinstance(getattr(self.user.data, stripped_value), str):
                     container_spec['env'][env_key] = getattr(self.user.data, stripped_value)
 
