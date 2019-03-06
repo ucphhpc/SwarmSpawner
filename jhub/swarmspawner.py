@@ -3,6 +3,7 @@ A Spawner for JupyterHub that runs each user's
 server in a separate Docker Service
 """
 
+import os
 import hashlib
 import docker
 import copy
@@ -505,11 +506,31 @@ class SwarmSpawner(Spawner):
 
             self.log.debug("Image info: {}".format(image_info))
             # Does that image have restricted access
-            if 'access' in image_info and self.service_owner not in image_info['access']:
-                self.log.error("User: {} tried to launch {} without access".format(
-                    self.service_owner, image_info['image']
-                ))
-                raise Exception("You don't have permission to launch that image")
+            if 'access' in image_info:
+                # Check for static or db users
+                allowed = False
+                if self.service_owner in image_info['access']:
+                    allowed = True
+                else:
+                    if os.path.exists(image_info['access']):
+                        db_path = image_info['access']
+                        try:
+                            self.log.info("Checking db: {} for "
+                                          "User: {}".format(db_path,
+                                                            self.service_owner))
+                            with open(db_path, 'r') as db:
+                                users = [user.rstrip('\n').rstrip('\r\n') for user in db]
+                                if self.service_owner in users:
+                                    allowed = True
+                        except IOError as err:
+                            self.log.error("User: {} tried to open db file {},"
+                                           "Failed {}".format(self.service_owner,
+                                                              db_path, err))
+                if not allowed:
+                    self.log.error("User: {} tried to launch {} without access"
+                                   .format(
+                                       self.service_owner, image_info['image']))
+                    raise Exception("You don't have permission to launch that image")
 
             self.log.debug("Container spec: {}".format(container_spec))
 
@@ -555,10 +576,17 @@ class SwarmSpawner(Spawner):
                     container_spec['env'][env_key] = getattr(self, stripped_value)
                 if hasattr(self.user, stripped_value) \
                         and isinstance(getattr(self.user, stripped_value), str):
-                    container_spec['env'][env_key] = getattr(self.user, stripped_value)
-                if 'data' in self.user and hasattr(self.user.data, stripped_value) \
-                        and isinstance(getattr(self.user.data, stripped_value), str):
-                    container_spec['env'][env_key] = getattr(self.user.data, stripped_value)
+                    container_spec['env'][env_key] = getattr(self.user,
+                                                             stripped_value)
+                try:
+                    if 'data' in self.user and hasattr(self.user.data, stripped_value) \
+                            and isinstance(getattr(self.user.data, stripped_value), str):
+                        container_spec['env'][env_key] = getattr(self.user.data,
+                                                                 stripped_value)
+                except TypeError as err:
+                    self.log.info("User object type {} is not iterable, "
+                                  "so we can't check for dynamic Authenticator"
+                                  " data, err: {}".format(type(self.user), err))
 
             # Args of image
             if 'args' in image_info and isinstance(image_info['args'], list):
