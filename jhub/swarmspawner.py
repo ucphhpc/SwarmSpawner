@@ -578,15 +578,10 @@ class SwarmSpawner(Spawner):
                         and isinstance(getattr(self.user, stripped_value), str):
                     container_spec['env'][env_key] = getattr(self.user,
                                                              stripped_value)
-                try:
-                    if 'data' in self.user and hasattr(self.user.data, stripped_value) \
-                            and isinstance(getattr(self.user.data, stripped_value), str):
-                        container_spec['env'][env_key] = getattr(self.user.data,
-                                                                 stripped_value)
-                except TypeError as err:
-                    self.log.info("User object type {} is not iterable, "
-                                  "so we can't check for dynamic Authenticator"
-                                  " data, err: {}".format(type(self.user), err))
+                if hasattr(self.user, 'data') and hasattr(self.user.data, stripped_value) \
+                        and isinstance(getattr(self.user.data, stripped_value), str):
+                    container_spec['env'][env_key] = getattr(self.user.data,
+                                                                stripped_value)
 
             # Args of image
             if 'args' in image_info and isinstance(image_info['args'], list):
