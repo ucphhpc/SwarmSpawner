@@ -578,10 +578,11 @@ class SwarmSpawner(Spawner):
                         and isinstance(getattr(self.user, stripped_value), str):
                     container_spec['env'][env_key] = getattr(self.user,
                                                              stripped_value)
-                if hasattr(self.user, 'data') and hasattr(self.user.data, stripped_value) \
+                if hasattr(self.user, 'data') \
+                        and hasattr(self.user.data, stripped_value)\
                         and isinstance(getattr(self.user.data, stripped_value), str):
                     container_spec['env'][env_key] = getattr(self.user.data,
-                                                                stripped_value)
+                                                             stripped_value)
 
             # Args of image
             if 'args' in image_info and isinstance(image_info['args'], list):
