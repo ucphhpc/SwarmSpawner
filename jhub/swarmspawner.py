@@ -28,6 +28,7 @@ from traitlets import (
     Int
 )
 from jhub.mount import VolumeMounter
+from jhub.util import recursive_format
 
 
 class UnicodeOrFalse(Unicode):
@@ -692,6 +693,29 @@ class SwarmSpawner(Spawner):
                     container_spec.update(
                         {'user': str(uid) + ":" + str(gid)}
                     )
+
+            # Global container user
+            if 'user' in container_spec:
+                container_spec['user'] = str(container_spec['user'])
+
+            # Image user
+            if 'user' in image_info:
+                container_spec.update({
+                    'user': str(image_info['user'])
+                })
+
+            dynamic_holders = [Spawner, self, self.user]
+            if hasattr(self.user, 'data'):
+                dynamic_holders.append(self.user.data)
+
+            # Expand container_spec before start
+            for construct in dynamic_holders:
+                try:
+                    if not hasattr(construct, '__dict__'):
+                        continue
+                    recursive_format(container_spec, construct.__dict__)
+                except TypeError:
+                    pass
 
             # Create the service
             container_spec = ContainerSpec(image, **container_spec)
