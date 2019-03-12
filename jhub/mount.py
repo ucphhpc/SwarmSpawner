@@ -84,6 +84,10 @@ class VolumeMounter(Mounter):
                 if not isinstance(val, dict):
                     raise TypeError("{} is expected to be of a {} type".format(
                         key, dict))
+             elif key == "driver_config":
+                 if not isinstance(val, str) and not isinstance(val, DriverConfig):
+                     raise TypeError("{} is expected to be of a {} or {} type".format(
+                        key, str, DriverConfig))
             else:
                 if not isinstance(val, str):
                     raise TypeError("{} is expected to be of {} type".format(
