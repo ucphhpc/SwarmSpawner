@@ -16,7 +16,8 @@ class Mounter(LoggingConfigurable):
     @gen.coroutine
     def init(self, owner=None, keep=True):
         # Check if username specific source is expected
-        if 'source' in self.config and owner is not None:
+        if 'source' in self.config and owner is not None \
+                and 'username' in self.config['source']:
             self.config['source'] = self.config['source'].format(
                 username=owner
             )
