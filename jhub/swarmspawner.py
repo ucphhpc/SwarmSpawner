@@ -207,12 +207,12 @@ class SwarmSpawner(Spawner):
             m = hashlib.md5()
             m.update(self.user.name.encode('utf-8'))
             if hasattr(self.user, 'real_name'):
-                self._service_owner = self.user.real_name[-39:]
+                self._service_owner = self.user.real_name[-31:]
             elif hasattr(self.user, 'name'):
                 # Maximum 63 characters, 10 are comes from the underlying format
                 # i.e. prefix=jupyter-, postfix=-1
-                # get up to last 40 characters as service identifier
-                self._service_owner = self.user.name[-39:]
+                # get up to last 32 characters as service identifier
+                self._service_owner = self.user.name[-31:]
             else:
                 self._service_owner = m.hexdigest()
         return self._service_owner
