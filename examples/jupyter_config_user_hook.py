@@ -1,5 +1,9 @@
+import os
+import shelve
 # Configuration file for jupyterhub.
 user_start_id = 10000
+cur_path = os.path.join('/srv/jupyterhub/')
+db_path = os.path.join(cur_path, 'user_uid.db')
 
 # Simple method to generate a uid for the user
 def simple_user_id(spawner):
@@ -9,28 +13,34 @@ def simple_user_id(spawner):
         spawner.log.info("Pre-Spawn, user {} already has id {}".format(user,
                                                                        user.uid))
         return False
-
     spawner.log.info("Pre-Spawn, creating id for {}".format(user))
-    cur_id = None
-    # If used for real, remember to lock file
-    try:
-        with open('current_user_id', 'r') as user_file:
-            cur_id = user_file.readline()
-    except IOError as err:
-        spawner.log.error("Could not open current_user_id {}".format(err))
 
-    if cur_id is None:
-        new_id = user_start_id
-    else:
-        new_id = int(cur_id) + 1
-    try:
-        with open('current_user_id', 'w') as user_file:
-            user_file.write(str(new_id))
-    except IOError as err:
-        spawner.log.error("Could not open current_user_id {}".format(err))
+    user_id = None
+    with shelve.open(db_path) as db:
+        ids = list(db.keys())
+        if not ids:
+            # First user
+            new_id = str(user_start_id)
+            db[new_id] = user.name
+            user_id = new_id
+        else:
+            # check if user exists
+            usernames = list(db.values())
+            if user.name not in usernames:
+                new_id = str(int(ids[-1]) + 1)
+                db[new_id] = user.name
+                user_id = new_id
+            else:
+                # fetch existing id
+                for uid, username in db.items():
+                    if username == user.name:
+                        user_id = uid
+                        break
+
+    if not user_id:
+        spawner.log.error("Pre-Spawn, failed to aquire a uid for {}".format(user))
         return False
-
-    spawner.user.uid = str(new_id)
+    spawner.user.uid = user_id
 
 c = get_config()
 
@@ -60,15 +70,14 @@ c.SwarmSpawner.container_spec = {
 c.SwarmSpawner.pre_spawn_hook = simple_user_id
 
 c.SwarmSpawner.dockerimages = [
-    {'name': 'Slurm Notebook',
-     'image': 'nielsbohr/slurm-notebook:edge',
-     'env': {'NB_USER': '{UNIX_NAME}',
-            'NB_UID': '{uid}',
-            'NB_GID': '100',
-            'HOME': '{UNIX_NAME}',
-            'CHOWN_HOME': 'yes',
-            'CHOWN_HOME_OPTS': '-R',
-            'GRANT_SUDO': 'no'},
-     'uid_gid': 'root'
-    }
+    {'name': 'Base Notebook',
+     'image': 'nielsbohr/base-notebook',
+     'env': {'NB_USER': '{_service_owner}',
+             'NB_UID': '{uid}',
+             'HOME': '/home/{_service_owner}',
+             'CHOWN_HOME': 'yes',
+             'GRANT_SUDO': 'no'},
+     'uid_gid': 'root',
+     'command': "/bin/bash -c 'mkdir -p /home/{_service_owner}; /usr/local/bin/start-notebook.sh'"
+    },
 ]

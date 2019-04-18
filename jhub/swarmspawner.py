@@ -3,6 +3,7 @@ A Spawner for JupyterHub that runs each user's
 server in a separate Docker Service
 """
 
+import os
 import hashlib
 import docker
 import copy
@@ -27,6 +28,7 @@ from traitlets import (
     Int
 )
 from jhub.mount import VolumeMounter
+from jhub.util import recursive_format
 
 
 class UnicodeOrFalse(Unicode):
@@ -205,12 +207,12 @@ class SwarmSpawner(Spawner):
             m = hashlib.md5()
             m.update(self.user.name.encode('utf-8'))
             if hasattr(self.user, 'real_name'):
-                self._service_owner = self.user.real_name[-39:]
+                self._service_owner = self.user.real_name[-32:]
             elif hasattr(self.user, 'name'):
                 # Maximum 63 characters, 10 are comes from the underlying format
                 # i.e. prefix=jupyter-, postfix=-1
-                # get up to last 40 characters as service identifier
-                self._service_owner = self.user.name[-39:]
+                # get up to last 32 characters as service identifier
+                self._service_owner = self.user.name[-32:]
             else:
                 self._service_owner = m.hexdigest()
         return self._service_owner
@@ -505,11 +507,31 @@ class SwarmSpawner(Spawner):
 
             self.log.debug("Image info: {}".format(image_info))
             # Does that image have restricted access
-            if 'access' in image_info and self.service_owner not in image_info['access']:
-                self.log.error("User: {} tried to launch {} without access".format(
-                    self.service_owner, image_info['image']
-                ))
-                raise Exception("You don't have permission to launch that image")
+            if 'access' in image_info:
+                # Check for static or db users
+                allowed = False
+                if self.service_owner in image_info['access']:
+                    allowed = True
+                else:
+                    if os.path.exists(image_info['access']):
+                        db_path = image_info['access']
+                        try:
+                            self.log.info("Checking db: {} for "
+                                          "User: {}".format(db_path,
+                                                            self.service_owner))
+                            with open(db_path, 'r') as db:
+                                users = [user.rstrip('\n').rstrip('\r\n') for user in db]
+                                if self.service_owner in users:
+                                    allowed = True
+                        except IOError as err:
+                            self.log.error("User: {} tried to open db file {},"
+                                           "Failed {}".format(self.service_owner,
+                                                              db_path, err))
+                if not allowed:
+                    self.log.error("User: {} tried to launch {} without access"
+                                   .format(
+                                       self.service_owner, image_info['image']))
+                    raise Exception("You don't have permission to launch that image")
 
             self.log.debug("Container spec: {}".format(container_spec))
 
@@ -555,10 +577,13 @@ class SwarmSpawner(Spawner):
                     container_spec['env'][env_key] = getattr(self, stripped_value)
                 if hasattr(self.user, stripped_value) \
                         and isinstance(getattr(self.user, stripped_value), str):
-                    container_spec['env'][env_key] = getattr(self.user, stripped_value)
-                if hasattr(self.user, 'data') and hasattr(self.user.data, stripped_value) \
+                    container_spec['env'][env_key] = getattr(self.user,
+                                                             stripped_value)
+                if hasattr(self.user, 'data') \
+                        and hasattr(self.user.data, stripped_value)\
                         and isinstance(getattr(self.user.data, stripped_value), str):
-                    container_spec['env'][env_key] = getattr(self.user.data, stripped_value)
+                    container_spec['env'][env_key] = getattr(self.user.data,
+                                                             stripped_value)
 
             # Args of image
             if 'args' in image_info and isinstance(image_info['args'], list):
@@ -668,6 +693,29 @@ class SwarmSpawner(Spawner):
                     container_spec.update(
                         {'user': str(uid) + ":" + str(gid)}
                     )
+
+            # Global container user
+            if 'user' in container_spec:
+                container_spec['user'] = str(container_spec['user'])
+
+            # Image user
+            if 'user' in image_info:
+                container_spec.update({
+                    'user': str(image_info['user'])
+                })
+
+            dynamic_holders = [Spawner, self, self.user]
+            if hasattr(self.user, 'data'):
+                dynamic_holders.append(self.user.data)
+
+            # Expand container_spec before start
+            for construct in dynamic_holders:
+                try:
+                    if not hasattr(construct, '__dict__'):
+                        continue
+                    recursive_format(container_spec, construct.__dict__)
+                except TypeError:
+                    pass
 
             # Create the service
             container_spec = ContainerSpec(image, **container_spec)
