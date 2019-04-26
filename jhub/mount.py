@@ -80,7 +80,7 @@ class VolumeMounter(Mounter):
 
         # validate types
         for key, val in self.config.items():
-            if key == 'labels':
+            if key == 'labels' or key == 'driver_options':
                 if not isinstance(val, dict):
                     raise TypeError("{} is expected to be of a {} type".format(
                         key, dict))
