@@ -15,7 +15,7 @@ More info about Docker Services `here <https://docs.docker.com/engine/reference/
 Prerequisites
 ================
 
-Python version 3.3 and above is required.
+Python version 3.3 or above is required.
 
 
 Installation
