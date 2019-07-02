@@ -1,3 +1,4 @@
+import copy
 from tornado import gen
 from traitlets.config import LoggingConfigurable, Config
 from docker.types import DriverConfig, Mount
@@ -11,7 +12,9 @@ class Mounter(LoggingConfigurable):
             raise Exception("A dictionary typed config is expected")
         if not config:
             raise Exception("A non-zero sized dictionary is expected")
-        self.config = Config(config)
+        # Ensure that we don't change the passed in config,
+        # But only use it. Deep is allowed if it is of type Config
+        self.config = copy.deepcopy(Config(config))
 
     @gen.coroutine
     def init(self, owner=None, keep=True):
