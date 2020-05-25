@@ -28,17 +28,17 @@ setup(
         'Intended Audience :: Developers',
         'Topic :: Software Development :: Libraries :: Python Modules',
         'License :: OSI Approved :: BSD License',
-        'Programming Language :: Python :: 3.3',
-        'Programming Language :: Python :: 3.4',
         'Programming Language :: Python :: 3.5',
         'Programming Language :: Python :: 3.6',
+        'Programming Language :: Python :: 3.7',
+        'Programming Language :: Python :: 3.8'
     ],
     keywords=['Interactive', 'Interpreter', 'Shell', 'Web'],
     packages=find_packages(exclude=['contrib', 'docs', 'tests']),
     install_requires=[
-        'docker>=3.4.1',
-        'jupyterhub>=0.9.2',
-        'flatten-dict',
+        'docker==3.7.3',
+        'jupyterhub==1.0.0',
+        'flatten-dict==0.2.0',
         'traitlets',
         'tornado',
         'async_generator'

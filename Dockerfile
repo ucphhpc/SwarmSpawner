@@ -1,7 +1,7 @@
 # This is the dockerfile that builds an image from this package that we
 # can use for testing.
 
-FROM jupyterhub/jupyterhub:0.9.2
+FROM jupyterhub/jupyterhub:1.0.0
 
 ADD jhub SwarmSpawner/jhub
 ADD setup.py SwarmSpawner/setup.py

@@ -1,5 +1,5 @@
 docker==3.7.3
-jupyterhub==1.1.0
+jupyterhub==1.0.0
 flatten-dict==0.1.0
 traitlets
 tornado

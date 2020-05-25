@@ -123,7 +123,8 @@ def test_remote_auth_hub(image, swarm, network, make_service):
             hub_api_url = "{}/api/contents/".format(service_prefix)
             new_file = 'write_test.ipynb'
             data = json.dumps({'name': new_file})
-            notebook_headers = {'X-XSRFToken': s.cookies['_xsrf']}
+            # s.cookies['_xsrf']
+            notebook_headers = {'X-XSRFToken': s.cookies._cookies['127.0.0.1']['/']['_xsrf'].value}
             resp = s.put(''.join([JHUB_URL, hub_api_url, new_file]), data=data,
                          headers=notebook_headers)
             assert resp.status_code == 201
