@@ -8,7 +8,6 @@ from docker.errors import NotFound
 HUB_IMAGE_TAG = "hub:test"
 NETWORK_NAME = "jh_test"
 HUB_SERVICE_NAME = "jupyterhub"
-
 CONFIG_TEMPLATE_PATH = "tests/jupyter_config.j2"
 
 
