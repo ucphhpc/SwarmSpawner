@@ -96,6 +96,7 @@ def test_remote_auth_hub(image, swarm, network, make_service):
         assert login_response.status_code == 200
         # Spawn a notebook
         spawn_form_resp = s.get(JHUB_URL + "/hub/spawn")
+        test_logger.info("Spawn page message: {}".format(spawn_form_resp.text))
         assert spawn_form_resp.status_code == 200
         assert 'Select a notebook image' in spawn_form_resp.text
         payload = {
@@ -122,7 +123,8 @@ def test_remote_auth_hub(image, swarm, network, make_service):
         # Notebook ids
         notebook_services = [service for service in post_spawn_services
                              if "jupyter-" in service.name]
-        test_logger.info("Current running jupyter services: {}".format(notebook_services))
+        test_logger.info("Current running jupyter services: {}".format(
+            notebook_services))
 
         # Wait for user home
         for notebook_service in notebook_services:
@@ -161,7 +163,8 @@ def test_remote_auth_hub(image, swarm, network, make_service):
             test_logger.info("Shutting down user: {}".format(jhub_user))
             resp = s.delete(JHUB_URL + "/hub/api/users/{}/server".format(jhub_user),
                             headers={'Referer': '127.0.0.1:8000/hub/'})
-            test_logger.info("Response from removing the user server: {}".format(resp.text))
+            test_logger.info("Response from removing the user server: {}".format(
+                resp.text))
             assert resp.status_code == 204
         # double check it is gone
         services_after_remove = client.services.list()
