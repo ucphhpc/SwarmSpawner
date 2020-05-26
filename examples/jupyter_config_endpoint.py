@@ -22,16 +22,15 @@ c.SwarmSpawner.networks = ["jupyterhub_default"]
 
 c.SwarmSpawner.container_spec = {
     'env': {'JUPYTER_ENABLE_LAB': '1',
-            'TZ': 'Europe/Copenhagen',
-            'NOTEBOOK_DIR': '/home/jovyan/work'}
+            'TZ': 'Europe/Copenhagen'}
 }
 
 c.SwarmSpawner.use_user_options = True
 
 c.SwarmSpawner.dockerimages = [
     {'image': 'nielsbohr/base-notebook:latest',
-     'name': 'Default jupyter notebook'},
-    {'image': 'nielsbohr/base-notebook:latest',
-     'name': 'HPC Notebook',
-     'env': {'NOTEBOOK_DIR': '/home/jovyan'}}
+     'name': 'Default jupyter notebook',
+     'endpoint_spec': {
+         'ports': {8888: 8888}
+     }}
 ]

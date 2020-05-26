@@ -15,7 +15,7 @@ from pprint import pformat
 from docker.errors import APIError
 from docker.tls import TLSConfig
 from docker.types import TaskTemplate, Resources, ContainerSpec, Placement, \
-    ConfigReference
+    ConfigReference, EndpointSpec
 from docker.utils import kwargs_from_env
 from tornado import gen
 from jupyterhub.spawner import Spawner
@@ -634,6 +634,10 @@ class SwarmSpawner(Spawner):
                     if isinstance(c, dict):
                         self.configs.append(c)
 
+            endpoint_spec = {}
+            if 'endpoint_spec' in image_info:
+                endpoint_spec = image_info['endpoint_spec']
+
             if self.configs:
                 # Check that the supplied configs already exists
                 current_configs = yield self.docker('configs')
@@ -728,10 +732,14 @@ class SwarmSpawner(Spawner):
 
             task_tmpl = TaskTemplate(**task_spec)
             self.log.info("task temp: {}".format(task_tmpl))
+            # Set endpoint spec
+            endpoint_spec = EndpointSpec(**endpoint_spec)
+
             resp = yield self.docker('create_service',
                                      task_tmpl,
                                      name=self.service_name,
-                                     networks=networks)
+                                     networks=networks,
+                                     endpoint_spec=endpoint_spec)
             self.service_id = resp['ID']
             self.log.info("Created Docker service {} (id: {}) from image {}"
                           " for user {}".format(self.service_name,

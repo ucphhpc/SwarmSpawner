@@ -32,9 +32,7 @@ c.SwarmSpawner.container_spec = {
 c.SwarmSpawner.use_user_options = True
 
 c.SwarmSpawner.dockerimages = [
-    {'image': 'nielsbohr/slurm-notebook:edge',
-     'name': 'Default jupyter notebook'},
-    {'image': 'nielsbohr/hpc-notebook',
+    {'image': 'nielsbohr/hpc-notebook:latest',
      'name': 'HPC Notebook',
      'args': ['/usr/bin/supervisord']}
 ]
