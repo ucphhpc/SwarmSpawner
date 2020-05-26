@@ -1,6 +1,7 @@
 import pytest
 import docker
 import requests
+import logging
 import json
 import time
 import socket
@@ -16,7 +17,15 @@ MOUNT_SERVICE_NAME = 'mount_target'
 
 JHUB_URL = "http://127.0.0.1:8000"
 
+
+# Logger
+logging.basicConfig(level=logging.INFO)
+test_logger = logging.getLogger()
+
+
+# Test data
 rand_key = ''.join(SystemRandom().choice("0123456789abcdef") for _ in range(32))
+
 
 # root dir
 hub_path = dirname(dirname(__file__))
@@ -53,10 +62,13 @@ mount_service = {'image': MOUNT_IMAGE_TAG, 'name': MOUNT_SERVICE_NAME,
 @pytest.mark.parametrize('network', [network_config], indirect=['network'])
 def test_sshfs_mount_hub(image, swarm, network, make_service):
     """ Test that spawning a jhub service works"""
+    test_logger.info("Start of mount service testing")
     make_service(hub_sshfs_service)
     mount_target = make_service(mount_service)
     client = docker.from_env()
     services_before_spawn = client.services.list()
+    test_logger.info("Pre test services: {}".format(services_before_spawn))
+
     # Both services should be running here
     for service in services_before_spawn:
         while service.tasks() and \
@@ -69,6 +81,7 @@ def test_sshfs_mount_hub(image, swarm, network, make_service):
     user_cert = '/C=DK/ST=NA/L=NA/O=NBI/OU=NA/CN=Name' \
                 '/emailAddress=mail@sdfsf.com'
     # Auth header
+    test_logger.info("Authenticating with user: {}".format(user_cert))
     headers = {'Remote-User': user_cert}
     with requests.Session() as s:
         ready = False
@@ -78,10 +91,12 @@ def test_sshfs_mount_hub(image, swarm, network, make_service):
                 s.get(JHUB_URL)
                 if s.get(JHUB_URL + "/hub/home").status_code == 401:
                     ready = True
+                time.sleep(5)
             except requests.exceptions.ConnectionError:
                 pass
 
         login_response = s.get(JHUB_URL + "/hub/home", headers=headers)
+        test_logger.info("Home response message: {}".format(login_response.text))
         assert login_response.status_code == 200
 
         private_key = ''
@@ -97,6 +112,7 @@ def test_sshfs_mount_hub(image, swarm, network, make_service):
 
         # Spawn a notebook
         spawn_form_resp = s.get(JHUB_URL + "/hub/spawn")
+        test_logger.info("Spawn page message: {}".format(spawn_form_resp.text))
         assert spawn_form_resp.status_code == 200
         assert 'Select a notebook image' in spawn_form_resp.text
         payload = {
@@ -110,12 +126,15 @@ def test_sshfs_mount_hub(image, swarm, network, make_service):
                       'PRIVATEKEY': private_key}
         headers.update({'Mount': str(mount_info)})
         mount_resp = s.post(JHUB_URL + "/hub/data", headers=headers)
+        test_logger.info("Hub Data response message: {}".format(mount_resp.text))
         assert mount_resp.status_code == 200
         spawn_resp = s.post(JHUB_URL + "/hub/spawn", data=payload, headers=headers)
+        test_logger.info("Spawn POST response message: {}".format(spawn_resp.text))
         assert spawn_resp.status_code == 200
 
         post_spawn_services = list(set(client.services.list()) - set(
             services_before_spawn))
+        test_logger.info("Post spawn services: {}".format(post_spawn_services))
         # New services are there
         assert len(post_spawn_services) > 0
 
@@ -140,6 +159,8 @@ def test_sshfs_mount_hub(image, swarm, network, make_service):
         # Notebook ids
         notebook_services = [service for service in post_spawn_services
                              if "jupyter-" in service.name]
+        test_logger.info("Current running jupyter services: {}".format(
+            notebook_services))
         assert len(notebook_services) > 0
 
         notebook_volumes = [volume for volume in client.volumes.list()
@@ -164,15 +185,29 @@ def test_sshfs_mount_hub(image, swarm, network, make_service):
             hub_api_url = "{}/api/contents/".format(service_prefix)
             new_file = 'write_test.ipynb'
             data = json.dumps({'name': new_file})
-            notebook_headers = {'X-XSRFToken': s.cookies['_xsrf']}
-            resp = s.put(''.join([JHUB_URL, hub_api_url, new_file]), data=data,
-                         headers=notebook_headers)
-            assert resp.status_code == 201
+            test_logger.info("Looking for xsrf in: {}".format(s.cookies))
+
+            xsrf_token = None
+            if '_xsrf' in s.cookies:
+                xsrf_token = s.cookies['_xsrf']
+
+            if xsrf_token:
+                notebook_headers = {
+                    'X-XSRFToken': xsrf_token
+                }
+                resp = s.put(''.join([JHUB_URL, hub_api_url, new_file]), data=data,
+                             headers=notebook_headers)
+                assert resp.status_code == 201
+            else:
+                test_logger.info("XSRF token was not found in: {}".format(s.cookies))
 
             # Remove via the web interface
             jhub_user = envs['JUPYTERHUB_USER']
+            test_logger.info("Shutting down user: {}".format(jhub_user))
             resp = s.delete(JHUB_URL + "/hub/api/users/{}/server".format(jhub_user),
                             headers={'Referer': '127.0.0.1:8000/hub/'})
+            test_logger.info("Response from removing the user server: {}".format(
+                resp.text))
             assert resp.status_code == 204
         # double check it is gone
         notebook_volumes_after = [volume for volume in client.volumes.list()
@@ -183,3 +218,4 @@ def test_sshfs_mount_hub(image, swarm, network, make_service):
         services_after_remove = client.services.list()
         assert len((set(services_before_spawn) - set(services_after_remove))) == 0
         assert len(notebook_volumes_after) == 0
+        test_logger.info("End of mount service testing")

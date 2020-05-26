@@ -1,6 +1,7 @@
 import docker
 import time
 import requests
+import logging
 import pytest
 from random import SystemRandom
 from docker.types import EndpointSpec
@@ -14,7 +15,14 @@ MOUNT_SERVICE_NAME = 'mount_target'
 
 JHUB_URL = "http://127.0.0.1:8000"
 
+
+# Logger
+logging.basicConfig(level=logging.INFO)
+test_logger = logging.getLogger()
+
+# Test data
 rand_key = ''.join(SystemRandom().choice("0123456789abcdef") for _ in range(32))
+
 
 # root dir
 hub_path = dirname(dirname(__file__))
@@ -41,11 +49,13 @@ hub_service = {'image': HUB_IMAGE_TAG, 'name': HUB_SERVICE_NAME,
 @pytest.mark.parametrize('network', [network_config], indirect=['network'])
 def test_creates_service(image, swarm, network, make_service):
     """Test that logging in as a new user creates a new docker service."""
+    test_logger.info("Start of service testing")
     make_service(hub_service)
     client = docker.from_env()
     # jupyterhub service should be running at this point
     services_before_spawn = client.services.list()
-
+    test_logger.info("Pre test services: {}".format(services_before_spawn))
+    
     with requests.Session() as s:
         ready = False
         while not ready:
@@ -53,26 +63,32 @@ def test_creates_service(image, swarm, network, make_service):
                 s.get(JHUB_URL)
                 if s.get(JHUB_URL + "/hub/login").status_code == 200:
                     ready = True
+                time.sleep(5)
             except requests.exceptions.ConnectionError:
                 pass
 
         # login
         user = "a-new-user"
+        test_logger.info("Authenticating with user: {}".format(user))
         login_response = s.post(JHUB_URL + "/hub/login?next=",
                                 data={"username": user,
                                       "password": "just magnets"})
+        test_logger.info("Login response message: {}".format(login_response.text))
         assert login_response.status_code == 200
         # Spawn a notebook
         spawn_form_resp = s.get(JHUB_URL + "/hub/spawn")
+        test_logger.info("Spawn page message: {}".format(spawn_form_resp.text))
         assert spawn_form_resp.status_code == 200
         assert 'Select a notebook image' in spawn_form_resp.text
         payload = {
             'dockerimage': 'nielsbohr/base-notebook:latest'
         }
         spawn_resp = s.post(JHUB_URL + "/hub/spawn", data=payload)
+        test_logger.info("Spawn POST response message: {}".format(spawn_resp.text))
         assert spawn_resp.status_code == 200
 
         services = client.services.list()
+        test_logger.info("Post spawn services: {}".format(services))
         # New services are there
         assert len(services) > 0
 
@@ -94,7 +110,10 @@ def test_creates_service(image, swarm, network, make_service):
         # Remove via the web interface
         resp = s.delete(JHUB_URL + "/hub/api/users/{}/server".format(user),
                         headers={'Referer': '127.0.0.1:8000/hub/'})
+        test_logger.info("Response from removing the user server: {}".format(
+                resp.text))
         assert resp.status_code == 204
         # double check it is gone
         services_after_remove = client.services.list()
         assert len((set(services_before_spawn) - set(services_after_remove))) == 0
+        test_logger.info("End of test service")

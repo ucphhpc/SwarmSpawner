@@ -25,6 +25,7 @@ test_logger = logging.getLogger()
 # Test data
 rand_key = ''.join(SystemRandom().choice("0123456789abcdef") for _ in range(32))
 
+
 # root dir
 hub_path = dirname(dirname(__file__))
 hub_image = {'path': hub_path, 'tag': HUB_IMAGE_TAG, 'rm': True, 'pull': False}
