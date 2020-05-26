@@ -55,7 +55,7 @@ def test_creates_service(image, swarm, network, make_service):
     # jupyterhub service should be running at this point
     services_before_spawn = client.services.list()
     test_logger.info("Pre test services: {}".format(services_before_spawn))
-    
+
     with requests.Session() as s:
         ready = False
         while not ready:
@@ -111,7 +111,7 @@ def test_creates_service(image, swarm, network, make_service):
         resp = s.delete(JHUB_URL + "/hub/api/users/{}/server".format(user),
                         headers={'Referer': '127.0.0.1:8000/hub/'})
         test_logger.info("Response from removing the user server: {}".format(
-                resp.text))
+                         resp.text))
         assert resp.status_code == 204
         # double check it is gone
         services_after_remove = client.services.list()
