@@ -129,7 +129,7 @@ def test_remote_auth_hub(image, swarm, network, make_service):
                 xsrf_token = s.cookies['_xsrf']
 
             localhost_cookie = s.cookies._cookies['127.0.0.1']['/']
-            if '_xsrf' not in localhost_cookie:
+            if '_xsrf' in localhost_cookie:
                 xsrf_token = localhost_cookie['_xsrf'].value
 
             if xsrf_token:
