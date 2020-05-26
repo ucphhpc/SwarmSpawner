@@ -140,11 +140,11 @@ def test_remote_auth_hub(image, swarm, network, make_service):
                              headers=notebook_headers)
                 assert resp.status_code == 201
 
-                # Remove via the web interface
-                jhub_user = envs['JUPYTERHUB_USER']
-                resp = s.delete(JHUB_URL + "/hub/api/users/{}/server".format(jhub_user),
-                                headers={'Referer': '127.0.0.1:8000/hub/'})
-                assert resp.status_code == 204
+            # Remove via the web interface
+            jhub_user = envs['JUPYTERHUB_USER']
+            resp = s.delete(JHUB_URL + "/hub/api/users/{}/server".format(jhub_user),
+                            headers={'Referer': '127.0.0.1:8000/hub/'})
+            assert resp.status_code == 204
         # double check it is gone
         services_after_remove = client.services.list()
         assert len((set(services_before_spawn) - set(services_after_remove))) == 0
