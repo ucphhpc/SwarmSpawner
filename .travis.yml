@@ -12,6 +12,7 @@ before_install:
 install:
 - pip install -r tests/requirements.txt
 - docker plugin install rasmunk/sshfs --grant-all-permissions
+- docker pull nielsbohr/base-notebook:latest
 script:
 - python setup.py check -rms
 - flake8
