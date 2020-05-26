@@ -128,9 +128,9 @@ def test_remote_auth_hub(image, swarm, network, make_service):
             if '_xsrf' in localhost_cookie:
                 notebook_headers = {
                     'X-XSRFToken': localhost_cookie['_xsrf'].value
-                    }
+                }
                 resp = s.put(''.join([JHUB_URL, hub_api_url, new_file]), data=data,
-                            headers=notebook_headers)
+                             headers=notebook_headers)
                 assert resp.status_code == 201
 
             # Remove via the web interface
