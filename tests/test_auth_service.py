@@ -124,20 +124,27 @@ def test_remote_auth_hub(image, swarm, network, make_service):
             new_file = 'write_test.ipynb'
             data = json.dumps({'name': new_file})
             # s.cookies['_xsrf']
+            xsrf_token = None
+            if '_xsrf' in s.cookies:
+                xsrf_token = s.cookies['_xsrf']
+
             localhost_cookie = s.cookies._cookies['127.0.0.1']['/']
-            if '_xsrf' in localhost_cookie:
+            if '_xsrf' not in localhost_cookie:
+                xsrf_token = localhost_cookie['_xsrf'].value
+
+            if xsrf_token:
                 notebook_headers = {
-                    'X-XSRFToken': localhost_cookie['_xsrf'].value
+                    'X-XSRFToken': xsrf_token
                 }
                 resp = s.put(''.join([JHUB_URL, hub_api_url, new_file]), data=data,
                              headers=notebook_headers)
                 assert resp.status_code == 201
 
-            # Remove via the web interface
-            jhub_user = envs['JUPYTERHUB_USER']
-            resp = s.delete(JHUB_URL + "/hub/api/users/{}/server".format(jhub_user),
-                            headers={'Referer': '127.0.0.1:8000/hub/'})
-            assert resp.status_code == 204
+                # Remove via the web interface
+                jhub_user = envs['JUPYTERHUB_USER']
+                resp = s.delete(JHUB_URL + "/hub/api/users/{}/server".format(jhub_user),
+                                headers={'Referer': '127.0.0.1:8000/hub/'})
+                assert resp.status_code == 204
         # double check it is gone
         services_after_remove = client.services.list()
         assert len((set(services_before_spawn) - set(services_after_remove))) == 0
