@@ -127,7 +127,7 @@ The individual dictionaries also makes it possible to define whether the image s
     c.SwarmSpawner.dockerimages = [
         {'image': 'jupyter/base-notebook:30f16d52126f',
          'name': 'Minimal python notebook'},
-        {'image': 'nielsbohr/base-notebook:latest',
+        {'image': 'jupyter/base-notebook:latest',
          'name': 'Image with automatic {replace_me} mount, supports Py2/3 and R,',
          'mounts': mounts}
     ]
