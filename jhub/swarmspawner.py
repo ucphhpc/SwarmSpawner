@@ -14,25 +14,24 @@ from concurrent.futures import ThreadPoolExecutor
 from pprint import pformat
 from docker.errors import APIError
 from docker.tls import TLSConfig
-from docker.types import TaskTemplate, Resources, ContainerSpec, Placement, \
-    ConfigReference, EndpointSpec
+from docker.types import (
+    TaskTemplate,
+    Resources,
+    ContainerSpec,
+    Placement,
+    ConfigReference,
+    EndpointSpec,
+)
 from docker.utils import kwargs_from_env
 from tornado import gen
 from jupyterhub.spawner import Spawner
-from traitlets import (
-    default,
-    Dict,
-    Unicode,
-    List,
-    Bool,
-    Int
-)
+from traitlets import default, Dict, Unicode, List, Bool, Int
 from jhub.mount import VolumeMounter
 from jhub.util import recursive_format
 
 
 class UnicodeOrFalse(Unicode):
-    info_text = 'a unicode string or False'
+    info_text = "a unicode string or False"
 
     def validate(self, obj, value):
         if not value:
@@ -59,28 +58,38 @@ class SwarmSpawner(Spawner):
 
     dockerimages = List(
         trait=Dict(),
-        default_value=[{'image': 'nielsbohr/base-notebook:latest',
-                        'name': 'Default jupyter notebook'}],
+        default_value=[
+            {
+                "image": "nielsbohr/base-notebook:latest",
+                "name": "Default jupyter notebook",
+            }
+        ],
         minlen=1,
         config=True,
-        help="Docker images that are available to the user of the host"
+        help="Docker images that are available to the user of the host",
     )
 
-    form_template = Unicode("""
+    form_template = Unicode(
+        """
         <label for="dockerimage">Select a notebook image:</label>
         <select class="form-control" name="dockerimage" required autofocus>
             {option_template}
-        </select>""", config=True, help="Form template.")
+        </select>""",
+        config=True,
+        help="Form template.",
+    )
 
-    option_template = Unicode("""
+    option_template = Unicode(
+        """
         <option value="{image}">{name}</option>""",
-                              config=True,
-                              help="Template for html form options.")
+        config=True,
+        help="Template for html form options.",
+    )
     _executor = None
 
     disabled_form = Unicode()
 
-    @default('options_form')
+    @default("options_form")
     def _options_form(self):
         """Return the form with the drop-down menu."""
         # User options not enabled -> return default jupyterhub form
@@ -88,16 +97,18 @@ class SwarmSpawner(Spawner):
             return self.disabled_form
 
         # Support the use of dynamic string replacement
-        if hasattr(self.user, 'mount'):
+        if hasattr(self.user, "mount"):
             for di in self.dockerimages:
-                if '{replace_me}' in di['name']:
-                    di['name'] = di['name'].replace('{replace_me}',
-                                                    self.user.mount[
-                                                        'HOST'])
-        options = ''.join([
-            self.option_template.format(image=di['image'], name=di['name'])
-            for di in self.dockerimages
-        ])
+                if "{replace_me}" in di["name"]:
+                    di["name"] = di["name"].replace(
+                        "{replace_me}", self.user.mount["HOST"]
+                    )
+        options = "".join(
+            [
+                self.option_template.format(image=di["image"], name=di["name"])
+                for di in self.dockerimages
+            ]
+        )
         return self.form_template.format(option_template=options)
 
     def options_from_form(self, form_data):
@@ -109,11 +120,11 @@ class SwarmSpawner(Spawner):
 
         i_default = self.dockerimages[0]
         # formdata looks like {'dockerimage': ['jupyterhub/singleuser']}"""
-        image = form_data.get('dockerimage', [i_default])[0]
+        image = form_data.get("dockerimage", [i_default])[0]
         # Don't allow users to input their own images
-        if image not in [image['image'] for image in self.dockerimages]:
+        if image not in [image["image"] for image in self.dockerimages]:
             image = i_default
-        options = {'user_selected_image': image}
+        options = {"user_selected_image": image}
         return options
 
     @property
@@ -134,9 +145,9 @@ class SwarmSpawner(Spawner):
         if cls._client is None:
             kwargs = {}
             if self.tls_config:
-                kwargs['tls'] = TLSConfig(**self.tls_config)
+                kwargs["tls"] = TLSConfig(**self.tls_config)
             kwargs.update(kwargs_from_env())
-            client = docker.APIClient(version='auto', **kwargs)
+            client = docker.APIClient(version="auto", **kwargs)
 
             cls._client = client
         return cls._client
@@ -152,7 +163,7 @@ class SwarmSpawner(Spawner):
             Prefix for service names. The full service name for a particular
             user will be <prefix>-<hash(username)>-<server_name>.
             """
-        )
+        ),
     )
     tls_config = Dict(
         config=True,
@@ -161,34 +172,49 @@ class SwarmSpawner(Spawner):
             Check for more info:
             http://docker-py.readthedocs.io/en/stable/tls.html
             """
-        )
+        ),
     )
 
     container_spec = Dict({}, config=True, help="Params to create the service")
-    resource_spec = Dict(
-        {}, config=True, help="Params about cpu and memory limits")
+    resource_spec = Dict({}, config=True, help="Params about cpu and memory limits")
 
-    placement = Dict({}, config=True,
-                     help=dedent(
-                         """List of placement constraints into the swarm
-                         """))
+    placement = Dict(
+        {},
+        config=True,
+        help=dedent(
+            """List of placement constraints into the swarm
+                         """
+        ),
+    )
 
-    networks = List([], config=True,
-                    help=dedent(
-                        """Additional args to create_host_config for service create
-                        """))
-    configs = List(trait=Dict(),
-                   config=True, help=dedent("""Configs to attach to the service"""))
+    networks = List(
+        [],
+        config=True,
+        help=dedent(
+            """Additional args to create_host_config for service create
+                        """
+        ),
+    )
+    configs = List(
+        trait=Dict(), config=True, help=dedent("""Configs to attach to the service""")
+    )
 
-    use_user_options = Bool(False, config=True,
-                            help=dedent(
-                                """the spawner will use the dict passed through the form
+    use_user_options = Bool(
+        False,
+        config=True,
+        help=dedent(
+            """the spawner will use the dict passed through the form
                                 or as json body when using the Hub Api
-                                """))
-    jupyterhub_service_name = Unicode(config=True,
-                                      help=dedent(
-                                          """Name of the service running the JupyterHub
-                                          """))
+                                """
+        ),
+    )
+    jupyterhub_service_name = Unicode(
+        config=True,
+        help=dedent(
+            """Name of the service running the JupyterHub
+                                          """
+        ),
+    )
 
     @property
     def tls_client(self):
@@ -205,10 +231,10 @@ class SwarmSpawner(Spawner):
     def service_owner(self):
         if self._service_owner is None:
             m = hashlib.md5()
-            m.update(self.user.name.encode('utf-8'))
-            if hasattr(self.user, 'real_name'):
+            m.update(self.user.name.encode("utf-8"))
+            if hasattr(self.user, "real_name"):
                 self._service_owner = self.user.real_name[-32:]
-            elif hasattr(self.user, 'name'):
+            elif hasattr(self.user, "name"):
                 # Maximum 63 characters, 10 are comes from the underlying format
                 # i.e. prefix=jupyter-, postfix=-1
                 # get up to last 32 characters as service identifier
@@ -230,10 +256,7 @@ class SwarmSpawner(Spawner):
         else:
             server_name = 1
 
-        return "{}-{}-{}".format(self.service_prefix,
-                                 self.service_owner,
-                                 server_name
-                                 )
+        return "{}-{}-{}".format(self.service_prefix, self.service_owner, server_name)
 
     @property
     def tasks(self):
@@ -245,17 +268,17 @@ class SwarmSpawner(Spawner):
 
     def load_state(self, state):
         super().load_state(state)
-        self.service_id = state.get('service_id', '')
+        self.service_id = state.get("service_id", "")
 
     def get_state(self):
         state = super().get_state()
         if self.service_id:
-            state['service_id'] = self.service_id
+            state["service_id"] = self.service_id
         return state
 
     def clear_state(self):
         super().clear_state()
-        self.service_id = ''
+        self.service_id = ""
 
     @staticmethod
     def _env_keep_default():
@@ -264,24 +287,24 @@ class SwarmSpawner(Spawner):
         return []
 
     def _public_hub_api_url(self):
-        proto, path = self.hub.api_url.split('://', 1)
-        _, rest = path.split(':', 1)
-        return '{proto}://{name}:{rest}'.format(
-            proto=proto,
-            name=self.jupyterhub_service_name,
-            rest=rest
+        proto, path = self.hub.api_url.split("://", 1)
+        _, rest = path.split(":", 1)
+        return "{proto}://{name}:{rest}".format(
+            proto=proto, name=self.jupyterhub_service_name, rest=rest
         )
 
     def get_env(self):
         env = super().get_env()
-        env.update(dict(
-            JPY_USER=self.user.name,
-            JPY_COOKIE_NAME=self.user.server.cookie_name,
-            JPY_BASE_URL=self.user.server.base_url,
-            JPY_HUB_PREFIX=self.hub.server.base_url
-        ))
+        env.update(
+            dict(
+                JPY_USER=self.user.name,
+                JPY_COOKIE_NAME=self.user.server.cookie_name,
+                JPY_BASE_URL=self.user.server.base_url,
+                JPY_HUB_PREFIX=self.hub.server.base_url,
+            )
+        )
 
-        env['JPY_HUB_API_URL'] = self._public_hub_api_url()
+        env["JPY_HUB_API_URL"] = self._public_hub_api_url()
         return env
 
     def _docker(self, method, *args, **kwargs):
@@ -301,25 +324,25 @@ class SwarmSpawner(Spawner):
 
     @gen.coroutine
     def get_service(self):
-        self.log.debug("Getting Docker service '{}' with id: '{}'".format(
-            self.service_name, self.service_id))
-        try:
-            service = yield self.docker(
-                'inspect_service', self.service_name
+        self.log.debug(
+            "Getting Docker service '{}' with id: '{}'".format(
+                self.service_name, self.service_id
             )
-            self.service_id = service['ID']
+        )
+        try:
+            service = yield self.docker("inspect_service", self.service_name)
+            self.service_id = service["ID"]
         except APIError as err:
             if err.response.status_code == 404:
-                self.log.info(
-                    "Docker service '{}' is gone".format(self.service_name))
+                self.log.info("Docker service '{}' is gone".format(self.service_name))
                 service = None
                 # Docker service is gone, remove service id
-                self.service_id = ''
+                self.service_id = ""
             elif err.response.status_code == 500:
                 self.log.info("Docker Swarm Server error")
                 service = None
                 # Docker service is unhealthy, remove the service_id
-                self.service_id = ''
+                self.service_id = ""
             else:
                 raise
         return service
@@ -332,28 +355,31 @@ class SwarmSpawner(Spawner):
             self.log.warn("Docker service not found")
             return 0
 
-        task_filter = {'service': service['Spec']['Name']}
-        self.tasks = yield self.docker(
-            'tasks', task_filter
-        )
+        task_filter = {"service": service["Spec"]["Name"]}
+        self.tasks = yield self.docker("tasks", task_filter)
 
         running_task = None
         for task in self.tasks:
-            task_state = task['Status']['State']
-            if task_state == 'running':
+            task_state = task["Status"]["State"]
+            if task_state == "running":
                 self.log.debug(
                     "Task {} of Docker service {} status: {}".format(
-                        task['ID'][:7], self.service_id[:7],
-                        pformat(task_state)),
+                        task["ID"][:7], self.service_id[:7], pformat(task_state)
+                    ),
                 )
                 # there should be at most one running task
                 running_task = task
-            if task_state == 'rejected':
-                task_err = task['Status']['Err']
-                self.log.error("Task {} of Docker service {} status {} "
-                               "message {}"
-                               .format(task['ID'][:7], self.service_id[:7],
-                                       pformat(task_state), pformat(task_err)))
+            if task_state == "rejected":
+                task_err = task["Status"]["Err"]
+                self.log.error(
+                    "Task {} of Docker service {} status {} "
+                    "message {}".format(
+                        task["ID"][:7],
+                        self.service_id[:7],
+                        pformat(task_state),
+                        pformat(task_err),
+                    )
+                )
                 # If the tasks is rejected -> remove it
                 yield self.stop()
 
@@ -362,65 +388,81 @@ class SwarmSpawner(Spawner):
         else:
             return 0
 
-    async def check_update(self, image, tag='latest'):
-        full_image = ''.join([image, ':', tag])
+    async def check_update(self, image, tag="latest"):
+        full_image = "".join([image, ":", tag])
         download_tracking = {}
         initial_output = False
         total_download = 0
-        for download in self.client.pull(image, tag=tag, stream=True,
-                                         decode=True):
+        for download in self.client.pull(image, tag=tag, stream=True, decode=True):
             if not initial_output:
                 await yield_(
-                    {'progress': 70, 'message': 'Downloading new update '
-                                                'for {}'.format(full_image)})
+                    {
+                        "progress": 70,
+                        "message": "Downloading new update "
+                        "for {}".format(full_image),
+                    }
+                )
                 initial_output = True
-            if 'id' and 'progress' in download:
-                _id = download['id']
+            if "id" and "progress" in download:
+                _id = download["id"]
                 if _id not in download_tracking:
-                    del download['id']
+                    del download["id"]
                     download_tracking[_id] = download
                 else:
                     download_tracking[_id].update(download)
 
                 # Output every 20 MB
                 for _id, tracker in download_tracking.items():
-                    if tracker['progressDetail']['current'] \
-                            == tracker['progressDetail']['total']:
-                        total_download += (tracker['progressDetail'][
-                            'total'] * pow(10, -6))
-                        await yield_({'progress': 80,
-                                      'message': 'Downloaded {} MB of {}'
-                                      .format(total_download, full_image)})
+                    if (
+                        tracker["progressDetail"]["current"]
+                        == tracker["progressDetail"]["total"]
+                    ):
+                        total_download += tracker["progressDetail"]["total"] * pow(
+                            10, -6
+                        )
+                        await yield_(
+                            {
+                                "progress": 80,
+                                "message": "Downloaded {} MB of {}".format(
+                                    total_download, full_image
+                                ),
+                            }
+                        )
                         # return to web processing
                         await sleep(1)
 
                 # Remove completed
                 download_tracking = {
-                    _id: tracker for _id, tracker in
-                    download_tracking.items()
-                    if tracker['progressDetail']['current'] != tracker[
-                        'progressDetail']['total']
+                    _id: tracker
+                    for _id, tracker in download_tracking.items()
+                    if tracker["progressDetail"]["current"]
+                    != tracker["progressDetail"]["total"]
                 }
 
     @async_generator
     async def progress(self):
         top_task = self.tasks[0]
-        image = top_task['Spec']['ContainerSpec']['Image']
-        self.log.info(
-            "Spawning progress of {} with image".format(self.service_id))
-        task_status = top_task['Status']['State']
+        image = top_task["Spec"]["ContainerSpec"]["Image"]
+        self.log.info("Spawning progress of {} with image".format(self.service_id))
+        task_status = top_task["Status"]["State"]
         _tag = None
         if ":" in image:
             _image, _tag = image.split(":")
         else:
             _image = image
-        if task_status == 'preparing':
-            await yield_({'progress': 50,
-                          'message': 'Preparing a server '
-                                     'with {} the image'.format(image)})
-            await yield_({'progress': 60,
-                          'message': 'Checking for new version of {}'.format(
-                              image)})
+        if task_status == "preparing":
+            await yield_(
+                {
+                    "progress": 50,
+                    "message": "Preparing a server " "with {} the image".format(image),
+                }
+            )
+            await yield_(
+                {
+                    "progress": 60,
+                    "message": "Checking for new version of {}".format(image),
+                }
+            )
             if _tag is not None:
                 await self.check_update(_image, _tag)
             else:
@@ -431,7 +473,7 @@ class SwarmSpawner(Spawner):
     def removed_volume(self, name):
         result = False
         try:
-            yield self.docker('remove_volume', name=name)
+            yield self.docker("remove_volume", name=name)
             self.log.info("Removed volume: {}".format(name))
             result = True
         except APIError as err:
@@ -475,30 +517,33 @@ class SwarmSpawner(Spawner):
         service = yield self.get_service()
         if service is None:
             # Validate state
-            if hasattr(self, 'container_spec') \
-                    and self.container_spec is not None:
+            if hasattr(self, "container_spec") and self.container_spec is not None:
                 container_spec = dict(**self.container_spec)
             elif user_options == {}:
                 self.log.error(
                     "User: {} is trying to create a service"
-                    " without a container_spec".format(self.user))
-                raise Exception("That notebook is missing a specification"
-                                "to launch it, contact the admin to resolve "
-                                "this issue")
+                    " without a container_spec".format(self.user)
+                )
+                raise Exception(
+                    "That notebook is missing a specification"
+                    "to launch it, contact the admin to resolve "
+                    "this issue"
+                )
 
             # Setup service
-            container_spec.update(user_options.get('container_spec', {}))
+            container_spec.update(user_options.get("container_spec", {}))
 
             # Which image to spawn
-            if self.use_user_options and 'user_selected_image' in user_options:
-                uimage = user_options['user_selected_image']
+            if self.use_user_options and "user_selected_image" in user_options:
+                uimage = user_options["user_selected_image"]
                 image_info = None
                 for di in self.dockerimages:
-                    if di['image'] == uimage:
+                    if di["image"] == uimage:
                         image_info = copy.deepcopy(di)
                 if image_info is None:
-                    err_msg = "User selected image: {} couldn't be found" \
-                        .format(uimage['image'])
+                    err_msg = "User selected image: {} couldn't be found".format(
+                        uimage["image"]
+                    )
                     self.log.error(err_msg)
                     raise Exception(err_msg)
             else:
@@ -507,30 +552,36 @@ class SwarmSpawner(Spawner):
 
             self.log.debug("Image info: {}".format(image_info))
             # Does that image have restricted access
-            if 'access' in image_info:
+            if "access" in image_info:
                 # Check for static or db users
                 allowed = False
-                if self.service_owner in image_info['access']:
+                if self.service_owner in image_info["access"]:
                     allowed = True
                 else:
-                    if os.path.exists(image_info['access']):
-                        db_path = image_info['access']
+                    if os.path.exists(image_info["access"]):
+                        db_path = image_info["access"]
                         try:
-                            self.log.info("Checking db: {} for "
-                                          "User: {}".format(db_path,
-                                                            self.service_owner))
-                            with open(db_path, 'r') as db:
-                                users = [user.rstrip('\n').rstrip('\r\n') for user in db]
+                            self.log.info(
+                                "Checking db: {} for "
+                                "User: {}".format(db_path, self.service_owner)
+                            )
+                            with open(db_path, "r") as db:
+                                users = [
+                                    user.rstrip("\n").rstrip("\r\n") for user in db
+                                ]
                                 if self.service_owner in users:
                                     allowed = True
                         except IOError as err:
-                            self.log.error("User: {} tried to open db file {},"
-                                           "Failed {}".format(self.service_owner,
-                                                              db_path, err))
+                            self.log.error(
+                                "User: {} tried to open db file {},"
+                                "Failed {}".format(self.service_owner, db_path, err)
+                            )
                 if not allowed:
-                    self.log.error("User: {} tried to launch {} without access"
-                                   .format(
-                                       self.service_owner, image_info['image']))
+                    self.log.error(
+                        "User: {} tried to launch {} without access".format(
+                            self.service_owner, image_info["image"]
+                        )
+                    )
                     raise Exception("You don't have permission to launch that image")
 
             self.log.debug("Container spec: {}".format(container_spec))
@@ -538,13 +589,13 @@ class SwarmSpawner(Spawner):
             # Setup mounts
             mounts = []
             # Global mounts
-            if 'mounts' in container_spec:
-                mounts.extend(container_spec['mounts'])
-            container_spec['mounts'] = []
+            if "mounts" in container_spec:
+                mounts.extend(container_spec["mounts"])
+            container_spec["mounts"] = []
 
             # Image mounts
-            if 'mounts' in image_info:
-                mounts.extend(image_info['mounts'])
+            if "mounts" in image_info:
+                mounts.extend(image_info["mounts"])
 
             for mount in mounts:
                 if isinstance(mount, dict):
@@ -552,126 +603,141 @@ class SwarmSpawner(Spawner):
                     m = yield m.create(owner=self.service_owner)
                 else:
                     # Expects a mount_class that supports 'create'
-                    if hasattr(self.user, 'data'):
-                        m = yield mount.create(self.user.data,
-                                               owner=self.service_owner)
+                    if hasattr(self.user, "data"):
+                        m = yield mount.create(self.user.data, owner=self.service_owner)
                     else:
                         m = yield mount.create(owner=self.service_owner)
-                container_spec['mounts'].append(m)
+                container_spec["mounts"].append(m)
 
             # Some envs are required by the single-user-image
-            if 'env' in container_spec:
-                container_spec['env'].update(self.get_env())
+            if "env" in container_spec:
+                container_spec["env"].update(self.get_env())
             else:
-                container_spec['env'] = self.get_env()
+                container_spec["env"] = self.get_env()
 
             # Env of image
-            if 'env' in image_info and isinstance(image_info['env'], dict):
-                container_spec['env'].update(image_info['env'])
+            if "env" in image_info and isinstance(image_info["env"], dict):
+                container_spec["env"].update(image_info["env"])
 
             # Dynamic update of env values
-            for env_key, env_value in container_spec['env'].items():
-                stripped_value = env_value.lstrip('{').rstrip('}')
-                if hasattr(self, stripped_value) \
-                        and isinstance(getattr(self, stripped_value), str):
-                    container_spec['env'][env_key] = getattr(self, stripped_value)
-                if hasattr(self.user, stripped_value) \
-                        and isinstance(getattr(self.user, stripped_value), str):
-                    container_spec['env'][env_key] = getattr(self.user,
-                                                             stripped_value)
-                if hasattr(self.user, 'data') \
-                        and hasattr(self.user.data, stripped_value)\
-                        and isinstance(getattr(self.user.data, stripped_value), str):
-                    container_spec['env'][env_key] = getattr(self.user.data,
-                                                             stripped_value)
+            for env_key, env_value in container_spec["env"].items():
+                stripped_value = env_value.lstrip("{").rstrip("}")
+                if hasattr(self, stripped_value) and isinstance(
+                    getattr(self, stripped_value), str
+                ):
+                    container_spec["env"][env_key] = getattr(self, stripped_value)
+                if hasattr(self.user, stripped_value) and isinstance(
+                    getattr(self.user, stripped_value), str
+                ):
+                    container_spec["env"][env_key] = getattr(self.user, stripped_value)
+                if (
+                    hasattr(self.user, "data")
+                    and hasattr(self.user.data, stripped_value)
+                    and isinstance(getattr(self.user.data, stripped_value), str)
+                ):
+                    container_spec["env"][env_key] = getattr(
+                        self.user.data, stripped_value
+                    )
 
             # Args of image
-            if 'args' in image_info and isinstance(image_info['args'], list):
-                container_spec.update({'args': image_info['args']})
+            if "args" in image_info and isinstance(image_info["args"], list):
+                container_spec.update({"args": image_info["args"]})
 
-            if 'command' in image_info and isinstance(image_info['command'], list)\
-                    or 'command' in image_info and \
-                    isinstance(image_info['command'], str):
-                container_spec.update({'command': image_info['command']})
+            if (
+                "command" in image_info
+                and isinstance(image_info["command"], list)
+                or "command" in image_info
+                and isinstance(image_info["command"], str)
+            ):
+                container_spec.update({"command": image_info["command"]})
 
             # Log mounts config
-            self.log.debug("User: {} container_spec mounts: {}".format(
-                self.user, container_spec['mounts']))
+            self.log.debug(
+                "User: {} container_spec mounts: {}".format(
+                    self.user, container_spec["mounts"]
+                )
+            )
 
             # Global resource_spec
             resource_spec = {}
-            if hasattr(self, 'resource_spec'):
+            if hasattr(self, "resource_spec"):
                 resource_spec = self.resource_spec
-            resource_spec.update(user_options.get('resource_spec', {}))
+            resource_spec.update(user_options.get("resource_spec", {}))
 
             networks = None
-            if hasattr(self, 'networks'):
+            if hasattr(self, "networks"):
                 networks = self.networks
-            if user_options.get('networks') is not None:
-                networks = user_options.get('networks')
+            if user_options.get("networks") is not None:
+                networks = user_options.get("networks")
 
             # Global placement
             placement = None
-            if hasattr(self, 'placement'):
+            if hasattr(self, "placement"):
                 placement = self.placement
-            if user_options.get('placement') is not None:
-                placement = user_options.get('placement')
+            if user_options.get("placement") is not None:
+                placement = user_options.get("placement")
 
             # Image to spawn
-            image = image_info['image']
+            image = image_info["image"]
 
             # Image resources
-            if 'resource_spec' in image_info:
-                resource_spec = image_info['resource_spec']
+            if "resource_spec" in image_info:
+                resource_spec = image_info["resource_spec"]
 
             # Placement of image
-            if 'placement' in image_info:
-                placement = image_info['placement']
+            if "placement" in image_info:
+                placement = image_info["placement"]
 
             # Configs attached to image
-            if 'configs' in image_info and isinstance(image_info['configs'], list):
-                for c in image_info['configs']:
+            if "configs" in image_info and isinstance(image_info["configs"], list):
+                for c in image_info["configs"]:
                     if isinstance(c, dict):
                         self.configs.append(c)
 
             endpoint_spec = {}
-            if 'endpoint_spec' in image_info:
-                endpoint_spec = image_info['endpoint_spec']
+            if "endpoint_spec" in image_info:
+                endpoint_spec = image_info["endpoint_spec"]
 
             if self.configs:
                 # Check that the supplied configs already exists
-                current_configs = yield self.docker('configs')
-                config_error_msg = "The server has a misconfigured config, " \
+                current_configs = yield self.docker("configs")
+                config_error_msg = (
+                    "The server has a misconfigured config, "
                     "please contact an administrator to resolve this"
+                )
 
                 for c in self.configs:
-                    if 'config_name' not in c:
+                    if "config_name" not in c:
                         self.log.error(
                             "Config: {} does not have a "
-                            "required config_name key".format(c))
+                            "required config_name key".format(c)
+                        )
                         raise Exception(config_error_msg)
-                    if 'config_id' not in c:
+                    if "config_id" not in c:
                         # Find the id from the supplied name
                         config_ids = [
-                            cc['ID'] for cc in current_configs
-                            if cc['Spec']['Name'] == c['config_name']]
+                            cc["ID"]
+                            for cc in current_configs
+                            if cc["Spec"]["Name"] == c["config_name"]
+                        ]
                         if not config_ids:
                             self.log.error("A config with name {} could not be found")
                             raise Exception(config_error_msg)
-                        c['config_id'] = config_ids[0]
+                        c["config_id"] = config_ids[0]
 
                 container_spec.update(
-                    {'configs': [ConfigReference(**c) for c in self.configs]})
+                    {"configs": [ConfigReference(**c) for c in self.configs]}
+                )
 
             # Global container user
             uid_gid = None
-            if 'uid_gid' in container_spec:
-                uid_gid = copy.deepcopy(container_spec['uid_gid'])
-                del container_spec['uid_gid']
+            if "uid_gid" in container_spec:
+                uid_gid = copy.deepcopy(container_spec["uid_gid"])
+                del container_spec["uid_gid"]
 
             # Image user
-            if 'uid_gid' in image_info:
-                uid_gid = image_info['uid_gid']
+            if "uid_gid" in image_info:
+                uid_gid = image_info["uid_gid"]
 
             self.log.info("gid info {}".format(uid_gid))
             if isinstance(uid_gid, str):
@@ -680,42 +746,42 @@ class SwarmSpawner(Spawner):
                 else:
                     uid, gid = uid_gid, None
 
-                if uid == '{uid}' and hasattr(self.user, 'uid') \
-                        and self.user.uid is not None:
+                if (
+                    uid == "{uid}"
+                    and hasattr(self.user, "uid")
+                    and self.user.uid is not None
+                ):
                     uid = self.user.uid
 
-                if gid is not None and gid == '{gid}' \
-                        and hasattr(self.user, 'gid') \
-                        and self.user.gid is not None:
+                if (
+                    gid is not None
+                    and gid == "{gid}"
+                    and hasattr(self.user, "gid")
+                    and self.user.gid is not None
+                ):
                     gid = self.user.gid
 
                 if uid:
-                    container_spec.update(
-                        {'user': str(uid)}
-                    )
+                    container_spec.update({"user": str(uid)})
                 if uid and gid:
-                    container_spec.update(
-                        {'user': str(uid) + ":" + str(gid)}
-                    )
+                    container_spec.update({"user": str(uid) + ":" + str(gid)})
 
             # Global container user
-            if 'user' in container_spec:
-                container_spec['user'] = str(container_spec['user'])
+            if "user" in container_spec:
+                container_spec["user"] = str(container_spec["user"])
 
             # Image user
-            if 'user' in image_info:
-                container_spec.update({
-                    'user': str(image_info['user'])
-                })
+            if "user" in image_info:
+                container_spec.update({"user": str(image_info["user"])})
 
             dynamic_holders = [Spawner, self, self.user]
-            if hasattr(self.user, 'data'):
+            if hasattr(self.user, "data"):
                 dynamic_holders.append(self.user.data)
 
             # Expand container_spec before start
             for construct in dynamic_holders:
                 try:
-                    if not hasattr(construct, '__dict__'):
+                    if not hasattr(construct, "__dict__"):
                         continue
                     recursive_format(container_spec, construct.__dict__)
                 except TypeError:
@@ -726,45 +792,54 @@ class SwarmSpawner(Spawner):
             resources = Resources(**resource_spec)
             placement = Placement(**placement)
 
-            task_spec = {'container_spec': container_spec,
-                         'resources': resources,
-                         'placement': placement}
+            task_spec = {
+                "container_spec": container_spec,
+                "resources": resources,
+                "placement": placement,
+            }
 
             task_tmpl = TaskTemplate(**task_spec)
             self.log.info("task temp: {}".format(task_tmpl))
             # Set endpoint spec
             endpoint_spec = EndpointSpec(**endpoint_spec)
 
-            resp = yield self.docker('create_service',
-                                     task_tmpl,
-                                     name=self.service_name,
-                                     networks=networks,
-                                     endpoint_spec=endpoint_spec)
-            self.service_id = resp['ID']
-            self.log.info("Created Docker service {} (id: {}) from image {}"
-                          " for user {}".format(self.service_name,
-                                                self.service_id[:7], image,
-                                                self.user))
+            resp = yield self.docker(
+                "create_service",
+                task_tmpl,
+                name=self.service_name,
+                networks=networks,
+                endpoint_spec=endpoint_spec,
+            )
+            self.service_id = resp["ID"]
+            self.log.info(
+                "Created Docker service {} (id: {}) from image {}"
+                " for user {}".format(
+                    self.service_name, self.service_id[:7], image, self.user
+                )
+            )
 
             yield self.wait_for_running_tasks()
 
         else:
             self.log.info(
                 "Found existing Docker service '{}' (id: {})".format(
-                    self.service_name, self.service_id[:7]))
+                    self.service_name, self.service_id[:7]
+                )
+            )
             # Handle re-using API token.
             # Get the API token from the environment variables
             # of the running service:
-            envs = service['Spec']['TaskTemplate']['ContainerSpec']['Env']
+            envs = service["Spec"]["TaskTemplate"]["ContainerSpec"]["Env"]
             for line in envs:
-                if line.startswith('JPY_API_TOKEN='):
-                    self.api_token = line.split('=', 1)[1]
+                if line.startswith("JPY_API_TOKEN="):
+                    self.api_token = line.split("=", 1)[1]
                     break
 
         ip = self.service_name
         port = self.service_port
-        self.log.debug("Active service: '{}' with user '{}'".format(
-            self.service_name, self.user))
+        self.log.debug(
+            "Active service: '{}' with user '{}'".format(self.service_name, self.user)
+        )
 
         # we use service_name instead of ip
         # https://docs.docker.com/engine/swarm/networking/#use-swarm-mode-service-discovery
@@ -778,7 +853,9 @@ class SwarmSpawner(Spawner):
         """
         self.log.info(
             "Stopping and removing Docker service {} (id: {})".format(
-                self.service_name, self.service_id[:7]))
+                self.service_name, self.service_id[:7]
+            )
+        )
 
         service = yield self.get_service()
         if not service:
@@ -787,33 +864,36 @@ class SwarmSpawner(Spawner):
 
         # lookup mounts before removing the service
         volumes = None
-        if 'Mounts' in service['Spec']['TaskTemplate']['ContainerSpec']:
-            volumes = service['Spec']['TaskTemplate']['ContainerSpec'][
-                'Mounts']
+        if "Mounts" in service["Spec"]["TaskTemplate"]["ContainerSpec"]:
+            volumes = service["Spec"]["TaskTemplate"]["ContainerSpec"]["Mounts"]
         # Even though it returns the service is gone
         # the underlying containers are still being removed
-        removed_service = yield self.docker('remove_service', service['ID'])
+        removed_service = yield self.docker("remove_service", service["ID"])
         if removed_service:
-            self.log.info("Docker service {} (id: {}) removed".format(
-                self.service_name, self.service_id[:7]))
+            self.log.info(
+                "Docker service {} (id: {}) removed".format(
+                    self.service_name, self.service_id[:7]
+                )
+            )
             if volumes is not None:
                 for volume in volumes:
-                    labels = volume.get('VolumeOptions', {}).get('Labels', {})
+                    labels = volume.get("VolumeOptions", {}).get("Labels", {})
                     # Whether the volume should be kept
-                    if 'keep' in labels and labels['keep'] != 'True':
+                    if "keep" in labels and labels["keep"] != "True":
                         self.log.info("Volume {} should not be kept".format(volume))
-                        if 'Source' in volume:
+                        if "Source" in volume:
                             # Validate the volume exists
                             try:
-                                yield self.docker('inspect_volume', volume['Source'])
+                                yield self.docker("inspect_volume", volume["Source"])
                             except docker.errors.NotFound:
-                                self.log.info(
-                                    "No volume named: " + volume['Source'])
+                                self.log.info("No volume named: " + volume["Source"])
                             else:
-                                yield self.remove_volume(volume['Source'])
+                                yield self.remove_volume(volume["Source"])
                         else:
-                            self.log.error("Volume {} didn't have a Source key so it "
-                                           "can't be removed".format(volume))
+                            self.log.error(
+                                "Volume {} didn't have a Source key so it "
+                                "can't be removed".format(volume)
+                            )
 
     @gen.coroutine
     def wait_for_running_tasks(self, max_attempts=20):
@@ -821,20 +901,21 @@ class SwarmSpawner(Spawner):
         attempt = 0
         while not running:
             service = yield self.get_service()
-            task_filter = {'service': service['Spec']['Name']}
-            self.tasks = yield self.docker(
-                'tasks', task_filter
-            )
+            task_filter = {"service": service["Spec"]["Name"]}
+            self.tasks = yield self.docker("tasks", task_filter)
             preparing = False
             for task in self.tasks:
-                task_state = task['Status']['State']
-                self.log.info("Waiting for service: {} current task status: {}"
-                              .format(service['ID'], task_state))
-                if task_state == 'running':
+                task_state = task["Status"]["State"]
+                self.log.info(
+                    "Waiting for service: {} current task status: {}".format(
+                        service["ID"], task_state
+                    )
+                )
+                if task_state == "running":
                     running = True
-                if task_state == 'preparing':
+                if task_state == "preparing":
                     preparing = True
-                if task_state == 'rejected' or attempt > max_attempts:
+                if task_state == "rejected" or attempt > max_attempts:
                     return False
             if not preparing:
                 attempt += 1

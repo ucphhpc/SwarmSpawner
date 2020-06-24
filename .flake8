@@ -1,4 +1,4 @@
 [flake8]
-ignore = E226,E302,E41,E123
+ignore = E226,E302,E41,E123, W503
 max-line-length = 89
 exclude = tests/configs/*,build,examples,venv

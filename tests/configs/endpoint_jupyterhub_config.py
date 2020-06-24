@@ -1,9 +1,9 @@
 """A simple jupyter config file for testing the spawner."""
 c = get_config()
 
-c.JupyterHub.hub_ip = '0.0.0.0'
+c.JupyterHub.hub_ip = "0.0.0.0"
 
-c.JupyterHub.spawner_class = 'jhub.SwarmSpawner'
+c.JupyterHub.spawner_class = "jhub.SwarmSpawner"
 
 # The name of the service that's running the hub
 c.SwarmSpawner.jupyterhub_service_name = "jupyterhub"
@@ -18,17 +18,17 @@ c.SwarmSpawner.networks = ["jh_test"]
 c.SwarmSpawner.use_user_options = True
 
 c.SwarmSpawner.dockerimages = [
-    {'image': 'nielsbohr/base-notebook:latest',
-     'name': 'Basic Python Notebook',
-     'endpoint_spec': {
-         'mode': 'vip',
-         'ports': {'8000': '8000'}}}
+    {
+        "image": "nielsbohr/base-notebook:latest",
+        "name": "Basic Python Notebook",
+        "endpoint_spec": {"mode": "vip", "ports": {"8000": "8000"}},
+    }
 ]
 
 c.SwarmSpawner.container_spec = {
-    'args': ['/usr/local/bin/start-singleuser.sh'],
-    'env': {'JUPYTER_ENABLE_LAB': '1'}
+    "command": "start-notebook.sh",
+    "args": ["--NotebookApp.default_url=/lab"],
 }
 
-c.JupyterHub.authenticator_class = 'jhubauthenticators.DummyAuthenticator'
+c.JupyterHub.authenticator_class = "jhubauthenticators.DummyAuthenticator"
 c.DummyAuthenticator.password = "just magnets"

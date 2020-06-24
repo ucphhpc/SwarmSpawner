@@ -1,6 +1,7 @@
-docker==3.7.3
-jupyterhub==1.0.0
-flatten-dict==0.1.0
+docker==4.2.1
+jupyterhub==1.1.0
+flatten-dict
 traitlets
 tornado
 async_generator
+jhub-authenticators

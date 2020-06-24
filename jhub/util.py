@@ -15,5 +15,5 @@ def recursive_format(input, value):
                 except KeyError:
                     continue
             recursive_format(input_value, value)
-    if hasattr(input, '__dict__'):
+    if hasattr(input, "__dict__"):
         recursive_format(input.__dict__, value)

@@ -13,9 +13,10 @@ HUB_IMAGE_TAG = "hub:test"
 MOUNT_IMAGE_TAG = "nielsbohr/ssh-mount-dummy"
 NETWORK_NAME = "jh_test"
 HUB_SERVICE_NAME = "jupyterhub"
-MOUNT_SERVICE_NAME = 'mount_target'
+MOUNT_SERVICE_NAME = "mount_target"
+PORT = 8000
 
-JHUB_URL = "http://127.0.0.1:8000"
+JHUB_URL = "http://127.0.0.1:{}".format(PORT)
 
 
 # Logger
@@ -24,42 +25,47 @@ test_logger = logging.getLogger()
 
 
 # Test data
-rand_key = ''.join(SystemRandom().choice("0123456789abcdef") for _ in range(32))
+rand_key = "".join(SystemRandom().choice("0123456789abcdef") for _ in range(32))
 
 
 # root dir
 hub_path = dirname(dirname(__file__))
-hub_image = {'path': hub_path, 'tag': HUB_IMAGE_TAG, 'rm': True, 'pull': False}
+hub_image = {"path": hub_path, "tag": HUB_IMAGE_TAG, "rm": True, "pull": False}
 
 # swarm config
-swarm_config = {'advertise_addr': '192.168.99.100'}
-network_config = {'name': NETWORK_NAME, 'driver': 'overlay',
-                  'options': {'subnet': '192.168.0.0/20'},
-                  'attachable': True}
+swarm_config = {}
+network_config = {
+    "name": NETWORK_NAME,
+    "driver": "overlay",
+    "options": {"subnet": "192.168.0.0/24"},
+    "attachable": True,
+}
 
 # hub config
-hub_config = join(dirname(realpath(__file__)), 'configs', 'mount_jupyterhub_config.py')
-hub_sshfs_service = {'image': HUB_IMAGE_TAG, 'name': HUB_SERVICE_NAME,
-                     'mounts': [
-                         ':'.join(['/var/run/docker.sock',
-                                   '/var/run/docker.sock', 'rw']),
-                         ':'.join([hub_config,
-                                   '/etc/jupyterhub/jupyterhub_config.py',
-                                   'ro'])
-                     ],
-                     'networks': [NETWORK_NAME],
-                     'endpoint_spec': EndpointSpec(ports={8000: 8000}),
-                     'env': ['JUPYTERHUB_CRYPT_KEY=' + rand_key],
-                     'command': ['jupyterhub', '-f',
-                                 '/etc/jupyterhub/jupyterhub_config.py']}
+hub_config = join(dirname(realpath(__file__)), "configs", "mount_jupyterhub_config.py")
+hub_sshfs_service = {
+    "image": HUB_IMAGE_TAG,
+    "name": HUB_SERVICE_NAME,
+    "mounts": [
+        ":".join(["/var/run/docker.sock", "/var/run/docker.sock", "rw"]),
+        ":".join([hub_config, "/etc/jupyterhub/jupyterhub_config.py", "ro"]),
+    ],
+    "networks": [NETWORK_NAME],
+    "endpoint_spec": EndpointSpec(ports={PORT: PORT}),
+    "env": ["JUPYTERHUB_CRYPT_KEY=" + rand_key],
+    "command": ["jupyterhub", "-f", "/etc/jupyterhub/jupyterhub_config.py"],
+}
 
-mount_service = {'image': MOUNT_IMAGE_TAG, 'name': MOUNT_SERVICE_NAME,
-                 'endpoint_spec': EndpointSpec(ports={2222: 22})}
+mount_service = {
+    "image": MOUNT_IMAGE_TAG,
+    "name": MOUNT_SERVICE_NAME,
+    "endpoint_spec": EndpointSpec(ports={2222: 22}),
+}
 
 
-@pytest.mark.parametrize('image', [hub_image], indirect=['image'])
-@pytest.mark.parametrize('swarm', [swarm_config], indirect=['swarm'])
-@pytest.mark.parametrize('network', [network_config], indirect=['network'])
+@pytest.mark.parametrize("image", [hub_image], indirect=["image"])
+@pytest.mark.parametrize("swarm", [swarm_config], indirect=["swarm"])
+@pytest.mark.parametrize("network", [network_config], indirect=["network"])
 def test_sshfs_mount_hub(image, swarm, network, make_service):
     """ Test that spawning a jhub service works"""
     test_logger.info("Start of mount service testing")
@@ -71,60 +77,70 @@ def test_sshfs_mount_hub(image, swarm, network, make_service):
 
     # Both services should be running here
     for service in services_before_spawn:
-        while service.tasks() and \
-                service.tasks()[0]["Status"][
-                    "State"] != "running":
+        while service.tasks() and service.tasks()[0]["Status"]["State"] != "running":
             time.sleep(1)
             state = service.tasks()[0]["Status"]["State"]
-            assert state != 'failed'
+            assert state != "failed"
 
-    user_cert = '/C=DK/ST=NA/L=NA/O=NBI/OU=NA/CN=Name' \
-                '/emailAddress=mail@sdfsf.com'
+    user_cert = "/C=DK/ST=NA/L=NA/O=NBI/OU=NA/CN=Name" "/emailAddress=mail@sdfsf.com"
     # Auth header
     test_logger.info("Authenticating with user: {}".format(user_cert))
-    headers = {'Remote-User': user_cert}
+    headers = {"Remote-User": user_cert}
+    # Try for 5 minutes
+    num_attempts = 0
+    max_attempts = 60
     with requests.Session() as s:
         ready = False
-        # make sure jhub http service is up
         while not ready:
+            if num_attempts > max_attempts:
+                raise RuntimeError(
+                    "Failed to connect to the JupyterHub login page within: {}".format(
+                        5 * max_attempts / 60
+                    )
+                )
             try:
-                s.get(JHUB_URL)
-                if s.get(JHUB_URL + "/hub/home").status_code == 401:
+                print("Trying to connect to: {}".format(JHUB_URL))
+                resp = s.get(JHUB_URL)
+                if resp.status_code == 401:
                     ready = True
-                time.sleep(5)
+                else:
+                    print(resp)
             except requests.exceptions.ConnectionError:
                 pass
+            num_attempts += 1
+            time.sleep(5)
 
         login_response = s.get(JHUB_URL + "/hub/home", headers=headers)
         test_logger.info("Home response message: {}".format(login_response.text))
         assert login_response.status_code == 200
 
-        private_key = ''
+        private_key = ""
         # Extract mount target ssh private key
         for task in mount_target.tasks():
-            if task['Status']['State'] == 'running':
-                cont_id = task['Status']['ContainerStatus']['ContainerID']
-                cmd = ''.join(['cat ', '/home/mountuser/.ssh/id_rsa'])
+            if task["Status"]["State"] == "running":
+                cont_id = task["Status"]["ContainerStatus"]["ContainerID"]
+                cmd = "".join(["cat ", "/home/mountuser/.ssh/id_rsa"])
                 container = client.containers.get(cont_id)
-                private_key = container.exec_run(cmd)[1].decode('utf-8')
+                private_key = container.exec_run(cmd)[1].decode("utf-8")
                 break
-        assert private_key != ''
+        assert private_key != ""
 
         # Spawn a notebook
         spawn_form_resp = s.get(JHUB_URL + "/hub/spawn")
         test_logger.info("Spawn page message: {}".format(spawn_form_resp.text))
         assert spawn_form_resp.status_code == 200
-        assert 'Select a notebook image' in spawn_form_resp.text
-        payload = {
-            'dockerimage': 'nielsbohr/base-notebook:latest'
-        }
+        assert "Select a notebook image" in spawn_form_resp.text
+        payload = {"dockerimage": "nielsbohr/base-notebook:latest"}
 
-        target_user = 'mountuser'
+        target_user = "mountuser"
         ssh_host_target = socket.gethostname()
-        mount_info = {'HOST': 'DUMMY', 'USERNAME': target_user,
-                      'PATH': ''.join(['@', ssh_host_target, ':']),
-                      'PRIVATEKEY': private_key}
-        headers.update({'Mount': str(mount_info)})
+        mount_info = {
+            "HOST": "DUMMY",
+            "USERNAME": target_user,
+            "PATH": "".join(["@", ssh_host_target, ":"]),
+            "PRIVATEKEY": private_key,
+        }
+        headers.update({"Mount": str(mount_info)})
         mount_resp = s.post(JHUB_URL + "/hub/data", headers=headers)
         test_logger.info("Hub Data response message: {}".format(mount_resp.text))
         assert mount_resp.status_code == 200
@@ -132,88 +148,103 @@ def test_sshfs_mount_hub(image, swarm, network, make_service):
         test_logger.info("Spawn POST response message: {}".format(spawn_resp.text))
         assert spawn_resp.status_code == 200
 
-        post_spawn_services = list(set(client.services.list()) - set(
-            services_before_spawn))
+        post_spawn_services = list(
+            set(client.services.list()) - set(services_before_spawn)
+        )
         test_logger.info("Post spawn services: {}".format(post_spawn_services))
         # New services are there
         assert len(post_spawn_services) > 0
 
         # All should be running at this point
         for service in post_spawn_services:
-            while service.tasks() and \
-                    service.tasks()[0]["Status"]["State"] != "running":
+            while (
+                service.tasks() and service.tasks()[0]["Status"]["State"] != "running"
+            ):
                 time.sleep(1)
                 state = service.tasks()[0]["Status"]["State"]
-                assert state != 'failed'
+                assert state != "failed"
 
         # Validate mounts
         for service in post_spawn_services:
             for task in service.tasks():
                 # Correct image
-                if task['Spec']['ContainerSpec']['Image'] == image:
+                if task["Spec"]["ContainerSpec"]["Image"] == image:
                     # Validate mount
-                    assert task['Status']['State'] == 'running'
-                    for mount in task['Spec']['ContainerSpec']['Mounts']:
-                        assert mount['VolumeOptions']['DriverConfig']['Name'] \
-                            == 'rasmunk/sshfs:latest'
+                    assert task["Status"]["State"] == "running"
+                    for mount in task["Spec"]["ContainerSpec"]["Mounts"]:
+                        assert (
+                            mount["VolumeOptions"]["DriverConfig"]["Name"]
+                            == "rasmunk/sshfs:latest"
+                        )
         # Notebook ids
-        notebook_services = [service for service in post_spawn_services
-                             if "jupyter-" in service.name]
-        test_logger.info("Current running jupyter services: {}".format(
-            notebook_services))
+        notebook_services = [
+            service for service in post_spawn_services if "jupyter-" in service.name
+        ]
+        test_logger.info(
+            "Current running jupyter services: {}".format(notebook_services)
+        )
         assert len(notebook_services) > 0
 
-        notebook_volumes = [volume for volume in client.volumes.list()
-                            for service in notebook_services
-                            if volume.name.strip('sshvolume-user-')
-                            in service.name.strip('jupyter-')]
+        notebook_volumes = [
+            volume
+            for volume in client.volumes.list()
+            for service in notebook_services
+            if volume.name.strip("sshvolume-user-") in service.name.strip("jupyter-")
+        ]
 
         assert len(notebook_volumes) > 0
 
         # Wait for user home
         for notebook_service in notebook_services:
             envs = {}
-            for env in notebook_service.attrs['Spec']['TaskTemplate'][
-                    'ContainerSpec']['Env']:
-                key, value = env.split('=')
+            for env in notebook_service.attrs["Spec"]["TaskTemplate"]["ContainerSpec"][
+                "Env"
+            ]:
+                key, value = env.split("=")
                 envs[key] = value
-            service_prefix = envs['JUPYTERHUB_SERVICE_PREFIX']
+            service_prefix = envs["JUPYTERHUB_SERVICE_PREFIX"]
             home_resp = s.get(JHUB_URL + service_prefix)
             assert home_resp.status_code == 200
 
             # Write to user home
             hub_api_url = "{}/api/contents/".format(service_prefix)
-            new_file = 'write_test.ipynb'
-            data = json.dumps({'name': new_file})
+            new_file = "write_test.ipynb"
+            data = json.dumps({"name": new_file})
             test_logger.info("Looking for xsrf in: {}".format(s.cookies))
 
             xsrf_token = None
-            if '_xsrf' in s.cookies:
-                xsrf_token = s.cookies['_xsrf']
+            if "_xsrf" in s.cookies:
+                xsrf_token = s.cookies["_xsrf"]
 
             if xsrf_token:
-                notebook_headers = {
-                    'X-XSRFToken': xsrf_token
-                }
-                resp = s.put(''.join([JHUB_URL, hub_api_url, new_file]), data=data,
-                             headers=notebook_headers)
+                notebook_headers = {"X-XSRFToken": xsrf_token}
+                resp = s.put(
+                    "".join([JHUB_URL, hub_api_url, new_file]),
+                    data=data,
+                    headers=notebook_headers,
+                )
                 assert resp.status_code == 201
             else:
                 test_logger.info("XSRF token was not found in: {}".format(s.cookies))
 
             # Remove via the web interface
-            jhub_user = envs['JUPYTERHUB_USER']
+            jhub_user = envs["JUPYTERHUB_USER"]
             test_logger.info("Shutting down user: {}".format(jhub_user))
-            resp = s.delete(JHUB_URL + "/hub/api/users/{}/server".format(jhub_user),
-                            headers={'Referer': '127.0.0.1:8000/hub/'})
-            test_logger.info("Response from removing the user server: {}".format(
-                resp.text))
+            resp = s.delete(
+                JHUB_URL + "/hub/api/users/{}/server".format(jhub_user),
+                headers={"Referer": "127.0.0.1:{}/hub/".format(PORT)},
+            )
+            test_logger.info(
+                "Response from removing the user server: {}".format(resp.text)
+            )
             assert resp.status_code == 204
         # double check it is gone
-        notebook_volumes_after = [volume for volume in client.volumes.list()
-                                  for service in notebook_services
-                                  if volume.name.strip('sshvolume-user-')
-                                  in service.name.strip('jupyter-')]
+        notebook_volumes_after = [
+            volume
+            for volume in client.volumes.list()
+            for service in notebook_services
+            if volume.name.strip("sshvolume-user-") in service.name.strip("jupyter-")
+        ]
 
         services_after_remove = client.services.list()
         assert len((set(services_before_spawn) - set(services_after_remove))) == 0

@@ -1,22 +1,18 @@
 # This is the dockerfile that builds an image from this package that we
 # can use for testing.
 
-FROM jupyterhub/jupyterhub:1.0.0
+FROM jupyterhub/jupyterhub:1.2
 
 ADD jhub SwarmSpawner/jhub
 ADD setup.py SwarmSpawner/setup.py
 ADD requirements.txt SwarmSpawner/requirements.txt
 ADD version.py SwarmSpawner/version.py
 
-RUN pip install jhub-authenticators
-
 RUN cd SwarmSpawner \
-    && pip install -r requirements.txt \
+    && pip3 install -r requirements.txt \
     && touch README.rst \
-    && python setup.py install \
+    && python3 setup.py install \
     && cd .. \
     && rm -r SwarmSpawner
 
-# We'll need to mount the jupyter_config in the container when we
-# run it.
-CMD ["jupyterhub", "-f", "/srv/jupyterhub/jupyter_config.py"]
+CMD ["jupyterhub"]
