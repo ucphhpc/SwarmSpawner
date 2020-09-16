@@ -281,7 +281,7 @@ class SwarmSpawner(Spawner):
         self.service_id = ""
 
     @staticmethod
-    def _env_keep_default():
+    def _env_keep_default(arg):
         """it's called in traitlets. It's a special method name.
         Don't inherit any env from the parent process"""
         return []
