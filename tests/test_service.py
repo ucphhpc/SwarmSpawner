@@ -129,11 +129,22 @@ def test_creates_service(image, swarm, network, make_service):
         assert len(services_after_spawn) > 0
 
         # Remove via the web interface
-        resp = s.delete(
-            JHUB_URL + "/hub/api/users/{}/server".format(user),
-            headers={"Referer": "127.0.0.1:{}/hub/".format(PORT)},
-        )
-        test_logger.info("Response from removing the user server: {}".format(resp.text))
+        # Wait for the server to finish spawning
+        pending = True
+        num_wait, max_wait = 0, 15
+        while pending or num_wait > max_wait:
+            num_wait += 1
+            resp = s.delete(
+                JHUB_URL + "/hub/api/users/{}/server".format(user),
+                headers={"Referer": "127.0.0.1:{}/hub/".format(PORT)},
+            )
+            test_logger.info(
+                "Response from removing the user server: {}".format(resp.text)
+            )
+            if resp.status_code == 204:
+                pending = False
+            time.sleep(1)
+
         assert resp.status_code == 204
         # double check it is gone
         services_after_remove = client.services.list()
