@@ -39,5 +39,5 @@ c.SwarmSpawner.container_spec = {
 c.SwarmSpawner.configs = configs
 
 c.SwarmSpawner.dockerimages = [
-    {"image": "nielsbohr/slurm-notebook:edge", "name": "Default jupyter notebook"}
+    {"image": "nielsbohr/slurm-notebook:latest", "name": "Slurm notebook"}
 ]

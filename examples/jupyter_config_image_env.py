@@ -32,7 +32,7 @@ c.SwarmSpawner.dockerimages = [
     {"image": "nielsbohr/base-notebook:latest", "name": "Default jupyter notebook"},
     {
         "image": "nielsbohr/base-notebook:latest",
-        "name": "HPC Notebook",
+        "name": "Base Notebook",
         "env": {"NOTEBOOK_DIR": "/home/jovyan"},
     },
 ]
