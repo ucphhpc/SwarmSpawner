@@ -113,7 +113,7 @@ class SwarmSpawner(Spawner):
 
     def options_from_form(self, form_data):
         """Parse the submitted form data and turn it into the correct
-           structures for self.user_options."""
+        structures for self.user_options."""
         # user options not enabled, just return input
         if not self.use_user_options:
             return form_data
