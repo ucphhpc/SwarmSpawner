@@ -18,6 +18,7 @@ from docker.types import (
     TaskTemplate,
     Resources,
     ContainerSpec,
+    DriverConfig,
     Placement,
     ConfigReference,
     EndpointSpec,
@@ -176,15 +177,19 @@ class SwarmSpawner(Spawner):
     )
 
     container_spec = Dict({}, config=True, help="Params to create the service")
+
+    log_driver = Dict(
+        {},
+        config=True,
+        help=dedent("""Which logging driver should be used for each service"""),
+    )
+
     resource_spec = Dict({}, config=True, help="Params about cpu and memory limits")
 
     placement = Dict(
         {},
         config=True,
-        help=dedent(
-            """List of placement constraints into the swarm
-                         """
-        ),
+        help=dedent("""List of placement constraints for all images"""),
     )
 
     networks = List(
@@ -670,6 +675,13 @@ class SwarmSpawner(Spawner):
             if user_options.get("networks") is not None:
                 networks = user_options.get("networks")
 
+            # Global Log driver
+            log_driver = None
+            if hasattr(self, "log_driver"):
+                log_driver = self.log_driver
+            if user_options.get("log_driver") is not None:
+                log_driver = user_options.get("log_driver")
+
             # Global placement
             placement = None
             if hasattr(self, "placement"):
@@ -687,6 +699,10 @@ class SwarmSpawner(Spawner):
             # Placement of image
             if "placement" in image_info:
                 placement = image_info["placement"]
+
+            # Logdriver of image
+            if "log_driver" in image_info:
+                log_driver = image_info["log_driver"]
 
             # Configs attached to image
             if "configs" in image_info and isinstance(image_info["configs"], list):
@@ -787,8 +803,20 @@ class SwarmSpawner(Spawner):
                 except TypeError:
                     pass
 
+            # Log driver
+            log_driver_name, log_driver_options = None, None
+            if log_driver and isinstance(log_driver, dict):
+                if "name" in log_driver:
+                    log_driver_name = log_driver["name"]
+                if "options" in log_driver:
+                    log_driver_options = log_driver["options"]
+
             # Create the service
             container_spec = ContainerSpec(image, **container_spec)
+            if log_driver_name:
+                task_log_driver = DriverConfig(
+                    log_driver_name, options=log_driver_options
+                )
             resources = Resources(**resource_spec)
             placement = Placement(**placement)
 
@@ -796,6 +824,7 @@ class SwarmSpawner(Spawner):
                 "container_spec": container_spec,
                 "resources": resources,
                 "placement": placement,
+                "log_driver": task_log_driver,
             }
 
             task_tmpl = TaskTemplate(**task_spec)
