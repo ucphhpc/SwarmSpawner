@@ -813,19 +813,23 @@ class SwarmSpawner(Spawner):
 
             # Create the service
             container_spec = ContainerSpec(image, **container_spec)
+            resources = Resources(**resource_spec)
+            placement = Placement(**placement)
+
+            task_log_driver = None
             if log_driver_name:
                 task_log_driver = DriverConfig(
                     log_driver_name, options=log_driver_options
                 )
-            resources = Resources(**resource_spec)
-            placement = Placement(**placement)
 
             task_spec = {
                 "container_spec": container_spec,
                 "resources": resources,
                 "placement": placement,
-                "log_driver": task_log_driver,
             }
+
+            if task_log_driver:
+                task_spec.update({"log_driver": task_log_driver})
 
             task_tmpl = TaskTemplate(**task_spec)
             self.log.info("task temp: {}".format(task_tmpl))
