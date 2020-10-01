@@ -1,10 +1,10 @@
 ==============================
 jhub-SwarmSpawner
 ==============================
-
 .. image:: https://travis-ci.org/rasmunk/SwarmSpawner.svg?branch=master
     :target: https://travis-ci.org/rasmunk/SwarmSpawner
-
+.. image:: https://badge.fury.io/py/jhub-swarmspawner.svg
+    :target: https://badge.fury.io/py/jhub-swarmspawner
 
 **jhub-SwarmSpawner** enables `JupyterHub <https://github
 .com/jupyterhub/jupyterhub>`_ to spawn jupyter notebooks across Docker Swarm cluster

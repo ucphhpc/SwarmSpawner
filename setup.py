@@ -38,7 +38,7 @@ setup(
         "test": read_req(os.path.join("tests", "requirements.txt")),
     },
     classifiers=[
-        "Development Status :: 3 - Alpha",
+        "Development Status :: 4 - Beta",
         "Intended Audience :: Developers",
         "Topic :: Software Development :: Libraries :: Python Modules",
         "License :: OSI Approved :: BSD License",
