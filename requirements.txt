@@ -1,7 +1,3 @@
-docker==4.3.1
-jupyterhub==1.1.0
-flatten-dict
-traitlets
-tornado
-async_generator
+docker>=5.0.0
+jupyterhub>=1.4.0
 jhub-authenticators
