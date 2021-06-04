@@ -12,7 +12,7 @@ before_install:
 - sudo apt-get -y -o Dpkg::Options::="--force-confnew" install docker-ce
 install:
 - pip install -r tests/requirements.txt
-- docker plugin install rasmunk/sshfs --grant-all-permissions
+- docker plugin install nielsbohr/sshfs --grant-all-permissions
 - docker pull nielsbohr/base-notebook:latest
 script:
 - python setup.py check -rms

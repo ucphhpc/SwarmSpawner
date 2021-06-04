@@ -242,7 +242,7 @@ in addition the typical sshfs flags are supported, defaults to port 22
 
         mounts = [SSHFSMounter({
                     'type': 'volume',
-                    'driver_config': 'rasmunk/sshfs:latest',
+                    'driver_config': 'nielsbohr/sshfs:latest',
                     'driver_options': {'sshcmd': '{sshcmd}', 'id_rsa': '{id_rsa}',
                                        'one_time': 'True',
                                        'big_writes': '', 'allow_other': '',

@@ -174,7 +174,7 @@ def test_sshfs_mount_hub(image, swarm, network, make_service):
                     for mount in task["Spec"]["ContainerSpec"]["Mounts"]:
                         assert (
                             mount["VolumeOptions"]["DriverConfig"]["Name"]
-                            == "rasmunk/sshfs:latest"
+                            == "nielsbohr/sshfs:latest"
                         )
         # Notebook ids
         notebook_services = [
