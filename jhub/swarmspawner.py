@@ -138,6 +138,8 @@ class SwarmSpawner(Spawner):
 
     _client = None
 
+    _tasks = None
+
     @property
     def client(self):
         """single global client instance"""
