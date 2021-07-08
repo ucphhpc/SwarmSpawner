@@ -27,6 +27,6 @@ c.SwarmSpawner.container_spec = {
 c.SwarmSpawner.use_user_options = True
 db_path = os.path.join("/srv/jupyterhub", "access_db.txt")
 
-c.SwarmSpawner.dockerimages = [
+c.SwarmSpawner.images = [
     {"name": "base notebook", "image": "nielsbohr/base-notebook", "access": db_path}
 ]

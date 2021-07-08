@@ -24,7 +24,7 @@ c.SwarmSpawner.use_user_options = True
 
 mounts = [{"type": "bind", "source": "/tmp", "target": "/home/jovyan/tmpdir"}]
 
-c.SwarmSpawner.dockerimages = [
+c.SwarmSpawner.images = [
     {
         "image": "nielsbohr/slurm-notebook:latest",
         "name": "Default jupyter notebook",

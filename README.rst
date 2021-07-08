@@ -124,7 +124,7 @@ The individual dictionaries also makes it possible to define whether the image s
 .. code-block:: python
 
     # Available docker images the user can spawn
-    c.SwarmSpawner.dockerimages = [
+    c.SwarmSpawner.images = [
         {'image': 'jupyter/base-notebook:30f16d52126f',
          'name': 'Minimal python notebook'},
         {'image': 'jupyter/base-notebook:latest',
@@ -140,7 +140,7 @@ E.g.
 .. code-block:: python
 
     # Available docker images the user can spawn
-    c.SwarmSpawner.dockerimages = [
+    c.SwarmSpawner.images = [
         {'image': 'jupyter/base-notebook:30f16d52126f',
          'name': 'Minimal python notebook',
          'placement': {'constraint': ['node.hostname==worker1']}},
@@ -154,7 +154,7 @@ usernames are able to spawn that particular image.
 .. code-block:: python
 
     # Available docker images the user can spawn
-    c.SwarmSpawner.dockerimages = [
+    c.SwarmSpawner.images = [
         {'image': 'jupyter/base-notebook:30f16d52126f',
          'name': 'Minimal python notebook',
          'access': ['admin']},

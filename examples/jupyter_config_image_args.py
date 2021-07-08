@@ -27,7 +27,7 @@ c.SwarmSpawner.container_spec = {
 
 c.SwarmSpawner.use_user_options = True
 
-c.SwarmSpawner.dockerimages = [
+c.SwarmSpawner.images = [
     {
         "image": "nielsbohr/hpc-notebook:latest",
         "name": "HPC Notebook",

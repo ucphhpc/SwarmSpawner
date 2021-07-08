@@ -5,12 +5,12 @@ c = get_config()
 
 c.JupyterHub.ip = "0.0.0.0"
 c.JupyterHub.hub_ip = "0.0.0.0"
+c.JupyterHub.debug_proxy = True
 
 # Authenticator -> remote user header
 c.JupyterHub.authenticator_class = "jhubauthenticators.DataRemoteUserAuthenticator"
 c.DataRemoteUserAuthenticator.data_headers = ["Mount"]
 c.Authenticator.enable_auth_state = True
-
 
 c.JupyterHub.spawner_class = "jhub.SwarmSpawner"
 # First pulls can be really slow, so let's give it a big timeout
@@ -56,7 +56,7 @@ c.SwarmSpawner.use_user_options = True
 
 # Available docker images the user can spawn
 # Additional settings including, access, mounts, placement
-c.SwarmSpawner.dockerimages = [
+c.SwarmSpawner.images = [
     {
         "image": "nielsbohr/base-notebook:latest",
         "name": "Base Notebook",

@@ -3,10 +3,11 @@ A Spawner for JupyterHub that runs each user's
 server in a separate Docker Service
 """
 
-import os
-import hashlib
-import docker
+import ast
 import copy
+import docker
+import hashlib
+import os
 from asyncio import sleep
 from async_generator import async_generator, yield_
 from textwrap import dedent
@@ -48,7 +49,7 @@ class SwarmSpawner(Spawner):
 
     c.JupyterHub.spawner_class = 'jhub.SwarmSpawner'
     # Available docker images the user can spawn
-    c.SwarmSpawner.dockerimages = [
+    c.SwarmSpawner.images = [
         {'image': 'nielsbohr/base-notebook:latest',
         'name': 'Default jupyter notebook'}
 
@@ -57,12 +58,12 @@ class SwarmSpawner(Spawner):
     The images must be locally available before the user can spawn them
     """
 
-    dockerimages = List(
+    images = List(
         trait=Dict(),
         default_value=[
             {
                 "image": "nielsbohr/base-notebook:latest",
-                "name": "Default jupyter notebook",
+                "name": "Default Jupyter Notebook",
             }
         ],
         minlen=1,
@@ -72,8 +73,8 @@ class SwarmSpawner(Spawner):
 
     form_template = Unicode(
         """
-        <label for="dockerimage">Select a notebook image:</label>
-        <select class="form-control" name="dockerimage" required autofocus>
+        <label for="image">Select a notebook image:</label>
+        <select class="form-control" name="image" required autofocus>
             {option_template}
         </select>""",
         config=True,
@@ -81,8 +82,7 @@ class SwarmSpawner(Spawner):
     )
 
     option_template = Unicode(
-        """
-        <option value="{image}">{name}</option>""",
+        """<option value="{value}">{name}</option>""",
         config=True,
         help="Template for html form options.",
     )
@@ -96,21 +96,13 @@ class SwarmSpawner(Spawner):
         # User options not enabled -> return default jupyterhub form
         if not self.use_user_options:
             return self.disabled_form
-
-        # Support the use of dynamic string replacement
-        if hasattr(self.user, "mount"):
-            for di in self.dockerimages:
-                if "{replace_me}" in di["name"]:
-                    di["name"] = di["name"].replace(
-                        "{replace_me}", self.user.mount["HOST"]
-                    )
-        options = "".join(
-            [
-                self.option_template.format(image=di["image"], name=di["name"])
-                for di in self.dockerimages
-            ]
-        )
-        return self.form_template.format(option_template=options)
+        template_options = []
+        for di in self.images:
+            value = dict(image=di["image"], name=di["name"])
+            template_value = dict(name=di["name"], value=value)
+            template_options.append(self.option_template.format(**template_value))
+        option_template = "".join(template_options)
+        return self.form_template.format(option_template=option_template)
 
     def options_from_form(self, form_data):
         """Parse the submitted form data and turn it into the correct
@@ -119,13 +111,56 @@ class SwarmSpawner(Spawner):
         if not self.use_user_options:
             return form_data
 
-        i_default = self.dockerimages[0]
-        # formdata looks like {'dockerimage': ['jupyterhub/singleuser']}"""
-        image = form_data.get("dockerimage", [i_default])[0]
+        self.log.debug(
+            "User: {} submitted spawn form: ".format(self.user.name, form_data)
+        )
+        # formdata format: {'image': {'image': 'jupyterhub/singleuser',
+        # 'id': "Basic Jupyter Notebook"}}
+        image_data = form_data.get("image", None)
+        if not image_data:
+            image_data = self.images[0]
+        else:
+            if len(image_data) > 1:
+                self.log.warn(
+                    "User: {} tried to spawn multiple images".format(self.user.name)
+                )
+                raise RuntimeError("You can only select 1 image to spawn")
+            image_data = ast.literal_eval(image_data[0])
+
+        if "image" not in image_data or "name" not in image_data:
+            self.log.error(
+                "Either image or name was not in the supplied "
+                "form's image data: {}".format(image_data)
+            )
+            raise RuntimeError("An incorrect image form was supplied")
+
+        selected_name = image_data["name"]
+        selected_image = image_data["image"]
+        if selected_name not in [image["name"] for image in self.images]:
+            self.log.warn(
+                "User: {} tried to spawn an invalid image: {}".format(
+                    self.user.name, selected_name
+                )
+            )
+            raise RuntimeError(
+                "An invalid image name was selected: {}".format(selected_name)
+            )
+
+        if selected_image not in [image["image"] for image in self.images]:
+            self.log.warn(
+                "User: {} tried to spawn an invalid image: {}".format(
+                    self.user.name, selected_image
+                )
+            )
+            raise RuntimeError(
+                "An invalid image was selected: {}".format(selected_image)
+            )
+
         # Don't allow users to input their own images
-        if image not in [image["image"] for image in self.dockerimages]:
-            image = i_default
-        options = {"user_selected_image": image}
+        options = {
+            "user_selected_name": selected_name,
+            "user_selected_image": selected_image,
+        }
         return options
 
     @property
@@ -542,31 +577,32 @@ class SwarmSpawner(Spawner):
 
             # Which image to spawn
             if self.use_user_options and "user_selected_image" in user_options:
-                uimage = user_options["user_selected_image"]
-                image_info = None
-                for di in self.dockerimages:
-                    if di["image"] == uimage:
-                        image_info = copy.deepcopy(di)
-                if image_info is None:
+                image_name = user_options["user_selected_name"]
+                image_value = user_options["user_selected_image"]
+                selected_image = None
+                for di in self.images:
+                    if image_name == di["name"] and image_value == di["image"]:
+                        selected_image = copy.deepcopy(di)
+                if selected_image is None:
                     err_msg = "User selected image: {} couldn't be found".format(
-                        uimage["image"]
+                        image_value
                     )
                     self.log.error(err_msg)
                     raise Exception(err_msg)
             else:
                 # Default image
-                image_info = self.dockerimages[0]
+                selected_image = self.images[0]
 
-            self.log.debug("Image info: {}".format(image_info))
+            self.log.debug("Image info: {}".format(selected_image))
             # Does that image have restricted access
-            if "access" in image_info:
+            if "access" in selected_image:
                 # Check for static or db users
                 allowed = False
-                if self.service_owner in image_info["access"]:
+                if self.service_owner in selected_image["access"]:
                     allowed = True
                 else:
-                    if os.path.exists(image_info["access"]):
-                        db_path = image_info["access"]
+                    if os.path.exists(selected_image["access"]):
+                        db_path = selected_image["access"]
                         try:
                             self.log.info(
                                 "Checking db: {} for "
@@ -586,7 +622,7 @@ class SwarmSpawner(Spawner):
                 if not allowed:
                     self.log.error(
                         "User: {} tried to launch {} without access".format(
-                            self.service_owner, image_info["image"]
+                            self.service_owner, selected_image["image"]
                         )
                     )
                     raise Exception("You don't have permission to launch that image")
@@ -601,8 +637,8 @@ class SwarmSpawner(Spawner):
             container_spec["mounts"] = []
 
             # Image mounts
-            if "mounts" in image_info:
-                mounts.extend(image_info["mounts"])
+            if "mounts" in selected_image:
+                mounts.extend(selected_image["mounts"])
 
             for mount in mounts:
                 if isinstance(mount, dict):
@@ -623,8 +659,8 @@ class SwarmSpawner(Spawner):
                 container_spec["env"] = self.get_env()
 
             # Env of image
-            if "env" in image_info and isinstance(image_info["env"], dict):
-                container_spec["env"].update(image_info["env"])
+            if "env" in selected_image and isinstance(selected_image["env"], dict):
+                container_spec["env"].update(selected_image["env"])
 
             # Dynamic update of env values
             for env_key, env_value in container_spec["env"].items():
@@ -647,16 +683,16 @@ class SwarmSpawner(Spawner):
                     )
 
             # Args of image
-            if "args" in image_info and isinstance(image_info["args"], list):
-                container_spec.update({"args": image_info["args"]})
+            if "args" in selected_image and isinstance(selected_image["args"], list):
+                container_spec.update({"args": selected_image["args"]})
 
             if (
-                "command" in image_info
-                and isinstance(image_info["command"], list)
-                or "command" in image_info
-                and isinstance(image_info["command"], str)
+                "command" in selected_image
+                and isinstance(selected_image["command"], list)
+                or "command" in selected_image
+                and isinstance(selected_image["command"], str)
             ):
-                container_spec.update({"command": image_info["command"]})
+                container_spec.update({"command": selected_image["command"]})
 
             # Log mounts config
             self.log.debug(
@@ -692,29 +728,31 @@ class SwarmSpawner(Spawner):
                 placement = user_options.get("placement")
 
             # Image to spawn
-            image = image_info["image"]
+            image = selected_image["image"]
 
             # Image resources
-            if "resource_spec" in image_info:
-                resource_spec = image_info["resource_spec"]
+            if "resource_spec" in selected_image:
+                resource_spec = selected_image["resource_spec"]
 
             # Placement of image
-            if "placement" in image_info:
-                placement = image_info["placement"]
+            if "placement" in selected_image:
+                placement = selected_image["placement"]
 
             # Logdriver of image
-            if "log_driver" in image_info:
-                log_driver = image_info["log_driver"]
+            if "log_driver" in selected_image:
+                log_driver = selected_image["log_driver"]
 
             # Configs attached to image
-            if "configs" in image_info and isinstance(image_info["configs"], list):
-                for c in image_info["configs"]:
+            if "configs" in selected_image and isinstance(
+                selected_image["configs"], list
+            ):
+                for c in selected_image["configs"]:
                     if isinstance(c, dict):
                         self.configs.append(c)
 
             endpoint_spec = {}
-            if "endpoint_spec" in image_info:
-                endpoint_spec = image_info["endpoint_spec"]
+            if "endpoint_spec" in selected_image:
+                endpoint_spec = selected_image["endpoint_spec"]
 
             if self.configs:
                 # Check that the supplied configs already exists
@@ -754,8 +792,8 @@ class SwarmSpawner(Spawner):
                 del container_spec["uid_gid"]
 
             # Image user
-            if "uid_gid" in image_info:
-                uid_gid = image_info["uid_gid"]
+            if "uid_gid" in selected_image:
+                uid_gid = selected_image["uid_gid"]
 
             self.log.info("gid info {}".format(uid_gid))
             if isinstance(uid_gid, str):
@@ -789,8 +827,8 @@ class SwarmSpawner(Spawner):
                 container_spec["user"] = str(container_spec["user"])
 
             # Image user
-            if "user" in image_info:
-                container_spec.update({"user": str(image_info["user"])})
+            if "user" in selected_image:
+                container_spec.update({"user": str(selected_image["user"])})
 
             dynamic_holders = [Spawner, self, self.user]
             if hasattr(self.user, "data"):

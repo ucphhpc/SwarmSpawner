@@ -17,7 +17,7 @@ c.SwarmSpawner.networks = ["jh_test"]
 # user_options has to be enabled
 c.SwarmSpawner.use_user_options = True
 
-c.SwarmSpawner.dockerimages = [
+c.SwarmSpawner.images = [
     {
         "image": "nielsbohr/base-notebook:latest",
         "name": "Basic Python Notebook",

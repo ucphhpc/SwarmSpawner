@@ -22,6 +22,6 @@ c.SwarmSpawner.container_spec = {
     "args": ["--NotebookApp.default_url=/lab"],
 }
 
-c.SwarmSpawner.dockerimages = [
+c.SwarmSpawner.images = [
     {"image": "nielsbohr/python-notebook", "name": "Python Notebook"}
 ]

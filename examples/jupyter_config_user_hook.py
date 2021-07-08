@@ -64,7 +64,7 @@ c.SwarmSpawner.use_user_options = True
 
 c.SwarmSpawner.pre_spawn_hook = simple_user_id
 
-c.SwarmSpawner.dockerimages = [
+c.SwarmSpawner.images = [
     {
         "name": "Base Notebook",
         "image": "nielsbohr/base-notebook",

@@ -38,6 +38,6 @@ c.SwarmSpawner.container_spec = {
 
 c.SwarmSpawner.configs = configs
 
-c.SwarmSpawner.dockerimages = [
+c.SwarmSpawner.images = [
     {"image": "nielsbohr/slurm-notebook:latest", "name": "Slurm notebook"}
 ]

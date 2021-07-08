@@ -19,7 +19,7 @@ c.SwarmSpawner.use_user_options = True
 
 access_list = ["privileged-user"]
 
-c.SwarmSpawner.dockerimages = [
+c.SwarmSpawner.images = [
     {
         "image": "nielsbohr/base-notebook:latest",
         "name": "Basic Python Notebook",

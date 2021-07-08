@@ -33,7 +33,7 @@ hub_path = dirname(dirname(__file__))
 hub_image = {"path": hub_path, "tag": HUB_IMAGE_TAG, "rm": True, "pull": False}
 
 # swarm config
-swarm_config = {}
+swarm_config = {"advertise_addr": "192.168.1.73"}
 network_config = {
     "name": NETWORK_NAME,
     "driver": "overlay",
@@ -130,7 +130,7 @@ def test_sshfs_mount_hub(image, swarm, network, make_service):
         test_logger.info("Spawn page message: {}".format(spawn_form_resp.text))
         assert spawn_form_resp.status_code == 200
         assert "Select a notebook image" in spawn_form_resp.text
-        payload = {"dockerimage": "nielsbohr/base-notebook:latest"}
+        payload = {"image": "nielsbohr/base-notebook:latest"}
 
         target_user = "mountuser"
         ssh_host_target = socket.gethostname()
@@ -160,7 +160,7 @@ def test_sshfs_mount_hub(image, swarm, network, make_service):
             while (
                 service.tasks() and service.tasks()[0]["Status"]["State"] != "running"
             ):
-                time.sleep(1)
+                time.sleep(5)
                 state = service.tasks()[0]["Status"]["State"]
                 assert state != "failed"
 

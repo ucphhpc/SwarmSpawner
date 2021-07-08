@@ -30,7 +30,7 @@ hub_path = dirname(dirname(__file__))
 hub_image = {"path": hub_path, "tag": HUB_IMAGE_TAG, "rm": True, "pull": False}
 
 
-swarm_config = {}
+swarm_config = {"advertise_addr": "192.168.1.73"}
 network_config = {
     "name": NETWORK_NAME,
     "driver": "overlay",
@@ -116,7 +116,7 @@ def test_creates_service(image, swarm, network, make_service):
             while (
                 service.tasks() and service.tasks()[0]["Status"]["State"] != "running"
             ):
-                time.sleep(1)
+                time.sleep(5)
                 state = service.tasks()[0]["Status"]["State"]
                 assert state != "failed"
 

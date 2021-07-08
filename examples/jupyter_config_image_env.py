@@ -28,7 +28,7 @@ c.SwarmSpawner.container_spec = {
 
 c.SwarmSpawner.use_user_options = True
 
-c.SwarmSpawner.dockerimages = [
+c.SwarmSpawner.images = [
     {"image": "nielsbohr/base-notebook:latest", "name": "Default jupyter notebook"},
     {
         "image": "nielsbohr/base-notebook:latest",
