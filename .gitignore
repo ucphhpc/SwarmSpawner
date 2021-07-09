@@ -66,3 +66,6 @@ src
 
 venv/
 .vscode/
+
+jupyterhub-proxy.pid
+jupyterhub_cookie_secret
