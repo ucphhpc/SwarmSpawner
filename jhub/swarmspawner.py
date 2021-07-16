@@ -73,8 +73,8 @@ class SwarmSpawner(Spawner):
 
     form_template = Unicode(
         """
-        <label for="image">Select a notebook image:</label>
-        <select class="form-control" name="image" required autofocus>
+        <label for="select_image">Select a notebook image:</label>
+        <select class="form-control" name="select_image" required autofocus>
             {option_template}
         </select>""",
         config=True,
@@ -111,12 +111,12 @@ class SwarmSpawner(Spawner):
         if not self.use_user_options:
             return form_data
 
-        self.log.debug(
-            "User: {} submitted spawn form: ".format(self.user.name, form_data)
+        self.log.info(
+            "User: {} submitted spawn form: {}".format(self.user.name, form_data)
         )
-        # formdata format: {'image': {'image': 'jupyterhub/singleuser',
+        # formdata format: {'select_image': {'image': 'jupyterhub/singleuser',
         # 'id': "Basic Jupyter Notebook"}}
-        image_data = form_data.get("image", None)
+        image_data = form_data.get("select_image", None)
         if not image_data:
             image_data = self.images[0]
         else:
@@ -589,9 +589,13 @@ class SwarmSpawner(Spawner):
                     )
                     self.log.error(err_msg)
                     raise Exception(err_msg)
+                self.log.info(
+                    "Using the user selected image: {}".format(selected_image)
+                )
             else:
                 # Default image
                 selected_image = self.images[0]
+                self.log.info("Using the default image: {}".format(selected_image))
 
             self.log.debug("Image info: {}".format(selected_image))
             # Does that image have restricted access

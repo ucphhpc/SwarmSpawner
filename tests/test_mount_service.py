@@ -5,9 +5,23 @@ import logging
 import json
 import time
 import socket
+from urllib.parse import urljoin
 from random import SystemRandom
 from docker.types import EndpointSpec
 from os.path import dirname, join, realpath
+from util import (
+    get_service,
+    get_service_tasks,
+    get_task_mounts,
+    get_task_image,
+    get_volume,
+    get_service_url,
+    get_service_api_url,
+    get_service_user,
+    wait_for_task_state,
+    wait_for_site,
+    delete_via_url,
+)
 
 HUB_IMAGE_TAG = "hub:test"
 MOUNT_IMAGE_TAG = "nielsbohr/ssh-mount-dummy"
@@ -82,35 +96,15 @@ def test_sshfs_mount_hub(image, swarm, network, make_service):
             state = service.tasks()[0]["Status"]["State"]
             assert state != "failed"
 
-    user_cert = "/C=DK/ST=NA/L=NA/O=NBI/OU=NA/CN=Name" "/emailAddress=mail@sdfsf.com"
+    username = "testuser"
     # Auth header
-    test_logger.info("Authenticating with user: {}".format(user_cert))
-    headers = {"Remote-User": user_cert}
-    # Try for 5 minutes
-    num_attempts = 0
-    max_attempts = 60
-    with requests.Session() as s:
-        ready = False
-        while not ready:
-            if num_attempts > max_attempts:
-                raise RuntimeError(
-                    "Failed to connect to the JupyterHub login page within: {}".format(
-                        5 * max_attempts / 60
-                    )
-                )
-            try:
-                print("Trying to connect to: {}".format(JHUB_URL))
-                resp = s.get(JHUB_URL)
-                if resp.status_code == 401:
-                    ready = True
-                else:
-                    print(resp)
-            except requests.exceptions.ConnectionError:
-                pass
-            num_attempts += 1
-            time.sleep(5)
+    test_logger.info("Authenticating with user: {}".format(username))
+    auth_header = {"Remote-User": username}
+    assert wait_for_site(JHUB_URL, valid_status_code=401) is True
 
-        login_response = s.get(JHUB_URL + "/hub/home", headers=headers)
+    with requests.Session() as s:
+        auth_url = urljoin(JHUB_URL, "/hub/home")
+        login_response = s.get(auth_url, headers=auth_header)
         test_logger.info("Home response message: {}".format(login_response.text))
         assert login_response.status_code == 200
 
@@ -130,7 +124,10 @@ def test_sshfs_mount_hub(image, swarm, network, make_service):
         test_logger.info("Spawn page message: {}".format(spawn_form_resp.text))
         assert spawn_form_resp.status_code == 200
         assert "Select a notebook image" in spawn_form_resp.text
-        payload = {"image": "nielsbohr/base-notebook:latest"}
+        user_image = "nielsbohr/base-notebook:latest"
+        user_image_name = "Base Notebook"
+        payload = {"select_image": [{"image": user_image, "name": user_image_name}]}
+        json_payload = json.dumps(payload)
 
         target_user = "mountuser"
         ssh_host_target = socket.gethostname()
@@ -140,11 +137,15 @@ def test_sshfs_mount_hub(image, swarm, network, make_service):
             "PATH": "".join(["@", ssh_host_target, ":"]),
             "PRIVATEKEY": private_key,
         }
-        headers.update({"Mount": str(mount_info)})
-        mount_resp = s.post(JHUB_URL + "/hub/data", headers=headers)
+        mount_header = dict(Mount=str(mount_info))
+        mount_header.update(auth_header)
+        mount_resp = s.post(JHUB_URL + "/hub/data", headers=mount_header)
         test_logger.info("Hub Data response message: {}".format(mount_resp.text))
         assert mount_resp.status_code == 200
-        spawn_resp = s.post(JHUB_URL + "/hub/spawn", data=payload, headers=headers)
+        spawn_resp = s.post(
+            JHUB_URL + "/hub/spawn", data=json_payload, headers=mount_header
+        )
+
         test_logger.info("Spawn POST response message: {}".format(spawn_resp.text))
         assert spawn_resp.status_code == 200
 
@@ -155,97 +156,99 @@ def test_sshfs_mount_hub(image, swarm, network, make_service):
         # New services are there
         assert len(post_spawn_services) > 0
 
-        # All should be running at this point
-        for service in post_spawn_services:
-            while (
-                service.tasks() and service.tasks()[0]["Status"]["State"] != "running"
-            ):
-                time.sleep(5)
-                state = service.tasks()[0]["Status"]["State"]
-                assert state != "failed"
+        # Get spawned service
+        target_service_name = "{}-{}-{}".format("jupyter", username, "1")
+        # jupyterhub_service = get_service(client, HUB_SERVICE_NAME)
+        spawned_service = get_service(client, target_service_name)
+        assert spawned_service is not None
+
+        # Verify that a task is succesfully running
+        task_state_found = wait_for_task_state(
+            client, spawned_service, filters={"desired-state": "running"}
+        )
+        assert task_state_found is not False
+
+        tasks = get_service_tasks(
+            client, spawned_service, filters={"desired-state": "running"}
+        )
+        assert tasks is not None
+        assert isinstance(tasks, list) is True
+        assert len(tasks) == 1
+        task = tasks[0]
+
+        mount_volume_name = "sshvolume-user-{}".format(username)
+        task_mounts = get_task_mounts(
+            client, task, filters={"Source": mount_volume_name}
+        )
+        # Ensure it is using the correct driver
+        for mount in task_mounts:
+            assert (
+                mount["VolumeOptions"]["DriverConfig"]["Name"]
+                == "nielsbohr/sshfs:latest"
+            )
+
+        # Ensure it is the correct image
+        service_image = get_task_image(task)
+        assert service_image == user_image
 
         # Validate mounts
-        for service in post_spawn_services:
-            for task in service.tasks():
-                # Correct image
-                if task["Spec"]["ContainerSpec"]["Image"] == image:
-                    # Validate mount
-                    assert task["Status"]["State"] == "running"
-                    for mount in task["Spec"]["ContainerSpec"]["Mounts"]:
-                        assert (
-                            mount["VolumeOptions"]["DriverConfig"]["Name"]
-                            == "nielsbohr/sshfs:latest"
-                        )
-        # Notebook ids
-        notebook_services = [
-            service for service in post_spawn_services if "jupyter-" in service.name
-        ]
-        test_logger.info(
-            "Current running jupyter services: {}".format(notebook_services)
+        test_logger.info("Current running jupyter services: {}".format(spawned_service))
+        volume = get_volume(client, mount_volume_name)
+        assert volume is not None
+
+        # Get the service api url
+        service_url = get_service_url(spawned_service)
+        # If failed the service might not be running
+        if not service_url:
+            test_logger.info("Properly failed to start the service correctly")
+        assert service_url is not None
+
+        # Combine with the base jhub URL
+        jhub_service_api = urljoin(JHUB_URL, service_url)
+        # Wait for the site to be up and running
+        assert wait_for_site(
+            jhub_service_api,
+            valid_status_code=200,
+            auth_url=auth_url,
+            auth_headers=auth_header,
+            require_xsrf=True,
         )
-        assert len(notebook_services) > 0
 
-        notebook_volumes = [
-            volume
-            for volume in client.volumes.list()
-            for service in notebook_services
-            if volume.name.strip("sshvolume-user-") in service.name.strip("jupyter-")
-        ]
+        # Write to user home
+        new_file = "write_test.ipynb"
+        data = json.dumps({"name": new_file})
+        test_logger.info("Looking for xsrf in: {}".format(s.cookies))
 
-        assert len(notebook_volumes) > 0
+        assert "_xsrf" in s.cookies
+        xsrf_token = s.cookies["_xsrf"]
+        service_api_url = get_service_api_url(spawned_service, postfix_url="contents/")
+        jhub_service_content = urljoin(JHUB_URL, service_api_url)
 
-        # Wait for user home
-        for notebook_service in notebook_services:
-            envs = {}
-            for env in notebook_service.attrs["Spec"]["TaskTemplate"]["ContainerSpec"][
-                "Env"
-            ]:
-                key, value = env.split("=")
-                envs[key] = value
-            service_prefix = envs["JUPYTERHUB_SERVICE_PREFIX"]
-            home_resp = s.get(JHUB_URL + service_prefix)
-            assert home_resp.status_code == 200
+        xsrf_headers = {"X-XSRFToken": xsrf_token}
+        resp = s.put(
+            "".join([jhub_service_content, new_file]),
+            data=data,
+            headers=xsrf_headers,
+        )
+        assert resp.status_code == 201
 
-            # Write to user home
-            hub_api_url = "{}/api/contents/".format(service_prefix)
-            new_file = "write_test.ipynb"
-            data = json.dumps({"name": new_file})
-            test_logger.info("Looking for xsrf in: {}".format(s.cookies))
+        # Remove via the web interface
+        jhub_user = get_service_user(spawned_service)
+        # Wait for the server to finish deleting
+        delete_url = urljoin(JHUB_URL, "/hub/api/users/{}/server".format(jhub_user))
+        delete_headers = dict(Referer=JHUB_URL)
+        delete_headers.update(xsrf_headers)
 
-            xsrf_token = None
-            if "_xsrf" in s.cookies:
-                xsrf_token = s.cookies["_xsrf"]
+        assert (
+            delete_via_url(
+                delete_url,
+                headers=delete_headers,
+                auth_url=auth_url,
+                auth_headers=auth_header,
+            )
+            is True
+        )
 
-            if xsrf_token:
-                notebook_headers = {"X-XSRFToken": xsrf_token}
-                resp = s.put(
-                    "".join([JHUB_URL, hub_api_url, new_file]),
-                    data=data,
-                    headers=notebook_headers,
-                )
-                assert resp.status_code == 201
-            else:
-                test_logger.info("XSRF token was not found in: {}".format(s.cookies))
-
-            # Remove via the web interface
-            jhub_user = envs["JUPYTERHUB_USER"]
-            # Remove via the web interface
-            # Wait for the server to finish spawning
-            pending = True
-            num_wait, max_wait = 0, 15
-            while pending or num_wait > max_wait:
-                num_wait += 1
-                resp = s.delete(
-                    JHUB_URL + "/hub/api/users/{}/server".format(jhub_user),
-                    headers={"Referer": "127.0.0.1:{}/hub/".format(PORT)},
-                )
-                test_logger.info(
-                    "Response from removing the user server: {}".format(resp.text)
-                )
-                if resp.status_code == 204:
-                    pending = False
-                time.sleep(1)
-            assert resp.status_code == 204
         # double check it is gone
         notebook_volumes_after = [
             volume
