@@ -122,6 +122,19 @@ def get_session_csrf(session, url):
     return False
 
 
+def get_site(session, url, timeout=60, valid_status_code=200):
+    num_attempts = 0
+    while num_attempts < timeout:
+        try:
+            resp = s.get(url)
+            if resp.status_code == valid_status_code:
+                return True
+        except requests.exceptions.ConnectionError:
+            pass
+        num_attempts += 1
+        time.sleep(1)
+    return False
+
 
 # Waits for 5 minutes for a site to be ready
 def wait_for_site(
@@ -132,27 +145,29 @@ def wait_for_site(
     auth_headers=None,
     require_xsrf=False,
 ):
-    num_attempts = 0
     with requests.Session() as s:
         if auth_url:
             auth_resp = s.get(auth_url, headers=auth_headers)
             if auth_resp.status_code != 200:
                 return False
-
-        while num_attempts < timeout:
-            try:
-                resp = s.get(url)
-                if resp.status_code == valid_status_code:
-                    if require_xsrf:
-                        if "_xsrf" in s.cookies:
-                            return True
-                    else:
-                        return True
-            except requests.exceptions.ConnectionError:
-                pass
-            num_attempts += 1
-            time.sleep(1)
+        if get_site(s, url, timeout=timeout, valid_status_code=valid_status_code):
+            if require_xsrf:
+                if "_xsrf" in s.cookies:
+                    return True
+            else:
+                return True
     return False
+
+
+def wait_for_session(session, url, timeout=60, valid_status_code=200, require_xsrf=False):
+    if get_site(session, url, timeout=timeout, valid_status_code=valid_status_code):
+        if require_xsrf:
+            if "_xsrf" in session.cookies:
+                return True
+        else:
+            return True
+    return False
+
 
 
 def delete_via_url(

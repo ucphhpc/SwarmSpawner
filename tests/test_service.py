@@ -30,7 +30,7 @@ hub_path = dirname(dirname(__file__))
 hub_image = {"path": hub_path, "tag": HUB_IMAGE_TAG, "rm": True, "pull": False}
 
 
-swarm_config = {"advertise_addr": "192.168.1.73"}
+swarm_config = {}
 network_config = {
     "name": NETWORK_NAME,
     "driver": "overlay",

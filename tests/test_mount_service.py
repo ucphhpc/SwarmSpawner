@@ -47,7 +47,7 @@ hub_path = dirname(dirname(__file__))
 hub_image = {"path": hub_path, "tag": HUB_IMAGE_TAG, "rm": True, "pull": False}
 
 # swarm config
-swarm_config = {"advertise_addr": "192.168.1.73"}
+swarm_config = {}
 network_config = {
     "name": NETWORK_NAME,
     "driver": "overlay",
@@ -211,7 +211,7 @@ def test_sshfs_mount_hub(image, swarm, network, make_service):
             valid_status_code=200,
             auth_url=auth_url,
             auth_headers=auth_header,
-            require_xsrf=True,
+            require_xsrf=True
         )
 
         # Write to user home
@@ -219,6 +219,8 @@ def test_sshfs_mount_hub(image, swarm, network, make_service):
         data = json.dumps({"name": new_file})
         test_logger.info("Looking for xsrf in: {}".format(s.cookies))
 
+        # Refresh csrf token
+        assert wait_for_session(s, jhub_service_api)
         assert "_xsrf" in s.cookies
         xsrf_token = s.cookies["_xsrf"]
         service_api_url = get_service_api_url(spawned_service, postfix_url="contents/")
