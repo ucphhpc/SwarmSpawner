@@ -10,17 +10,18 @@ from random import SystemRandom
 from docker.types import EndpointSpec
 from os.path import dirname, join, realpath
 from util import (
+    delete,
     get_service,
-    get_service_tasks,
     get_task_mounts,
     get_task_image,
     get_volume,
     get_service_url,
     get_service_api_url,
     get_service_user,
-    wait_for_task_state,
+    remove_volume,
+    wait_for_session,
+    wait_for_service_task,
     wait_for_site,
-    delete_via_url,
 )
 
 HUB_IMAGE_TAG = "hub:test"
@@ -169,21 +170,13 @@ def test_sshfs_mount_hub(image, swarm, network, make_service):
         assert spawned_service is not None
 
         # Verify that a task is succesfully running
-        task_state_found = wait_for_task_state(
+        running_task = wait_for_service_task(
             client, spawned_service, filters={"desired-state": "running"}
         )
-        assert task_state_found is not False
-
-        tasks = get_service_tasks(
-            client, spawned_service, filters={"desired-state": "running"}
-        )
-        assert tasks is not None
-        assert isinstance(tasks, list) is True
-        assert len(tasks) == 1
-        task = tasks[0]
+        assert running_task
 
         task_mounts = get_task_mounts(
-            client, task, filters={"Source": mount_volume_name}
+            client, running_task, filters={"Source": mount_volume_name}
         )
         # Ensure it is using the correct driver
         for mount in task_mounts:
@@ -193,7 +186,7 @@ def test_sshfs_mount_hub(image, swarm, network, make_service):
             )
 
         # Ensure it is the correct image
-        service_image = get_task_image(task)
+        service_image = get_task_image(running_task)
         assert service_image == user_image
 
         # Validate mounts
@@ -210,14 +203,6 @@ def test_sshfs_mount_hub(image, swarm, network, make_service):
 
         # Combine with the base jhub URL
         jhub_service_api = urljoin(JHUB_URL, service_url)
-        # Wait for the site to be up and running
-        assert wait_for_site(
-            jhub_service_api,
-            valid_status_code=200,
-            auth_url=auth_url,
-            auth_headers=auth_header,
-            require_xsrf=True,
-        )
 
         # Write to user home
         new_file = "write_test.ipynb"
@@ -225,7 +210,7 @@ def test_sshfs_mount_hub(image, swarm, network, make_service):
         test_logger.info("Looking for xsrf in: {}".format(s.cookies))
 
         # Refresh csrf token
-        assert wait_for_session(s, jhub_service_api)
+        assert wait_for_session(s, jhub_service_api, require_xsrf=True)
         assert "_xsrf" in s.cookies
         xsrf_token = s.cookies["_xsrf"]
         service_api_url = get_service_api_url(spawned_service, postfix_url="contents/")
@@ -233,36 +218,27 @@ def test_sshfs_mount_hub(image, swarm, network, make_service):
 
         xsrf_headers = {"X-XSRFToken": xsrf_token}
         resp = s.put(
-            "".join([jhub_service_content, new_file]), data=data, headers=xsrf_headers,
+            "".join([jhub_service_content, new_file]),
+            data=data,
+            headers=xsrf_headers,
         )
         assert resp.status_code == 201
 
         # Remove via the web interface
         jhub_user = get_service_user(spawned_service)
-        # Wait for the server to finish deleting
         delete_url = urljoin(JHUB_URL, "/hub/api/users/{}/server".format(jhub_user))
         delete_headers = dict(Referer=JHUB_URL)
         delete_headers.update(xsrf_headers)
 
-        assert (
-            delete_via_url(
-                delete_url,
-                headers=delete_headers,
-                auth_url=auth_url,
-                auth_headers=auth_header,
-            )
-            is True
-        )
+        # Wait for the server to finish deleting
+        deleted = delete(s, delete_url, headers=delete_headers)
+        assert deleted
 
-        # double check it is gone
-        notebook_volumes_after = [
-            volume
-            for volume in client.volumes.list()
-            for service in notebook_services
-            if volume.name.strip("sshvolume-user-") in service.name.strip("jupyter-")
-        ]
+        deleted_service = get_service(client, target_service_name)
+        assert deleted_service is None
 
-        services_after_remove = client.services.list()
-        assert len((set(services_before_spawn) - set(services_after_remove))) == 0
-        assert len(notebook_volumes_after) == 0
+        # Ensure that the volume is gone
+        created_volume = get_volume(client, mount_volume_name)
+        if created_volume:
+            assert remove_volume(client, mount_volume_name)
         test_logger.info("End of mount service testing")

@@ -16,14 +16,15 @@ def get_service(client, service_name, filters=None):
     return services[0]
 
 
-def get_service_tasks(client, service, filters=None):
+def get_service_tasks(client, service, filters=None, target_state="running"):
     if not filters:
         filters = {}
     try:
-        return service.tasks(filters=filters)
+        tasks = service.tasks(filters=filters)
+        return tasks
     except docker.errors.NotFound:
-        return None
-    return None
+        pass
+    return []
 
 
 def get_task_mounts(client, task, filters=None):
@@ -62,8 +63,12 @@ def get_volume(client, volume_name, filters=None):
 def remove_volume(client, volume_name):
     volume = get_volume(client, volume_name)
     if volume:
-        return volume.remove()
-    return False
+        try:
+            volume.remove()
+            return True
+        except Exception:
+            return False
+    return True
 
 
 def get_service_env(service, env_key=None):
@@ -114,40 +119,54 @@ def get_service_api_url(service, postfix_url=None):
     return api_url
 
 
-def wait_for_task_state(client, service, timeout=60, filters=None):
+def get_task_state(service_task):
+    return service_task["Status"]["State"]
+
+
+def wait_for_service_task(
+    client, service, timeout=60, filters=None, target_state="running"
+):
     attempts = 0
     while attempts < timeout:
-        service_tasks = get_service_tasks(client, service, filters=filters)
-        if get_service_tasks(client, service, filters=filters):
-            return True
+        tasks = get_service_tasks(
+            client, service, filters=filters, target_state=target_state
+        )
+        for task in tasks:
+            task_state = get_task_state(task)
+            if task_state == target_state:
+                return task
         attempts += 1
         time.sleep(1)
-    return False
+    return None
 
 
-def get_session_csrf(session, url):
+def get_site(session, url, headers=None, valid_status_code=200):
+    if not headers:
+        headers = {}
     try:
-        resp = s.get(url)
+        resp = session.get(url, headers=headers)
+        if resp.status_code == valid_status_code:
+            return True
     except requests.exceptions.ConnectionError:
         pass
     return False
 
 
-def get_site(session, url, timeout=60, valid_status_code=200):
-    num_attempts = 0
-    while num_attempts < timeout:
-        try:
-            resp = session.get(url)
-            if resp.status_code == valid_status_code:
+# Waits for 5 minutes for a site to be ready
+def _wait_for_site(session, url, timeout=60, valid_status_code=200, require_xsrf=False):
+    attempts = 0
+    while attempts < timeout:
+        if get_site(session, url, valid_status_code=valid_status_code):
+            if require_xsrf:
+                if "_xsrf" in session.cookies:
+                    return True
+            else:
                 return True
-        except requests.exceptions.ConnectionError:
-            pass
-        num_attempts += 1
+        attempts += 1
         time.sleep(1)
     return False
 
 
-# Waits for 5 minutes for a site to be ready
 def wait_for_site(
     url,
     timeout=60,
@@ -161,7 +180,14 @@ def wait_for_site(
             auth_resp = s.get(auth_url, headers=auth_headers)
             if auth_resp.status_code != 200:
                 return False
-        if get_site(s, url, timeout=timeout, valid_status_code=valid_status_code):
+
+        if _wait_for_site(
+            s,
+            url,
+            timeout=timeout,
+            valid_status_code=valid_status_code,
+            require_xsrf=require_xsrf,
+        ):
             if require_xsrf:
                 if "_xsrf" in s.cookies:
                     return True
@@ -173,7 +199,13 @@ def wait_for_site(
 def wait_for_session(
     session, url, timeout=60, valid_status_code=200, require_xsrf=False
 ):
-    if get_site(session, url, timeout=timeout, valid_status_code=valid_status_code):
+    if _wait_for_site(
+        session,
+        url,
+        timeout=timeout,
+        valid_status_code=valid_status_code,
+        require_xsrf=require_xsrf,
+    ):
         if require_xsrf:
             if "_xsrf" in session.cookies:
                 return True
@@ -182,34 +214,20 @@ def wait_for_session(
     return False
 
 
-def delete_via_url(
-    url,
-    headers=None,
-    timeout=60,
-    valid_status_code=204,
-    auth_url=None,
-    auth_headers=None,
-    require_xsrf=False,
-):
+def delete(session, url, timeout=60, headers=None, valid_status_code=204):
     if not headers:
         headers = {}
 
     attempts = 0
-    with requests.Session() as s:
-        # If authentication is required
-        if auth_url:
-            auth_resp = s.get(auth_url, headers=auth_headers)
-            if auth_resp.status_code != 200:
-                return False
-
-        while attempts < timeout:
-            resp = s.delete(url, headers=headers)
-            if resp.status_code == valid_status_code:
-                if require_xsrf:
-                    if "_xsrf" in s.cookies:
-                        return True
-                else:
-                    return True
-            attempts += 1
-            time.sleep(1)
+    while attempts < timeout:
+        resp = session.delete(url, headers=headers)
+        if resp.status_code == valid_status_code:
+            return True
+        attempts += 1
+        time.sleep(1)
     return False
+
+
+def refresh_csrf(session, url, timeout=60, headers=None):
+    if not headers:
+        headers = {}
