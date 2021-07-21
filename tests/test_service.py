@@ -1,4 +1,5 @@
 import docker
+import json
 import time
 import requests
 import logging
@@ -6,6 +7,8 @@ import pytest
 from random import SystemRandom
 from docker.types import EndpointSpec
 from os.path import dirname, join, realpath
+from urllib.parse import urljoin
+from util import get_service, get_task_image, wait_for_site, wait_for_service_task
 
 HUB_IMAGE_TAG = "hub:test"
 MOUNT_IMAGE_TAG = "nielsbohr/ssh-mount-dummy"
@@ -64,44 +67,27 @@ def test_creates_service(image, swarm, network, make_service):
     services_before_spawn = client.services.list()
     test_logger.info("Pre test services: {}".format(services_before_spawn))
 
-    # Try for 5 minutes
-    num_attempts = 0
-    max_attempts = 60
-    with requests.Session() as s:
-        ready = False
-        while not ready:
-            if num_attempts > max_attempts:
-                raise RuntimeError(
-                    "Failed to connect to the JupyterHub login page within: {}".format(
-                        5 * max_attempts / 60
-                    )
-                )
-            try:
-                print("Trying to connect to: {}".format(JHUB_URL))
-                resp = s.get(JHUB_URL)
-                if resp.status_code == 200:
-                    ready = True
-                else:
-                    print(resp)
-            except requests.exceptions.ConnectionError:
-                pass
-            num_attempts += 1
-            time.sleep(5)
+    username = "a-new-user"
+    password = "just magnets"
+    test_logger.info("Authenticating with user: {}".format(username))
+    assert wait_for_site(JHUB_URL, valid_status_code=401) is True
 
+    with requests.Session() as s:
         # login
-        user = "a-new-user"
-        test_logger.info("Authenticating with user: {}".format(user))
+        test_logger.info("Authenticating with user: {}".format(username))
         login_response = s.post(
             JHUB_URL + "/hub/login?next=",
-            data={"username": user, "password": "just magnets"},
+            data={"username": username, "password": password},
         )
         test_logger.info("Login response message: {}".format(login_response.text))
         assert login_response.status_code == 200
         # Spawn a notebook
         spawn_form_resp = s.get(JHUB_URL + "/hub/spawn")
         test_logger.info("Spawn page message: {}".format(spawn_form_resp.text))
+
         assert spawn_form_resp.status_code == 200
         assert "Select a notebook image" in spawn_form_resp.text
+
         payload = {"dockerimage": "nielsbohr/base-notebook:latest"}
         spawn_resp = s.post(JHUB_URL + "/hub/spawn", data=payload)
         test_logger.info("Spawn POST response message: {}".format(spawn_resp.text))
@@ -121,7 +107,7 @@ def test_creates_service(image, swarm, network, make_service):
                 assert state != "failed"
 
         # wait for user home
-        home_resp = s.get(JHUB_URL + "/user/{}/tree?".format(user))
+        home_resp = s.get(JHUB_URL + "/user/{}/tree?".format(username))
         assert home_resp.status_code == 200
 
         # New services are there
@@ -135,7 +121,7 @@ def test_creates_service(image, swarm, network, make_service):
         while pending or num_wait > max_wait:
             num_wait += 1
             resp = s.delete(
-                JHUB_URL + "/hub/api/users/{}/server".format(user),
+                JHUB_URL + "/hub/api/users/{}/server".format(username),
                 headers={"Referer": "127.0.0.1:{}/hub/".format(PORT)},
             )
             test_logger.info(
@@ -150,3 +136,66 @@ def test_creates_service(image, swarm, network, make_service):
         services_after_remove = client.services.list()
         assert len((set(services_before_spawn) - set(services_after_remove))) == 0
         test_logger.info("End of test service")
+
+
+@pytest.mark.parametrize("image", [hub_image], indirect=["image"])
+@pytest.mark.parametrize("swarm", [swarm_config], indirect=["swarm"])
+@pytest.mark.parametrize("network", [network_config], indirect=["network"])
+def test_image_selection(image, swarm, network, make_service):
+    """Test that the spawner allows for dynamic image selection"""
+    test_logger.info("Start of the image selection test")
+    make_service(hub_service)
+    client = docker.from_env()
+    # jupyterhub service should be running at this point
+    services_before_spawn = client.services.list()
+    test_logger.info("Pre test services: {}".format(services_before_spawn))
+
+    username = "a-new-user"
+    password = "just magnets"
+    test_logger.info("Authenticating with user: {}".format(username))
+    assert wait_for_site(JHUB_URL, valid_status_code=401) is True
+
+    with requests.Session() as s:
+        # login
+        test_logger.info("Authenticating with user: {}".format(username))
+        login_response = s.post(
+            urljoin(JHUB_URL, "/hub/login"),
+            data={"username": username, "password": password},
+        )
+        test_logger.info("Login response message: {}".format(login_response.text))
+        assert login_response.status_code == 200
+
+        # Spawn a notebook
+        spawn_form_resp = s.get(JHUB_URL + "/hub/spawn")
+        test_logger.info("Spawn page message: {}".format(spawn_form_resp.text))
+
+        assert spawn_form_resp.status_code == 200
+        assert "Select a notebook image" in spawn_form_resp.text
+
+        user_image = "nielsbohr/base-notebook:latest"
+        user_image_name = "Base Notebook"
+
+        payload = {"select_image": [{"image": user_image, "name": user_image_name}]}
+        json_payload = json.dumps(payload)
+
+        spawn_resp = s.post(JHUB_URL + "/hub/spawn", data=payload)
+        test_logger.info("Spawn POST response message: {}".format(spawn_resp.text))
+        assert spawn_resp.status_code == 200
+
+        spawn_resp = s.post(urljoin(JHUB_URL, "/hub/spawn"), data=json_payload)
+
+        test_logger.info("Spawn POST response message: {}".format(spawn_resp.text))
+        assert spawn_resp.status_code == 200
+
+        target_service_name = "{}-{}-{}".format("jupyter", username, "1")
+        spawned_service = get_service(client, target_service_name)
+        assert spawned_service is not None
+
+        # Verify that a task is succesfully running
+        running_task = wait_for_service_task(
+            client, spawned_service, filters={"desired-state": "running"}
+        )
+        assert running_task
+
+        service_image = get_task_image(running_task)
+        assert service_image == user_image

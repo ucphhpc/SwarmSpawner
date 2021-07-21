@@ -18,6 +18,7 @@ from util import (
     get_service_url,
     get_service_api_url,
     get_service_user,
+    refresh_csrf,
     remove_volume,
     wait_for_session,
     wait_for_service_task,
@@ -156,16 +157,8 @@ def test_sshfs_mount_hub(image, swarm, network, make_service):
         test_logger.info("Spawn POST response message: {}".format(spawn_resp.text))
         assert spawn_resp.status_code == 200
 
-        post_spawn_services = list(
-            set(client.services.list()) - set(services_before_spawn)
-        )
-        test_logger.info("Post spawn services: {}".format(post_spawn_services))
-        # New services are there
-        assert len(post_spawn_services) > 0
-
         # Get spawned service
         target_service_name = "{}-{}-{}".format("jupyter", username, "1")
-        # jupyterhub_service = get_service(client, HUB_SERVICE_NAME)
         spawned_service = get_service(client, target_service_name)
         assert spawned_service is not None
 
@@ -225,10 +218,15 @@ def test_sshfs_mount_hub(image, swarm, network, make_service):
         assert resp.status_code == 201
 
         # Remove via the web interface
+        refresh_csrf(s, jhub_service_api)
+        assert "_xsrf" in s.cookies
+        delete_headers = {
+            "Referer": urljoin(JHUB_URL, "/hub/home"),
+            "Origin": JHUB_URL,
+        }
+
         jhub_user = get_service_user(spawned_service)
         delete_url = urljoin(JHUB_URL, "/hub/api/users/{}/server".format(jhub_user))
-        delete_headers = dict(Referer=JHUB_URL)
-        delete_headers.update(xsrf_headers)
 
         # Wait for the server to finish deleting
         deleted = delete(s, delete_url, headers=delete_headers)

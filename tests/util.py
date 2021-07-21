@@ -231,3 +231,4 @@ def delete(session, url, timeout=60, headers=None, valid_status_code=204):
 def refresh_csrf(session, url, timeout=60, headers=None):
     if not headers:
         headers = {}
+    return wait_for_session(session, url, timeout=timeout, require_xsrf=True)
