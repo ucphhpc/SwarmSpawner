@@ -53,7 +53,17 @@ def get_volume(client, volume_name, filters=None):
     if not filters:
         filters = {}
     volumes = client.volumes.list(filters=filters)
-    return volumes
+    for volume in volumes:
+        if volume.name == volume_name:
+            return volume
+    return None
+
+
+def remove_volume(client, volume_name):
+    volume = get_volume(client, volume_name)
+    if volume:
+        return volume.remove()
+    return False
 
 
 def get_service_env(service, env_key=None):
@@ -107,6 +117,7 @@ def get_service_api_url(service, postfix_url=None):
 def wait_for_task_state(client, service, timeout=60, filters=None):
     attempts = 0
     while attempts < timeout:
+        service_tasks = get_service_tasks(client, service, filters=filters)
         if get_service_tasks(client, service, filters=filters):
             return True
         attempts += 1
@@ -126,7 +137,7 @@ def get_site(session, url, timeout=60, valid_status_code=200):
     num_attempts = 0
     while num_attempts < timeout:
         try:
-            resp = s.get(url)
+            resp = session.get(url)
             if resp.status_code == valid_status_code:
                 return True
         except requests.exceptions.ConnectionError:
@@ -159,7 +170,9 @@ def wait_for_site(
     return False
 
 
-def wait_for_session(session, url, timeout=60, valid_status_code=200, require_xsrf=False):
+def wait_for_session(
+    session, url, timeout=60, valid_status_code=200, require_xsrf=False
+):
     if get_site(session, url, timeout=timeout, valid_status_code=valid_status_code):
         if require_xsrf:
             if "_xsrf" in session.cookies:
@@ -167,7 +180,6 @@ def wait_for_session(session, url, timeout=60, valid_status_code=200, require_xs
         else:
             return True
     return False
-
 
 
 def delete_via_url(

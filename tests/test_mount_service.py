@@ -102,6 +102,12 @@ def test_sshfs_mount_hub(image, swarm, network, make_service):
     auth_header = {"Remote-User": username}
     assert wait_for_site(JHUB_URL, valid_status_code=401) is True
 
+    mount_volume_name = "sshvolume-user-{}".format(username)
+    # Ensure that the volume is not present to begin with
+    existing_volume = get_volume(client, mount_volume_name)
+    if existing_volume:
+        assert remove_volume(client, mount_volume_name)
+
     with requests.Session() as s:
         auth_url = urljoin(JHUB_URL, "/hub/home")
         login_response = s.get(auth_url, headers=auth_header)
@@ -176,7 +182,6 @@ def test_sshfs_mount_hub(image, swarm, network, make_service):
         assert len(tasks) == 1
         task = tasks[0]
 
-        mount_volume_name = "sshvolume-user-{}".format(username)
         task_mounts = get_task_mounts(
             client, task, filters={"Source": mount_volume_name}
         )
@@ -211,7 +216,7 @@ def test_sshfs_mount_hub(image, swarm, network, make_service):
             valid_status_code=200,
             auth_url=auth_url,
             auth_headers=auth_header,
-            require_xsrf=True
+            require_xsrf=True,
         )
 
         # Write to user home
@@ -228,9 +233,7 @@ def test_sshfs_mount_hub(image, swarm, network, make_service):
 
         xsrf_headers = {"X-XSRFToken": xsrf_token}
         resp = s.put(
-            "".join([jhub_service_content, new_file]),
-            data=data,
-            headers=xsrf_headers,
+            "".join([jhub_service_content, new_file]), data=data, headers=xsrf_headers,
         )
         assert resp.status_code == 201
 
