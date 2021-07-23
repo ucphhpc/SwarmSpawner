@@ -8,7 +8,14 @@ from random import SystemRandom
 from docker.types import EndpointSpec
 from os.path import dirname, join, realpath
 from urllib.parse import urljoin
-from util import get_service, get_task_image, wait_for_site, wait_for_service_task
+from util import (
+    get_service,
+    get_task_image,
+    wait_for_site,
+    wait_for_service_task,
+    get_service_user,
+    delete,
+)
 
 HUB_IMAGE_TAG = "hub:test"
 MOUNT_IMAGE_TAG = "nielsbohr/ssh-mount-dummy"
@@ -70,7 +77,7 @@ def test_creates_service(image, swarm, network, make_service):
     username = "a-new-user"
     password = "just magnets"
     test_logger.info("Authenticating with user: {}".format(username))
-    assert wait_for_site(JHUB_URL, valid_status_code=401) is True
+    assert wait_for_site(JHUB_URL) is True
 
     with requests.Session() as s:
         # login
@@ -95,6 +102,7 @@ def test_creates_service(image, swarm, network, make_service):
 
         services = client.services.list()
         test_logger.info("Post spawn services: {}".format(services))
+
         # New services are there
         assert len(services) > 0
 
@@ -153,7 +161,7 @@ def test_image_selection(image, swarm, network, make_service):
     username = "a-new-user"
     password = "just magnets"
     test_logger.info("Authenticating with user: {}".format(username))
-    assert wait_for_site(JHUB_URL, valid_status_code=401) is True
+    assert wait_for_site(JHUB_URL) is True
 
     with requests.Session() as s:
         # login
@@ -199,3 +207,15 @@ def test_image_selection(image, swarm, network, make_service):
 
         service_image = get_task_image(running_task)
         assert service_image == user_image
+
+        # Delete the spawned service
+        delete_headers = {"Referer": urljoin(JHUB_URL, "/hub/home"), "Origin": JHUB_URL}
+
+        jhub_user = get_service_user(spawned_service)
+        delete_url = urljoin(JHUB_URL, "/hub/api/users/{}/server".format(jhub_user))
+
+        deleted = delete(s, delete_url, headers=delete_headers)
+        assert deleted
+
+        deleted_service = get_service(client, target_service_name)
+        assert deleted_service is None
