@@ -86,6 +86,19 @@ def get_service_env(service, env_key=None):
     return None
 
 
+def get_service_labels(service, label_key=None):
+    if "Labels" not in service.attrs["Spec"]["TaskTemplate"]["ContainerSpec"]:
+        return None
+
+    labels = service.attrs["Spec"]["TaskTemplate"]["ContainerSpec"]["Labels"]
+    if not label_key:
+        return labels
+
+    if label_key in labels:
+        return labels[label_key]
+    return None
+
+
 def get_service_prefix(service):
     # The prefix is located in the service environment variables
     return get_service_env(service, env_key="JUPYTERHUB_SERVICE_PREFIX")

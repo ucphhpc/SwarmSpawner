@@ -11,6 +11,7 @@ from urllib.parse import urljoin
 from util import (
     get_service,
     get_task_image,
+    get_service_labels,
     wait_for_site,
     wait_for_service_task,
     get_service_user,
@@ -181,16 +182,19 @@ def test_image_selection(image, swarm, network, make_service):
         assert "Select a notebook image" in spawn_form_resp.text
 
         user_image = "nielsbohr/base-notebook:latest"
-        user_image_name = "Base Notebook"
+        user_image_name = "Basic Python Notebook"
 
-        payload = {"select_image": [{"image": user_image, "name": user_image_name}]}
+        payload = {"name": user_image_name, "image": user_image}
         json_payload = json.dumps(payload)
-
-        spawn_resp = s.post(JHUB_URL + "/hub/spawn", data=payload)
-        test_logger.info("Spawn POST response message: {}".format(spawn_resp.text))
-        assert spawn_resp.status_code == 200
-
-        spawn_resp = s.post(urljoin(JHUB_URL, "/hub/spawn"), data=json_payload)
+        spawn_resp = s.post(
+            JHUB_URL + "/hub/spawn/{}".format(username),
+            files={
+                "select_image": (
+                    None,
+                    json_payload,
+                )
+            },
+        )
 
         test_logger.info("Spawn POST response message: {}".format(spawn_resp.text))
         assert spawn_resp.status_code == 200
@@ -205,8 +209,13 @@ def test_image_selection(image, swarm, network, make_service):
         )
         assert running_task
 
+        # Verify that the image is correct
         service_image = get_task_image(running_task)
         assert service_image == user_image
+
+        service_labels = get_service_labels(spawned_service)
+        assert service_labels is not None
+        assert service_labels["image_name"] == user_image_name
 
         # Delete the spawned service
         delete_headers = {"Referer": urljoin(JHUB_URL, "/hub/home"), "Origin": JHUB_URL}
@@ -218,4 +227,54 @@ def test_image_selection(image, swarm, network, make_service):
         assert deleted
 
         deleted_service = get_service(client, target_service_name)
+        assert deleted_service is None
+
+        # Spawn a second service with a different name but the same image ##
+
+        # Spawn a notebook
+        second_spawn_form_resp = s.get(JHUB_URL + "/hub/spawn")
+        test_logger.info("Spawn page message: {}".format(second_spawn_form_resp.text))
+
+        assert second_spawn_form_resp.status_code == 200
+        assert "Select a notebook image" in second_spawn_form_resp.text
+
+        second_image_name = "Basic Python Notebook 2"
+        selection_payload = {"name": second_image_name, "image": user_image}
+        json_second_payload = json.dumps(selection_payload)
+
+        spawn_resp = s.post(
+            JHUB_URL + "/hub/spawn/{}".format(username),
+            files={
+                "select_image": (
+                    None,
+                    json_second_payload,
+                )
+            },
+        )
+        test_logger.info("Spawn POST response message: {}".format(spawn_resp.text))
+        assert spawn_resp.status_code == 200
+
+        second_target_service_name = "{}-{}-{}".format("jupyter", username, "1")
+        second_spawned_service = get_service(client, second_target_service_name)
+        assert second_spawned_service is not None
+
+        # Verify that a task is succesfully running
+        second_running_task = wait_for_service_task(
+            client, second_spawned_service, filters={"desired-state": "running"}
+        )
+        assert second_running_task
+
+        # Verify that the image is correct
+        second_service_image = get_task_image(second_running_task)
+        assert second_service_image == user_image
+
+        second_service_labels = get_service_labels(second_spawned_service)
+        assert second_service_labels is not None
+        assert second_service_labels["image_name"] == second_image_name
+
+        # Delete the second spawned service
+        deleted = delete(s, delete_url, headers=delete_headers)
+        assert deleted
+
+        deleted_service = get_service(client, second_target_service_name)
         assert deleted_service is None

@@ -577,6 +577,7 @@ class SwarmSpawner(Spawner):
 
             # Which image to spawn
             if self.use_user_options and "user_selected_image" in user_options:
+                self.log.debug("User options received: {}".format(user_options))
                 image_name = user_options["user_selected_name"]
                 image_value = user_options["user_selected_image"]
                 selected_image = None
@@ -632,6 +633,9 @@ class SwarmSpawner(Spawner):
                     raise Exception("You don't have permission to launch that image")
 
             self.log.debug("Container spec: {}".format(container_spec))
+
+            # Assign the image name as a label
+            container_spec["labels"] = {"image_name": selected_image["name"]}
 
             # Setup mounts
             mounts = []
