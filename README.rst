@@ -277,7 +277,7 @@ You can also specify some resource for each service
 .. code-block:: python
 
         c.SwarmSpawner.resource_spec = {
-                        'cpu_limit' : int(1 * 1e9) # (int) – CPU limit in units of 10^9 CPU shares.
+                        'cpu_limit' : int(1 * 1e9), # (int) – CPU limit in units of 10^9 CPU shares.
                         'mem_limit' : int(512 * 1e6), # (int) – Memory limit in Bytes.
                         'cpu_reservation' : int(1 * 1e9), # (int) – CPU reservation in units of 10^9 CPU shares.
                         'mem_reservation' : int(512 * 1e6), # (int) – Memory reservation in Bytes
