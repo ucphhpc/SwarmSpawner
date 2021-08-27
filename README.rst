@@ -70,7 +70,9 @@ SwarmSpawner use the service's name instead of the service's ip, as a consequenc
 
 Define the services inside jupyterhub_config.py
 ===============================================
-You can define *container_spec*, *resource_spec* and *networks* inside **jupyterhub_config.py**.
+You can define *container_spec*, *
+
+* and *networks* inside **jupyterhub_config.py**.
 
 Container_spec__
 -------------------
@@ -118,7 +120,7 @@ These can be imposed as a placement policy to all services being spawned. E.g.
 Dockerimages
 ---------------------
 
-To define which images are available to the users, a list of dockerimages must be declared
+To define which images are available to the users, a list of `images` must be declared
 The individual dictionaries also makes it possible to define whether the image should mount any volumes when it is spawned
 
 .. code-block:: python
@@ -163,7 +165,7 @@ usernames are able to spawn that particular image.
 
 To make the user able to select between multiple available images, the following must be
 set.
-If this is not the case, the user will simply spawn an instance of the default image. i.e. dockerimages[0]
+If this is not the case, the user will simply spawn an instance of the default image. i.e. images[0]
 
 .. code-block:: python
 
@@ -275,9 +277,9 @@ You can also specify some resource for each service
 .. code-block:: python
 
         c.SwarmSpawner.resource_spec = {
-                        'cpu_limit' : 1000, # (int) – CPU limit in units of 10^9 CPU shares.
+                        'cpu_limit' : int(1 * 1e9) # (int) – CPU limit in units of 10^9 CPU shares.
                         'mem_limit' : int(512 * 1e6), # (int) – Memory limit in Bytes.
-                        'cpu_reservation' : 1000, # (int) – CPU reservation in units of 10^9 CPU shares.
+                        'cpu_reservation' : int(1 * 1e9), # (int) – CPU reservation in units of 10^9 CPU shares.
                         'mem_reservation' : int(512 * 1e6), # (int) – Memory reservation in Bytes
                         }
 
@@ -311,7 +313,15 @@ The spawner expect a dict with these keys:
                         # name of the image
                         'Image' : '',
                         'mounts' : mounts,
-                        'resource_spec' : {
+                        '
+                        
+                        
+                        
+                        
+                        
+                        
+                        
+                        ' : {
                                 # (int) – CPU limit in units of 10^9 CPU shares.
                                 'cpu_limit': int(1 * 1e9),
                                 # (int) – Memory limit in Bytes.
