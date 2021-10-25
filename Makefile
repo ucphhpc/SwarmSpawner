@@ -16,5 +16,6 @@ push:
 	docker push ${OWNER}/${IMAGE}:${TAG}
 
 # The tests requires access to the docker socket
-test:
+test: 
+	$(MAKE) build
 	pytest -s -v tests/
