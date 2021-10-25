@@ -174,8 +174,7 @@ def test_sshfs_mount_hub(image, swarm, network, make_service):
         # Ensure it is using the correct driver
         for mount in task_mounts:
             assert (
-                mount["VolumeOptions"]["DriverConfig"]["Name"]
-                == "ucphhpc/sshfs:latest"
+                mount["VolumeOptions"]["DriverConfig"]["Name"] == "ucphhpc/sshfs:latest"
             )
 
         # Ensure it is the correct image

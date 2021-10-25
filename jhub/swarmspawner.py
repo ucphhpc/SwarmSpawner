@@ -961,7 +961,7 @@ class SwarmSpawner(Spawner):
                     labels = volume.get("VolumeOptions", {}).get("Labels", {})
                     # Whether the volume should be kept
                     if "keep" in labels and labels["keep"] != "True":
-                        self.log.info("Volume {} should not be kept".format(volume))
+                        self.log.debug("Volume {} is not kept".format(volume))
                         if "Source" in volume:
                             # Validate the volume exists
                             try:
