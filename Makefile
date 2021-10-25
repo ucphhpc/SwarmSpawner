@@ -1,6 +1,7 @@
 OWNER=ucphhpc
 IMAGE=swarmspawner
 TAG=edge
+ARGS=
 
 .PHONY: build
 
@@ -8,7 +9,7 @@ all: clean build push
 
 build:
 	python3 setup.py sdist bdist_wheel
-	docker build -t ${OWNER}/${IMAGE}:${TAG} .
+	docker build -t ${OWNER}/${IMAGE}:${TAG} $(ARGS) .
 
 clean:
 	rm -fr dist build jhub_swarmspawner.egg-info
