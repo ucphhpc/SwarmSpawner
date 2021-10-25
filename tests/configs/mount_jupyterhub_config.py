@@ -27,7 +27,7 @@ sshfs_mount = [
     SSHFSMounter(
         {
             "type": "volume",
-            "driver_config": "nielsbohr/sshfs:latest",
+            "driver_config": "ucphhpc/sshfs:latest",
             "driver_options": {
                 "sshcmd": "{sshcmd}",
                 "id_rsa": "{id_rsa}",

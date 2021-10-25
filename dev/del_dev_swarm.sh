@@ -1,6 +1,6 @@
 #!/bin/bash
 NETWORK_NAME=jh_dev
-MOUNT_PLUGIN=nielsbohr/sshfs:latest
+MOUNT_PLUGIN=ucphhpc/sshfs:latest
 
 docker network rm $NETWORK_NAME
 docker plugin disable $MOUNT_PLUGIN

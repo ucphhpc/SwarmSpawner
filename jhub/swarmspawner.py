@@ -111,7 +111,7 @@ class SwarmSpawner(Spawner):
         if not self.use_user_options:
             return form_data
 
-        self.log.info(
+        self.log.debug(
             "User: {} submitted spawn form: {}".format(self.user.name, form_data)
         )
         # formdata format: {'select_image': {'image': 'jupyterhub/singleuser',
@@ -546,7 +546,7 @@ class SwarmSpawner(Spawner):
         You can specify the params for the service through
         jupyterhub_config.py or using the user_options
         """
-        self.log.info("User: {}, start spawn".format(self.user.__dict__))
+        self.log.debug("User: {}, start spawn".format(self.user.__dict__))
 
         # https://github.com/jupyterhub/jupyterhub
         # /blob/master/jupyterhub/user.py#L202
@@ -880,7 +880,7 @@ class SwarmSpawner(Spawner):
                 task_spec.update({"log_driver": task_log_driver})
 
             task_tmpl = TaskTemplate(**task_spec)
-            self.log.info("task temp: {}".format(task_tmpl))
+            self.log.debug("task temp: {}".format(task_tmpl))
             # Set endpoint spec
             endpoint_spec = EndpointSpec(**endpoint_spec)
 

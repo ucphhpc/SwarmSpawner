@@ -53,7 +53,7 @@ class VolumeMounter(Mounter):
 
     @gen.coroutine
     def create(self, data=None, owner=None, keep=True):
-        self.log.info("Creating mount {}".format(data))
+        self.log.debug("Creating mount {}".format(data))
         yield self.validate_config()
         yield self.init(owner, keep)
         mount = yield self.create_mount()
@@ -254,7 +254,7 @@ class SSHFSMounter(Mounter):
 
     @gen.coroutine
     def create(self, data=None, owner=None, keep=True):
-        self.log.info("Creating mount {}".format(data))
+        self.log.debug("Creating mount {}".format(data))
         yield self.init(owner, keep)
         yield self.validate_config()
         mount = yield self.create_mount(data)
