@@ -1,0 +1,15 @@
+environments:
+  pypi_package:
+    pipelines:
+      - swarmspawner
+pipelines:
+  swarmspawner:
+    group: pypi_package
+    locking: off
+    materials:
+      swarmspawner_git:  # this is the name of material
+        # says about type of material and url at once
+        git: https://github.com/ucphhpc/SwarmSpawner.git
+        branch: main
+    parameters:
+    template: pypi_package
