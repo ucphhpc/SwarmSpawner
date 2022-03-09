@@ -223,6 +223,12 @@ class SwarmSpawner(Spawner):
 
     resource_spec = Dict({}, config=True, help="Params about cpu and memory limits")
 
+    accelerators = List(
+        trait=Dict(),
+        config=True,
+        help=dedent("""Params about which accelerators should be attached"""),
+    )
+
     placement = Dict(
         {},
         config=True,
@@ -742,6 +748,10 @@ class SwarmSpawner(Spawner):
             if "resource_spec" in selected_image:
                 resource_spec = selected_image["resource_spec"]
 
+            # Accelerators attached to the image
+            if "accelerators" in selected_image:
+                accelerators = selected_image["accelerators"]
+
             # Placement of image
             if "placement" in selected_image:
                 placement = selected_image["placement"]
@@ -792,6 +802,15 @@ class SwarmSpawner(Spawner):
                 container_spec.update(
                     {"configs": [ConfigReference(**c) for c in self.configs]}
                 )
+
+            # Prepare the accelerators and attach it to the environment
+            if accelerators:
+                for accelerator in accelerators:
+                    accelerator_id = accelerator.aquire(self.user.name)
+                    # NVIDIA_VISIBLE_DEVICES=0:0
+                    container_spec["env"]["NVIDIA_VISIBLE_DEVICES"] = "{}".format(
+                        accelerator_id
+                    )
 
             # Global container user
             uid_gid = None
@@ -947,6 +966,7 @@ class SwarmSpawner(Spawner):
         volumes = None
         if "Mounts" in service["Spec"]["TaskTemplate"]["ContainerSpec"]:
             volumes = service["Spec"]["TaskTemplate"]["ContainerSpec"]["Mounts"]
+
         # Even though it returns the service is gone
         # the underlying containers are still being removed
         removed_service = yield self.docker("remove_service", service["ID"])
