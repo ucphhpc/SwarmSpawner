@@ -1,5 +1,7 @@
 environments:
   pypi_package:
+    environments:
+      GIT_USER: "{{SECRET:[github][username]}}"
     pipelines:
       - swarmspawner
 pipelines:
@@ -11,5 +13,13 @@ pipelines:
         # says about type of material and url at once
         git: https://github.com/ucphhpc/SwarmSpawner.git
         branch: main
+        destination: "swarmspawner"
+      publish_python_git:
+        git: https://github.com/rasmunk/publish-python-scripts.git
+        branch: main
+        username: ${GIT_USER}
+        password: "{{SECRET:[github][access_token]}}"
+        destination: "publish-python-scripts"
     parameters:
+      ARGS: ''
     template: pypi_package
