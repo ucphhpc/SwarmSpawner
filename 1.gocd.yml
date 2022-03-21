@@ -5,7 +5,7 @@ environments:
     pipelines:
       - swarmspawner
 pipelines:
-  swarmspawner:
+  swarmspawner_main:
     group: pypi_package
     locking: off
     materials:
@@ -13,6 +13,27 @@ pipelines:
         # says about type of material and url at once
         git: https://github.com/ucphhpc/SwarmSpawner.git
         branch: master
+        destination: swarmspawner
+      publish_python_git:
+        git: https://github.com/rasmunk/publish-python-scripts.git
+        branch: main
+        username: ${GIT_USER}
+        password: "{{SECRET:[github][access_token]}}"
+        destination: publish-python-scripts
+    parameters:
+      ARGS: ''
+      SRC_DIRECTORY: swarmspawner
+      TEST_DIRECTORY: swarmspawner
+      PUSH_DIRECTORY: publish-python-scripts
+    template: pypi_package
+  swarmspawner_accelerator_selction:
+    group: pypi_package
+    locking: off
+    materials:
+      swarmspawner_git:  # this is the name of material
+        # says about type of material and url at once
+        git: https://github.com/ucphhpc/SwarmSpawner.git
+        branch: accelerator_selction
         destination: swarmspawner
       publish_python_git:
         git: https://github.com/rasmunk/publish-python-scripts.git
