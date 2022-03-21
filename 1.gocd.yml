@@ -26,14 +26,14 @@ pipelines:
       TEST_DIRECTORY: swarmspawner
       PUSH_DIRECTORY: publish-python-scripts
     template: pypi_package
-  swarmspawner_accelerator_selction:
+  swarmspawner_accelerator_selection:
     group: pypi_package
     locking: off
     materials:
       swarmspawner_git:  # this is the name of material
         # says about type of material and url at once
         git: https://github.com/ucphhpc/SwarmSpawner.git
-        branch: accelerator_selction
+        branch: accelerator_selection
         destination: swarmspawner
       publish_python_git:
         git: https://github.com/rasmunk/publish-python-scripts.git
