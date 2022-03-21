@@ -3,7 +3,8 @@ environments:
     environments:
       GIT_USER: "{{SECRET:[github][username]}}"
     pipelines:
-      - swarmspawner
+      - swarmspawner_main
+      - swarmspawner_accelerator_selection
 pipelines:
   swarmspawner_main:
     group: pypi_package
