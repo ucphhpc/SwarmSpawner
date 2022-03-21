@@ -13,7 +13,7 @@ pipelines:
         # says about type of material and url at once
         git: https://github.com/ucphhpc/SwarmSpawner.git
         branch: master
-        destination: swarmspawner
+        destination: swarmspawner_main
       publish_python_git:
         git: https://github.com/rasmunk/publish-python-scripts.git
         branch: main
@@ -22,8 +22,8 @@ pipelines:
         destination: publish-python-scripts
     parameters:
       ARGS: ''
-      SRC_DIRECTORY: swarmspawner
-      TEST_DIRECTORY: swarmspawner
+      SRC_DIRECTORY: swarmspawner_main
+      TEST_DIRECTORY: swarmspawner_main
       PUSH_DIRECTORY: publish-python-scripts
     template: pypi_package
   swarmspawner_accelerator_selection:
@@ -34,7 +34,7 @@ pipelines:
         # says about type of material and url at once
         git: https://github.com/ucphhpc/SwarmSpawner.git
         branch: accelerator_selection
-        destination: swarmspawner
+        destination: swarmspawner_accelerator_selection
       publish_python_git:
         git: https://github.com/rasmunk/publish-python-scripts.git
         branch: main
@@ -43,7 +43,7 @@ pipelines:
         destination: publish-python-scripts
     parameters:
       ARGS: ''
-      SRC_DIRECTORY: swarmspawner
-      TEST_DIRECTORY: swarmspawner
+      SRC_DIRECTORY: swarmspawner_accelerator_selection
+      TEST_DIRECTORY: swarmspawner_accelerator_selection
       PUSH_DIRECTORY: publish-python-scripts
     template: pypi_package
