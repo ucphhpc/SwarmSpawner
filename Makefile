@@ -18,6 +18,9 @@ clean:
 push:
 	docker push ${OWNER}/${IMAGE}:${TAG}
 
+installtests:
+	pip3 install -r tests/requirements.txt
+
 # The tests requires access to the docker socket
 test: 
 	$(MAKE) build
