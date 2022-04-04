@@ -26,7 +26,7 @@ pipelines:
       SRC_DIRECTORY: swarmspawner_main
       TEST_DIRECTORY: swarmspawner_main
       PUSH_DIRECTORY: publish-python-scripts
-    template: pypi_package
+    template: bare_metal_pypi_package
   swarmspawner_accelerator_selection:
     group: pypi_package
     locking: off
@@ -47,4 +47,4 @@ pipelines:
       SRC_DIRECTORY: swarmspawner_accelerator_selection
       TEST_DIRECTORY: swarmspawner_accelerator_selection
       PUSH_DIRECTORY: publish-python-scripts
-    template: pypi_package
+    template: bare_metal_pypi_package
