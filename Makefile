@@ -7,7 +7,11 @@ ARGS=
 
 all: clean build push
 
+install:
+	pip3 install wheel
+
 build:
+	$(MAKE) install
 	python3 setup.py sdist bdist_wheel
 	docker build -t ${OWNER}/${IMAGE}:${TAG} $(ARGS) .
 
