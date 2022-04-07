@@ -1,4 +1,4 @@
-FROM jupyterhub/jupyterhub:1.4.0
+FROM jupyterhub/jupyterhub:2.2.2
 LABEL MAINTAINER Rasmus Munk <rasmus.munk@nbi.ku.dk>
 
 WORKDIR /app

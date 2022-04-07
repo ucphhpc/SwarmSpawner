@@ -734,6 +734,12 @@ class SwarmSpawner(Spawner):
             if user_options.get("log_driver") is not None:
                 log_driver = user_options.get("log_driver")
 
+            accelerators = []
+            if hasattr(self, "accelerators"):
+                accelerators = self.accelerators
+            if user_options.get("accelerators") is not None:
+                accelerators = user_options.get("accelerators")
+
             # Global placement
             placement = None
             if hasattr(self, "placement"):
