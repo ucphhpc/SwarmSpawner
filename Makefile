@@ -1,18 +1,21 @@
-PACKAGE_NAME=jhub_swarmspawner
+PACKAGE_NAME=jhub-swarmspawner
+PACKAGE_NAME_FORMATTED=$(subst -,_,$(PACKAGE_NAME))
 OWNER=ucphhpc
-IMAGE=swarmspawner
+IMAGE=$(PACKAGE_NAME)
 TAG=edge
 ARGS=
 
-#VENV_NAME=venv
-#VENV_DIR=$(VENV_NAME)/bin
-#ACTIVATE_FILE=$(VENV_DIR)/activate
-#PYTHON=$(VENV_DIR)/python3
-
-.PHONY: dockerbuild dockerclean dockerpush clean dist distclean maintainer-clean
+.PHONY: all init dockerbuild dockerclean dockerpush clean dist distclean maintainer-clean
 .PHONY: install uninstall installcheck check
 
-all: venv install-dep dockerbuild
+all: venv install-dep init dockerbuild
+
+init:
+ifeq ($(shell test -e defaults.env && echo yes), yes)
+ifneq ($(shell test -e .env && echo yes), yes)
+		ln -s defaults.env .env
+endif
+endif
 
 dockerbuild:
 	docker build -t $(OWNER)/$(IMAGE):$(TAG) $(ARGS) .
@@ -27,6 +30,7 @@ clean:
 	$(MAKE) dockerclean
 	$(MAKE) distclean
 	$(MAKE) venv-clean
+	rm -fr .env
 	rm -fr .pytest_cache
 	rm -fr tests/__pycache__
 
@@ -34,7 +38,7 @@ dist:
 	$(VENV)/python setup.py sdist bdist_wheel
 
 distclean:
-	rm -fr dist build ${PACKAGE_NAME}.egg-info
+	rm -fr dist build $(PACKAGE_NAME).egg-info $(PACKAGE_NAME_FORMATTED).egg-info
 
 maintainer-clean:
 	@echo 'This command is intended for maintainers to use; it'
