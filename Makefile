@@ -56,8 +56,15 @@ uninstall:
 	$(VENV)/pip uninstall -y -r requirements.txt
 	$(VENV)/pip uninstall -y -r $(PACKAGE_NAME)
 
+uninstallcheck:
+	$(VENV)/pip uninstall -y -r tests/requirements.txt
+	docker plugin disable ucphhpc/sshfs:latest
+	docker plugin rm ucphhpc/sshfs:latest
+
 installcheck:
 	$(VENV)/pip install -r tests/requirements.txt
+	# Used for testing SSHFS mounting
+	docker plugin install ucphhpc/sshfs:latest --grant-all-permissions
 
 # The tests requires access to the docker socket
 check:
