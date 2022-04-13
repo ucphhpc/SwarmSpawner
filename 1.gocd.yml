@@ -28,7 +28,7 @@ pipelines:
       PUSH_DIRECTORY: publish-python-scripts
     template: bare_metal_pypi_package
   swarmspawner_accelerator_selection:
-    group: pypi_package
+    group: bare_metal_pypi_package
     locking: off
     materials:
       swarmspawner_git:  # this is the name of material
