@@ -5,6 +5,8 @@ IMAGE=$(PACKAGE_NAME)
 TAG=edge
 ARGS=
 
+MOUNT_PLUGIN := $(shell docker plugin inspect ucphhpc/sshfs:latest > /dev/null 2>&1  && echo 0 || echo 1)
+
 .PHONY: all init dockerbuild dockerclean dockerpush clean dist distclean maintainer-clean
 .PHONY: install uninstall installcheck check
 
@@ -63,8 +65,14 @@ uninstallcheck:
 
 installcheck:
 	$(VENV)/pip install -r tests/requirements.txt
-	# Used for testing SSHFS mounting
-	docker plugin install ucphhpc/sshfs:latest --grant-all-permissions
+	@echo "Checking for the required ucphhpc/sshfs docker plugin for testing"
+ifeq ($(MOUNT_PLUGIN), 1)
+	@echo "The ucphhpc/sshfs docker plugin was not found"
+	@echo "Installing the missing ucphhpc/sshfs docker plugin"
+	@docker plugin install ucphhpc/sshfs:latest --grant-all-permissions
+else
+	@echo "Found the ucphhpc/sshfs docker plugin"
+endif
 
 # The tests requires access to the docker socket
 check:

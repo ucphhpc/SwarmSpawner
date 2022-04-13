@@ -104,9 +104,6 @@ def test_creates_service(image, swarm, network, make_service):
         services = client.services.list()
         test_logger.info("Post spawn services: {}".format(services))
 
-        # New services are there
-        assert len(services) > 0
-
         target_service_name = "{}-{}-{}".format("jupyter", username, "1")
         spawned_service = get_service(client, target_service_name)
         assert spawned_service is not None
@@ -139,9 +136,10 @@ def test_creates_service(image, swarm, network, make_service):
             time.sleep(1)
 
         assert resp.status_code == 204
+
         # double check it is gone
-        services_after_remove = client.services.list()
-        assert len((set(services_before_spawn) - set(services_after_remove))) == 0
+        deleted_service = get_service(client, target_service_name)
+        assert deleted_service is None
         test_logger.info("End of test service")
 
 

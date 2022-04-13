@@ -24,6 +24,7 @@ MOUNT_IMAGE_TAG = "nielsbohr/ssh-mount-dummy"
 NETWORK_NAME = "jh_test"
 HUB_SERVICE_NAME = "jupyterhub"
 MOUNT_SERVICE_NAME = "mount_target"
+TEST_SUBNET = "192.168.99.0/24"
 PORT = 8000
 
 JHUB_URL = "http://127.0.0.1:{}".format(PORT)
@@ -46,7 +47,7 @@ swarm_config = {}
 network_config = {
     "name": NETWORK_NAME,
     "driver": "overlay",
-    "options": {"subnet": "192.168.0.0/24"},
+    "options": {"subnet": TEST_SUBNET},
     "attachable": True,
 }
 remote_hub_config = join(
