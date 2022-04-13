@@ -1,12 +1,12 @@
 environments:
-  pypi_package:
+  bare_metal_pypi_package:
     environments:
       GIT_USER: "{{SECRET:[github][username]}}"
     pipelines:
       - swarmspawner
 pipelines:
   swarmspawner:
-    group: pypi_package
+    group: bare_metal_pypi_package
     locking: off
     materials:
       swarmspawner_git:  # this is the name of material
@@ -25,4 +25,4 @@ pipelines:
       SRC_DIRECTORY: swarmspawner
       TEST_DIRECTORY: swarmspawner
       PUSH_DIRECTORY: publish-python-scripts
-    template: pypi_package
+    template: bare_metal_pypi_package
