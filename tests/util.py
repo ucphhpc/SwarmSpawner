@@ -78,7 +78,7 @@ def get_service_env(service, env_key=None):
 
     envs = {}
     for env in service.attrs["Spec"]["TaskTemplate"]["ContainerSpec"]["Env"]:
-        key, value = env.split("=")
+        key, value = env.split("=", 1)
         envs[key] = value
 
     if env_key and env_key in envs:

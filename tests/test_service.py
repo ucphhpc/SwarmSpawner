@@ -104,35 +104,30 @@ def test_creates_service(image, swarm, network, make_service):
         services = client.services.list()
         test_logger.info("Post spawn services: {}".format(services))
 
-        # New services are there
-        assert len(services) > 0
+        target_service_name = "{}-{}-{}".format("jupyter", username, "1")
+        spawned_service = get_service(client, target_service_name)
+        assert spawned_service is not None
 
-        for service in services:
-            while (
-                service.tasks() and service.tasks()[0]["Status"]["State"] != "running"
-            ):
-                time.sleep(5)
-                state = service.tasks()[0]["Status"]["State"]
-                assert state != "failed"
+        # Verify that a task is succesfully running
+        running_task = wait_for_service_task(
+            client, spawned_service, filters={"desired-state": "running"}
+        )
+        assert running_task
 
         # wait for user home
         home_resp = s.get(JHUB_URL + "/user/{}/tree?".format(username))
         assert home_resp.status_code == 200
-
-        # New services are there
-        services_after_spawn = set(client.services.list()) - set(services_before_spawn)
-        assert len(services_after_spawn) > 0
-
         # Remove via the web interface
-        # Wait for the server to finish spawning
+        delete_headers = {"Referer": urljoin(JHUB_URL, "/hub/home"), "Origin": JHUB_URL}
+
+        jhub_user = get_service_user(spawned_service)
+        delete_url = urljoin(JHUB_URL, "/hub/api/users/{}/server".format(jhub_user))
+
         pending = True
         num_wait, max_wait = 0, 15
         while pending or num_wait > max_wait:
             num_wait += 1
-            resp = s.delete(
-                JHUB_URL + "/hub/api/users/{}/server".format(username),
-                headers={"Referer": "127.0.0.1:{}/hub/".format(PORT)},
-            )
+            resp = s.delete(delete_url, headers=delete_headers)
             test_logger.info(
                 "Response from removing the user server: {}".format(resp.text)
             )
@@ -141,9 +136,10 @@ def test_creates_service(image, swarm, network, make_service):
             time.sleep(1)
 
         assert resp.status_code == 204
+
         # double check it is gone
-        services_after_remove = client.services.list()
-        assert len((set(services_before_spawn) - set(services_after_remove))) == 0
+        deleted_service = get_service(client, target_service_name)
+        assert deleted_service is None
         test_logger.info("End of test service")
 
 
@@ -230,7 +226,6 @@ def test_image_selection(image, swarm, network, make_service):
         assert deleted_service is None
 
         # Spawn a second service with a different name but the same image ##
-
         # Spawn a notebook
         second_spawn_form_resp = s.get(JHUB_URL + "/hub/spawn")
         test_logger.info("Spawn page message: {}".format(second_spawn_form_resp.text))
