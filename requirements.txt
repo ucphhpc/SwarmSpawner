@@ -1,4 +1,4 @@
-docker>=5.0.0
-jupyterhub>=2.2.2
-flatten_dict>=0.4.0
-jhub-authenticators>=0.3.5
+docker>=5.0.*
+jupyterhub>=3.*
+flatten_dict>=0.4.*
+jhub-authenticators>=0.3.*
