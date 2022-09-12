@@ -110,7 +110,7 @@ def test_creates_service(image, swarm, network, make_service):
 
         # Verify that a task is succesfully running
         running_task = wait_for_service_task(
-            client, spawned_service, filters={"desired-state": "running"}
+            client, spawned_service, filters={"desired-state": "running"}, timeout=300
         )
         assert running_task
 
@@ -124,7 +124,7 @@ def test_creates_service(image, swarm, network, make_service):
         delete_url = urljoin(JHUB_URL, "/hub/api/users/{}/server".format(jhub_user))
 
         pending = True
-        num_wait, max_wait = 0, 15
+        num_wait, max_wait = 0, 30
         while pending or num_wait > max_wait:
             num_wait += 1
             resp = s.delete(delete_url, headers=delete_headers)
@@ -201,7 +201,7 @@ def test_image_selection(image, swarm, network, make_service):
 
         # Verify that a task is succesfully running
         running_task = wait_for_service_task(
-            client, spawned_service, filters={"desired-state": "running"}
+            client, spawned_service, filters={"desired-state": "running"}, timeout=300
         )
         assert running_task
 

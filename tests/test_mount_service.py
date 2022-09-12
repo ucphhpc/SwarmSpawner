@@ -166,7 +166,7 @@ def test_sshfs_mount_hub(image, swarm, network, make_service):
 
         # Verify that a task is succesfully running
         running_task = wait_for_service_task(
-            client, spawned_service, filters={"desired-state": "running"}
+            client, spawned_service, filters={"desired-state": "running"}, timeout=300
         )
         assert running_task
 
@@ -204,7 +204,7 @@ def test_sshfs_mount_hub(image, swarm, network, make_service):
         test_logger.info("Looking for xsrf in: {}".format(s.cookies))
 
         # Refresh csrf token
-        assert wait_for_session(s, jhub_service_api, require_xsrf=True)
+        assert wait_for_session(s, jhub_service_api, require_xsrf=True, timeout=300)
         assert "_xsrf" in s.cookies
         xsrf_token = s.cookies["_xsrf"]
         service_api_url = get_service_api_url(spawned_service, postfix_url="contents/")
