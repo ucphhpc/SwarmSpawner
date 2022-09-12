@@ -125,7 +125,9 @@ def test_sshfs_mount_hub(image, swarm, network, make_service):
                 container = client.containers.get(cont_id)
                 private_key = container.exec_run(cmd)[1].decode("utf-8")
                 break
+        assert isinstance(private_key, str)
         assert private_key != ""
+        assert "ssh-rsa" in private_key
 
         # Spawn a notebook
         spawn_form_resp = s.get(JHUB_URL + "/hub/spawn")
