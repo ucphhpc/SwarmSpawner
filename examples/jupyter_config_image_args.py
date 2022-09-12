@@ -29,7 +29,7 @@ c.SwarmSpawner.use_user_options = True
 
 c.SwarmSpawner.images = [
     {
-        "image": "nielsbohr/hpc-notebook:latest",
+        "image": "ucphhpc/hpc-notebook:latest",
         "name": "HPC Notebook",
         "args": ["/usr/bin/supervisord"],
     }

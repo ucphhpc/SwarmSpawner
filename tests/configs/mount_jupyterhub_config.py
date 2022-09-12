@@ -58,7 +58,7 @@ c.SwarmSpawner.use_user_options = True
 # Additional settings including, access, mounts, placement
 c.SwarmSpawner.images = [
     {
-        "image": "nielsbohr/base-notebook:latest",
+        "image": "ucphhpc/base-notebook:latest",
         "name": "Base Notebook",
         "mounts": sshfs_mount,
         "placement": {"constraints": []},

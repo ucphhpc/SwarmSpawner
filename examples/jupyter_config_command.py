@@ -26,7 +26,7 @@ mounts = [{"type": "bind", "source": "/tmp", "target": "/home/jovyan/tmpdir"}]
 
 c.SwarmSpawner.images = [
     {
-        "image": "nielsbohr/slurm-notebook:latest",
+        "image": "ucphhpc/slurm-notebook:latest",
         "name": "Default jupyter notebook",
         "command": "/bin/bash -c 'mkdir -p /home/jovyan/{tmpdir1,tempdir2}; "
         "/usr/bin/supervisord'",

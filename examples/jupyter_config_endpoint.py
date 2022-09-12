@@ -29,7 +29,7 @@ c.SwarmSpawner.use_user_options = True
 
 c.SwarmSpawner.images = [
     {
-        "image": "nielsbohr/base-notebook:latest",
+        "image": "ucphhpc/base-notebook:latest",
         "name": "Default jupyter notebook",
         "endpoint_spec": {"ports": {8888: 8888}},
     }

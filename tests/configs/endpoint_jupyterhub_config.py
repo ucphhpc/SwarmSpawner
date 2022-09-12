@@ -19,7 +19,7 @@ c.SwarmSpawner.use_user_options = True
 
 c.SwarmSpawner.images = [
     {
-        "image": "nielsbohr/base-notebook:latest",
+        "image": "ucphhpc/base-notebook:latest",
         "name": "Basic Python Notebook",
         "endpoint_spec": {"mode": "vip", "ports": {"8000": "8000"}},
     }

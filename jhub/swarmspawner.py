@@ -50,7 +50,7 @@ class SwarmSpawner(Spawner):
     c.JupyterHub.spawner_class = 'jhub.SwarmSpawner'
     # Available docker images the user can spawn
     c.SwarmSpawner.images = [
-        {'image': 'nielsbohr/base-notebook:latest',
+        {'image': 'ucphhpc/base-notebook:latest',
         'name': 'Default jupyter notebook'}
 
     ]
@@ -62,7 +62,7 @@ class SwarmSpawner(Spawner):
         trait=Dict(),
         default_value=[
             {
-                "image": "nielsbohr/base-notebook:latest",
+                "image": "ucphhpc/base-notebook:latest",
                 "name": "Default Jupyter Notebook",
             }
         ],

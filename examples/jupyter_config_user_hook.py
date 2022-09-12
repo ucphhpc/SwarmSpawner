@@ -67,7 +67,7 @@ c.SwarmSpawner.pre_spawn_hook = simple_user_id
 c.SwarmSpawner.images = [
     {
         "name": "Base Notebook",
-        "image": "nielsbohr/base-notebook",
+        "image": "ucphhpc/base-notebook",
         "env": {
             "NB_USER": "{_service_owner}",
             "NB_UID": "{uid}",

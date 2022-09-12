@@ -28,5 +28,5 @@ c.SwarmSpawner.use_user_options = True
 db_path = os.path.join("/srv/jupyterhub", "access_db.txt")
 
 c.SwarmSpawner.images = [
-    {"name": "base notebook", "image": "nielsbohr/base-notebook", "access": db_path}
+    {"name": "base notebook", "image": "ucphhpc/base-notebook", "access": db_path}
 ]

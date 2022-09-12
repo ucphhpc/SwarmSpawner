@@ -23,5 +23,5 @@ c.SwarmSpawner.container_spec = {
 }
 
 c.SwarmSpawner.images = [
-    {"image": "nielsbohr/python-notebook", "name": "Python Notebook"}
+    {"image": "ucphhpc/python-notebook", "name": "Python Notebook"}
 ]

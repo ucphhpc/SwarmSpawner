@@ -29,9 +29,9 @@ c.SwarmSpawner.container_spec = {
 c.SwarmSpawner.use_user_options = True
 
 c.SwarmSpawner.images = [
-    {"image": "nielsbohr/base-notebook:latest", "name": "Default jupyter notebook"},
+    {"image": "ucphhpc/base-notebook:latest", "name": "Default jupyter notebook"},
     {
-        "image": "nielsbohr/base-notebook:latest",
+        "image": "ucphhpc/base-notebook:latest",
         "name": "Base Notebook",
         "env": {"NOTEBOOK_DIR": "/home/jovyan"},
     },

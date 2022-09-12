@@ -19,7 +19,7 @@ from util import (
 )
 
 HUB_IMAGE_TAG = "hub:test"
-MOUNT_IMAGE_TAG = "nielsbohr/ssh-mount-dummy"
+MOUNT_IMAGE_TAG = "ucphhpc/ssh-mount-dummy"
 NETWORK_NAME = "jh_test"
 HUB_SERVICE_NAME = "jupyterhub"
 MOUNT_SERVICE_NAME = "mount_target"
@@ -96,7 +96,7 @@ def test_creates_service(image, swarm, network, make_service):
         assert spawn_form_resp.status_code == 200
         assert "Select a notebook image" in spawn_form_resp.text
 
-        payload = {"dockerimage": "nielsbohr/base-notebook:latest"}
+        payload = {"dockerimage": "ucphhpc/base-notebook:latest"}
         spawn_resp = s.post(JHUB_URL + "/hub/spawn", data=payload)
         test_logger.info("Spawn POST response message: {}".format(spawn_resp.text))
         assert spawn_resp.status_code == 200
@@ -177,7 +177,7 @@ def test_image_selection(image, swarm, network, make_service):
         assert spawn_form_resp.status_code == 200
         assert "Select a notebook image" in spawn_form_resp.text
 
-        user_image = "nielsbohr/base-notebook:latest"
+        user_image = "ucphhpc/base-notebook:latest"
         user_image_name = "Basic Python Notebook"
 
         payload = {"name": user_image_name, "image": user_image}

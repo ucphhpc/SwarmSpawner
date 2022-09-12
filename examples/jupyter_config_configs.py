@@ -39,5 +39,5 @@ c.SwarmSpawner.container_spec = {
 c.SwarmSpawner.configs = configs
 
 c.SwarmSpawner.images = [
-    {"image": "nielsbohr/slurm-notebook:latest", "name": "Slurm notebook"}
+    {"image": "ucphhpc/slurm-notebook:latest", "name": "Slurm notebook"}
 ]

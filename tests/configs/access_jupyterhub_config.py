@@ -21,7 +21,7 @@ access_list = ["privileged-user"]
 
 c.SwarmSpawner.images = [
     {
-        "image": "nielsbohr/base-notebook:latest",
+        "image": "ucphhpc/base-notebook:latest",
         "name": "Basic Python Notebook",
         "access": access_list,
     }
