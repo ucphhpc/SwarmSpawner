@@ -127,7 +127,7 @@ def test_sshfs_mount_hub(image, swarm, network, make_service):
                 break
         assert isinstance(private_key, str)
         assert private_key != ""
-        assert "ssh-rsa" in private_key
+        assert "BEGIN RSA PRIVATE KEY" in private_key
 
         # Spawn a notebook
         spawn_form_resp = s.get(JHUB_URL + "/hub/spawn")
