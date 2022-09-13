@@ -331,7 +331,8 @@ class SwarmSpawner(Spawner):
     @staticmethod
     def _env_keep_default(param):
         """it's called in traitlets. It's a special method name.
-        Don't inherit any env from the parent process"""
+        Don't inherit any env from the parent process.
+        """
         return []
 
     def _public_hub_api_url(self):
@@ -489,33 +490,35 @@ class SwarmSpawner(Spawner):
 
     @async_generator
     async def progress(self):
-        top_task = self.tasks[0]
-        image = top_task["Spec"]["ContainerSpec"]["Image"]
-        self.log.info("Spawning progress of {} with image".format(self.service_id))
-        task_status = top_task["Status"]["State"]
-        _tag = None
-        if ":" in image:
-            _image, _tag = image.split(":")
-        else:
-            _image = image
-        if task_status == "preparing":
-            await yield_(
-                {
-                    "progress": 50,
-                    "message": "Preparing a server " "with {} the image".format(image),
-                }
-            )
-            await yield_(
-                {
-                    "progress": 60,
-                    "message": "Checking for new version of {}".format(image),
-                }
-            )
-            if _tag is not None:
-                await self.check_update(_image, _tag)
+        if self.tasks:
+            top_task = self.tasks[0]
+            image = top_task["Spec"]["ContainerSpec"]["Image"]
+            self.log.info("Spawning progress of {} with image".format(self.service_id))
+            task_status = top_task["Status"]["State"]
+            _tag = None
+            if ":" in image:
+                _image, _tag = image.split(":")
             else:
-                await self.check_update(_image)
-            self.log.info("Finished progress from spawning {}".format(image))
+                _image = image
+            if task_status == "preparing":
+                await yield_(
+                    {
+                        "progress": 50,
+                        "message": "Preparing a server "
+                        "with {} the image".format(image),
+                    }
+                )
+                await yield_(
+                    {
+                        "progress": 60,
+                        "message": "Checking for new version of {}".format(image),
+                    }
+                )
+                if _tag is not None:
+                    await self.check_update(_image, _tag)
+                else:
+                    await self.check_update(_image)
+                self.log.info("Finished progress from spawning {}".format(image))
 
     @gen.coroutine
     def removed_volume(self, name):

@@ -12,16 +12,15 @@ c.JupyterHub.authenticator_class = "jhubauthenticators.DataRemoteUserAuthenticat
 c.DataRemoteUserAuthenticator.data_headers = ["Mount"]
 c.Authenticator.enable_auth_state = True
 
+notebook_dir = os.environ.get("NOTEBOOK_DIR") or os.path.join(
+    os.sep, "home", "jovyan", "work"
+)
 c.JupyterHub.spawner_class = "jhub.SwarmSpawner"
-# First pulls can be really slow, so let's give it a big timeout
+# First pulls can be really slow, so lt's give it a big timeout
 c.SwarmSpawner.start_timeout = 60 * 15
-
-c.SwarmSpawner.jupyterhub_service_name = "jupyterhub"
-
-c.SwarmSpawner.networks = ["jh_test"]
-
-notebook_dir = os.environ.get("NOTEBOOK_DIR") or "/home/jovyan/work/"
 c.SwarmSpawner.notebook_dir = notebook_dir
+c.SwarmSpawner.jupyterhub_service_name = "jupyterhub"
+c.SwarmSpawner.networks = ["jh_test"]
 
 sshfs_mount = [
     SSHFSMounter(
@@ -42,13 +41,6 @@ sshfs_mount = [
         }
     )
 ]
-
-# 'args' is the command to run inside the service
-# These are run inside every service
-c.SwarmSpawner.container_spec = {
-    "command": "start-notebook.sh",
-    "args": ["--NotebookApp.default_url=/lab"],
-}
 
 # Before the user can select which image to spawn,
 # user_options has to be enabled

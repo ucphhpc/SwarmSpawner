@@ -2,3 +2,4 @@ docker>=5.0.*
 jupyterhub>=3.*
 flatten_dict>=0.4.*
 jhub-authenticators>=0.3.*
+traitlets>=5.3.*

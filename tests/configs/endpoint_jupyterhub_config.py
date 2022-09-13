@@ -25,10 +25,5 @@ c.SwarmSpawner.images = [
     }
 ]
 
-c.SwarmSpawner.container_spec = {
-    "command": "start-notebook.sh",
-    "args": ["--NotebookApp.default_url=/lab"],
-}
-
 c.JupyterHub.authenticator_class = "jhubauthenticators.DummyAuthenticator"
 c.DummyAuthenticator.password = "just magnets"

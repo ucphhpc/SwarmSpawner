@@ -15,16 +15,9 @@ c.JupyterHub.cleanup_servers = False
 
 # First pulls can be really slow, so let's give it a big timeout
 c.SwarmSpawner.start_timeout = 60 * 5
-
+c.SwarmSpawner.notebook_dir = "~/work"
 c.SwarmSpawner.jupyterhub_service_name = "jupyterhub"
-
 c.SwarmSpawner.networks = ["jupyterhub_default"]
-
-c.SwarmSpawner.container_spec = {
-    "command": "start-notebook.sh",
-    "args": ["--NotebookApp.default_url=/lab"],
-    "env": {"NOTEBOOK_DIR": "/home/jovyan/work"},
-}
 
 c.SwarmSpawner.use_user_options = True
 
@@ -33,6 +26,5 @@ c.SwarmSpawner.images = [
     {
         "image": "ucphhpc/base-notebook:latest",
         "name": "Base Notebook",
-        "env": {"NOTEBOOK_DIR": "/home/jovyan"},
     },
 ]

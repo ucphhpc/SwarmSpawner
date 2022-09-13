@@ -18,8 +18,3 @@ c.SwarmSpawner.start_timeout = 60 * 5
 c.SwarmSpawner.jupyterhub_service_name = "jupyterhub"
 
 c.SwarmSpawner.networks = ["jupyterhub_default"]
-
-c.SwarmSpawner.container_spec = {
-    "command": "start-notebook.sh",
-    "args": ["--NotebookApp.default_url=/lab"],
-}

@@ -40,7 +40,8 @@ rand_key = "".join(SystemRandom().choice("0123456789abcdef") for _ in range(32))
 hub_path = dirname(dirname(__file__))
 hub_image = {"path": hub_path, "tag": HUB_IMAGE_TAG, "rm": True, "pull": False}
 
-
+# If the test host has multiple interfaces that the
+# swarm can listen, use -> advertise_addr': 'host-ip'
 swarm_config = {}
 network_config = {
     "name": NETWORK_NAME,

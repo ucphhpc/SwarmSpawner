@@ -14,19 +14,13 @@ c.JupyterHub.cleanup_servers = False
 
 # First pulls can be really slow, so let's give it a big timeout
 c.SwarmSpawner.start_timeout = 60 * 5
-
+c.SwarmSpawner.notebook_dir = "~/work"
 c.SwarmSpawner.jupyterhub_service_name = "jupyterhub"
-
 c.SwarmSpawner.networks = ["jupyterhub_default"]
 
-home_dir = "/home/jovyan/work"
-
+home_dir = os.path.join(os.sep, "home", "jovyan", "work")
 mounts = [{"type": "volume", "source": "", "target": home_dir}]
 
 c.SwarmSpawner.container_spec = {
-    # The command to run inside the service
-    "command": "start-notebook.sh",
-    "args": ["--NotebookApp.default_url=/lab"],
-    "env": {"NOTEBOOK_DIR": home_dir},
     "mounts": mounts,
 }

@@ -48,3 +48,4 @@ pipelines:
       TEST_DIRECTORY: swarmspawner_accelerator_selection
       PUSH_DIRECTORY: publish-python-scripts
     template: bare_metal_pypi_package
+

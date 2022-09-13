@@ -14,14 +14,10 @@ c.JupyterHub.hub_ip = "0.0.0.0"
 # First pulls can be really slow, so let's give it a big timeout
 c.SwarmSpawner.start_timeout = 60 * 5
 
+c.SwarmSpawner.notebook_dir = "~/work"
 c.SwarmSpawner.jupyterhub_service_name = "jupyterhub"
 c.SwarmSpawner.networks = ["jupyterhub_default"]
 
-c.SwarmSpawner.container_spec = {
-    "command": "start-notebook.sh",
-    "args": ["--NotebookApp.default_url=/lab"],
-}
-
 c.SwarmSpawner.images = [
-    {"image": "ucphhpc/python-notebook", "name": "Python Notebook"}
+    {"image": "ucphhpc/base-notebook:latest", "name": "Python Notebook"}
 ]

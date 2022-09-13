@@ -28,7 +28,5 @@ tmpfs_mounts = [
 ]
 
 c.SwarmSpawner.container_spec = {
-    "command": "start-notebook.sh",
-    "args": ["--NotebookApp.default_url=/lab"],
     "mounts": tmpfs_mounts,
 }
