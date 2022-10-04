@@ -1,16 +1,16 @@
 import os
 from jhub.mount import SSHFSMounter
+from jhubauthenticators import RegexUsernameParser
 
 c = get_config()
 
 c.JupyterHub.ip = "0.0.0.0"
 c.JupyterHub.hub_ip = "0.0.0.0"
-c.JupyterHub.debug_proxy = True
 
-# Authenticator -> remote user header
-c.JupyterHub.authenticator_class = "jhubauthenticators.DataRemoteUserAuthenticator"
-c.DataRemoteUserAuthenticator.data_headers = ["Mount"]
+# Authenticator -> Remote-User header value
+c.JupyterHub.authenticator_class = "jhubauthenticators.HeaderAuthenticator"
 c.Authenticator.enable_auth_state = True
+c.HeaderAuthenticator.user_external_allow_attributes = ["mount_data"]
 
 notebook_dir = os.environ.get("NOTEBOOK_DIR") or os.path.join(
     os.sep, "home", "jovyan", "work"
@@ -26,18 +26,19 @@ sshfs_mount = [
     SSHFSMounter(
         {
             "type": "volume",
-            "driver_config": "ucphhpc/sshfs:latest",
-            "driver_options": {
-                "sshcmd": "{sshcmd}",
-                "id_rsa": "{id_rsa}",
-                "one_time": "True",
-                "allow_other": "",
-                "reconnect": "",
-                "port": "2222",
+            "driver_config": {
+                "name": "ucphhpc/sshfs:latest",
+                "options": {
+                    "sshcmd": "{username}@{targetHost}:{targetPath}",
+                    "id_rsa": "{privateKey}",
+                    "allow_other": "",
+                    "reconnect": "",
+                    "port": "{port}",
+                },
             },
-            "source": "sshvolume-user-{username}",
+            "source": "sshvolume-user-{name}",
             "target": "/home/jovyan/work",
-            "labels": {"keep": "False"},
+            "labels": {"autoremove": "True"},
         }
     )
 ]
@@ -56,3 +57,7 @@ c.SwarmSpawner.images = [
         "placement": {"constraints": []},
     }
 ]
+
+# Which user state varibales should be used to format the service config
+c.SwarmSpawner.user_format_attributes = ["mount_data", "name"]
+

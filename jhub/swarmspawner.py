@@ -67,9 +67,12 @@ class SwarmSpawner(Spawner):
             }
         ],
         minlen=1,
-        config=True,
-        help="Docker images that are available to the user of the host",
-    )
+        help=dedent(
+            """
+            Docker images that are available to the user of the host.
+        """
+        ),
+    ).tag(config=True)
 
     form_template = Unicode(
         """
@@ -77,25 +80,30 @@ class SwarmSpawner(Spawner):
         <select class="form-control" name="select_image" required autofocus>
             {option_template}
         </select>""",
-        config=True,
-        help="Form template.",
-    )
+        help=dedent(
+            """
+            Form template.
+        """
+        ),
+    ).tag(config=True)
 
     option_template = Unicode(
         """<option value="{value}">{name}</option>""",
-        config=True,
-        help="Template for html form options.",
-    )
-    _executor = None
+        help=dedent(
+            """
+            Template for html form options.
+        """
+        ),
+    ).tag(config=True)
 
-    disabled_form = Unicode()
+    _executor = None
 
     @default("options_form")
     def _options_form(self):
         """Return the form with the drop-down menu."""
         # User options not enabled -> return default jupyterhub form
         if not self.use_user_options:
-            return self.disabled_form
+            return Unicode()
         template_options = []
         for di in self.images:
             value = dict(image=di["image"], name=di["name"])
@@ -191,78 +199,129 @@ class SwarmSpawner(Spawner):
         return cls._client
 
     service_id = Unicode()
-    service_port = Int(8888, min=1, max=65535, config=True)
-    service_image = Unicode("jupyterhub/singleuser", config=True)
-    service_prefix = Unicode(
-        "jupyter",
-        config=True,
+
+    service_port = Int(
+        8888,
+        min=1,
+        max=65535,
         help=dedent(
             """
-            Prefix for service names. The full service name for a particular
-            user will be <prefix>-<hash(username)>-<server_name>.
+                The port on which the spawned service should listen.
             """
         ),
-    )
+    ).tag(config=True)
+
+    service_prefix = Unicode(
+        "jupyter",
+        help=dedent(
+            """
+                Prefix for service names. The full service name for a particular
+                user will be <prefix>-<hash(username)>-<server_name>.
+            """
+        ),
+    ).tag(config=True)
+
     tls_config = Dict(
-        config=True,
         help=dedent(
             """Arguments to pass to docker TLS configuration.
             Check for more info:
             http://docker-py.readthedocs.io/en/stable/tls.html
             """
         ),
-    )
+    ).tag(config=True)
 
-    container_spec = Dict({}, config=True, help="Params to create the service")
+    container_spec = Dict(
+        {},
+        help=dedent(
+            """
+            Params to create the service.
+            """
+        ),
+    ).tag(config=True)
 
     log_driver = Dict(
         {},
-        config=True,
-        help=dedent("""Which logging driver should be used for each service"""),
-    )
+        help=dedent(
+            """
+            Which logging driver should be used for each service.
+            """
+        ),
+    ).tag(config=True)
 
-    resource_spec = Dict({}, config=True, help="Params about cpu and memory limits")
+    resource_spec = Dict(
+        {},
+        help=dedent(
+            """
+            Params about cpu and memory limits.
+            """
+        ),
+    ).tag(config=True)
 
     accelerators = List(
         trait=Dict(),
-        config=True,
-        help=dedent("""Params about which accelerators should be attached"""),
-    )
+        help=dedent(
+            """
+            Params about which accelerators should be attached to the service.
+            """
+        ),
+    ).tag(config=True)
 
     placement = Dict(
         {},
-        config=True,
-        help=dedent("""List of placement constraints for all images"""),
-    )
+        help=dedent(
+            """
+            List of placement constraints for all images.
+            """
+        ),
+    ).tag(config=True)
 
     networks = List(
         [],
-        config=True,
         help=dedent(
-            """Additional args to create_host_config for service create
-                        """
+            """
+            Additional args to create_host_config for service create.
+            """
         ),
-    )
+    ).tag(config=True)
+
     configs = List(
-        trait=Dict(), config=True, help=dedent("""Configs to attach to the service""")
-    )
+        trait=Dict(),
+        help=dedent(
+            """
+            Configs to attach to the service.
+            """
+        ),
+    ).tag(config=True)
 
     use_user_options = Bool(
         False,
-        config=True,
         help=dedent(
-            """the spawner will use the dict passed through the form
-                                or as json body when using the Hub Api
-                                """
+            """
+            The spawner will use the dict passed through the form
+                                or as json body when using the Hub Api.
+            """
         ),
-    )
+    ).tag(config=True)
+
     jupyterhub_service_name = Unicode(
-        config=True,
         help=dedent(
-            """Name of the service running the JupyterHub
-                                          """
+            """
+            Name of the service running the JupyterHub.
+            """
         ),
-    )
+    ).tag(config=True)
+
+    user_format_attributes = List(
+        default_value=[],
+        traits=[Unicode()],
+        allow_none=True,
+        help=dedent(
+            """
+            List of JupyterHub user attributes that are used to format Spawner
+            State attributes.
+            """
+        ),
+    ).tag(config=True)
 
     @property
     def tls_client(self):
@@ -280,9 +339,7 @@ class SwarmSpawner(Spawner):
         if self._service_owner is None:
             m = hashlib.md5()
             m.update(self.user.name.encode("utf-8"))
-            if hasattr(self.user, "real_name"):
-                self._service_owner = self.user.real_name[-32:]
-            elif hasattr(self.user, "name"):
+            if hasattr(self.user, "name"):
                 # Maximum 63 characters, 10 are comes from the underlying format
                 # i.e. prefix=jupyter-, postfix=-1
                 # get up to last 32 characters as service identifier
@@ -657,16 +714,27 @@ class SwarmSpawner(Spawner):
             if "mounts" in selected_image:
                 mounts.extend(selected_image["mounts"])
 
+            # Prepare the dictionary that can be used
+            # to format the mount config
+            format_mount_kwargs = {}
+            if self.user_format_attributes:
+                for attr in self.user_format_attributes:
+                    if hasattr(self.user, attr):
+                        value = getattr(self.user, attr)
+                        if not isinstance(value, dict):
+                            value = {attr: value}
+                        format_mount_kwargs[attr] = value
+
+            # Mounts can be declared as regular dictionaries
+            # or as special Mountable objects (see mount.py)
             for mount in mounts:
                 if isinstance(mount, dict):
                     m = VolumeMounter(mount)
-                    m = yield m.create(owner=self.service_owner)
+                    m = yield m.create(**format_mount_kwargs)
                 else:
-                    # Expects a mount_class that supports 'create'
-                    if hasattr(self.user, "data"):
-                        m = yield mount.create(self.user.data, owner=self.service_owner)
-                    else:
-                        m = yield mount.create(owner=self.service_owner)
+                    # Custom type mount defined
+                    # Is instantiated in the config
+                    m = yield mount.create(**format_mount_kwargs)
                 container_spec["mounts"].append(m)
 
             # Some envs are required by the single-user-image
@@ -866,16 +934,14 @@ class SwarmSpawner(Spawner):
             if "user" in selected_image:
                 container_spec.update({"user": str(selected_image["user"])})
 
-            dynamic_holders = [Spawner, self, self.user]
-            if hasattr(self.user, "data"):
-                dynamic_holders.append(self.user.data)
-
-            # Expand container_spec before start
-            for construct in dynamic_holders:
+            dynamic_value_owners = [Spawner, self, self.user]
+            # Format container_spec with data from the
+            # potential dynamic owners
+            for dynamic_owner in dynamic_value_owners:
                 try:
-                    if not hasattr(construct, "__dict__"):
+                    if not hasattr(dynamic_owner, "__dict__"):
                         continue
-                    recursive_format(container_spec, construct.__dict__)
+                    recursive_format(container_spec, dynamic_owner.__dict__)
                 except TypeError:
                     pass
 
@@ -989,7 +1055,7 @@ class SwarmSpawner(Spawner):
                 for volume in volumes:
                     labels = volume.get("VolumeOptions", {}).get("Labels", {})
                     # Whether the volume should be kept
-                    if "keep" in labels and labels["keep"] != "True":
+                    if "autoremove" in labels and labels["autoremove"] != "False":
                         self.log.debug("Volume {} is not kept".format(volume))
                         if "Source" in volume:
                             # Validate the volume exists
@@ -1001,7 +1067,7 @@ class SwarmSpawner(Spawner):
                                 yield self.remove_volume(volume["Source"])
                         else:
                             self.log.error(
-                                "Volume {} didn't have a Source key so it "
+                                "Volume {} didn't have a 'Source' key so it "
                                 "can't be removed".format(volume)
                             )
 

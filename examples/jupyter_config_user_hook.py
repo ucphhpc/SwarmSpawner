@@ -69,14 +69,14 @@ c.SwarmSpawner.images = [
         "name": "Base Notebook",
         "image": "ucphhpc/base-notebook",
         "env": {
-            "NB_USER": "{_service_owner}",
+            "NB_USER": "{service_owner}",
             "NB_UID": "{uid}",
-            "HOME": "/home/{_service_owner}",
+            "HOME": "/home/{service_owner}",
             "CHOWN_HOME": "yes",
             "GRANT_SUDO": "no",
         },
         "uid_gid": "root",
-        "command": "/bin/bash -c 'mkdir -p /home/{_service_owner}; /usr/local/bin/start-notebook.sh'",
+        "command": "/bin/bash -c 'mkdir -p /home/{service_owner}; /usr/local/bin/start-notebook.sh'",
         "args": ["--NotebookApp.default_url=/lab"],
     },
 ]

@@ -101,9 +101,7 @@ def test_sshfs_mount_hub(image, swarm, network, make_service):
             assert state != "failed"
 
     username = "testuser"
-    # Auth header
-    test_logger.info("Authenticating with user: {}".format(username))
-    auth_header = {"Remote-User": username}
+    # Wait for Jupyterhub is running
     assert wait_for_site(JHUB_URL, valid_status_code=401) is True
 
     mount_volume_name = "sshvolume-user-{}".format(username)
@@ -113,6 +111,12 @@ def test_sshfs_mount_hub(image, swarm, network, make_service):
         assert remove_volume(client, mount_volume_name)
 
     with requests.Session() as s:
+        # Login
+        auth_header = {"Remote-User": username}
+        login_response = s.post(JHUB_URL + "/hub/login", headers=auth_header)
+        test_logger.info("Login response message: {}".format(login_response.text))
+        assert login_response.status_code == 200
+
         auth_url = urljoin(JHUB_URL, "/hub/home")
         login_response = s.get(auth_url, headers=auth_header)
         test_logger.info("Home response message: {}".format(login_response.text))
@@ -139,23 +143,28 @@ def test_sshfs_mount_hub(image, swarm, network, make_service):
         user_image = "ucphhpc/base-notebook:latest"
         user_image_name = "Base Notebook"
         payload = {"select_image": [{"image": user_image, "name": user_image_name}]}
-        json_payload = json.dumps(payload)
+        user_image_selection = json.dumps(payload)
 
-        target_user = "mountuser"
+        target_username = "mountuser"
         ssh_host_target = socket.gethostname()
-        mount_info = {
-            "HOST": "DUMMY",
-            "USERNAME": target_user,
-            "PATH": "".join(["@", ssh_host_target, ":"]),
-            "PRIVATEKEY": private_key,
+
+        user_sshfs_mount_data = {
+            "username": target_username,
+            "targetHost": ssh_host_target,
+            "targetPath": "",
+            "privateKey": private_key,
+            "port": 2222,
         }
-        mount_header = dict(Mount=str(mount_info))
-        mount_header.update(auth_header)
-        mount_resp = s.post(JHUB_URL + "/hub/data", headers=mount_header)
+        # Header values must be of str type
+        user_mount_data = json.dumps({"mount_data": user_sshfs_mount_data})
+        mount_resp = s.post(
+            JHUB_URL + "/hub/set-user-data", data=user_mount_data, headers=auth_header
+        )
+
         test_logger.info("Hub Data response message: {}".format(mount_resp.text))
         assert mount_resp.status_code == 200
         spawn_resp = s.post(
-            JHUB_URL + "/hub/spawn", data=json_payload, headers=mount_header
+            JHUB_URL + "/hub/spawn", data=user_image_selection, headers=auth_header
         )
 
         test_logger.info("Spawn POST response message: {}".format(spawn_resp.text))
