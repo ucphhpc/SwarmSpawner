@@ -130,7 +130,7 @@ The individual dictionaries also makes it possible to define whether the image s
         {'image': 'jupyter/base-notebook:30f16d52126f',
          'name': 'Minimal python notebook'},
         {'image': 'jupyter/base-notebook:latest',
-         'name': 'Image with automatic {replace_me} mount, supports Py2/3 and R,',
+         'name': 'Image with automatic mount, supports Py2/3 and R,',
          'mounts': mounts}
     ]
 
@@ -208,12 +208,12 @@ If the volume doesn't exist it will be created.
 
 Named path
 --------------
-For both types, volume and bind, you can specify a ``{username}`` inside the source:
+For both types, volume and bind, you can specify a ``{name}`` inside the source:
 
 .. code-block:: python
 
         mounts = [{'type' : 'volume',
-                'source' : 'jupyterhub-user-{username}',
+                'source' : 'jupyterhub-user-{name}',
                 'target' : 'MountPointInsideTheContainer',}]
 
 
@@ -266,7 +266,7 @@ label flag. e.g.
 .. code-block:: python
 
         mounts = [{'type' : 'volume',
-                'source' : 'jupyterhub-user-{username}',
+                'source' : 'jupyterhub-user-{name}',
                 'target' : 'MountPointInsideTheContainer',
                 'label': {'autoremove': 'True'}}]
 
@@ -275,7 +275,7 @@ Or
 .. code-block:: python
 
         mounts = [{'type' : 'volume',
-                'source' : 'jupyterhub-user-{username}',
+                'source' : 'jupyterhub-user-{name}',
                 'target' : 'MountPointInsideTheContainer',
                 'label': {'autoremove': 'False'}}]
 
