@@ -250,7 +250,7 @@ in addition the typical sshfs flags are supported, defaults to port 22
                                        'big_writes': '', 'allow_other': '',
                                        'reconnect': '', 'port': '2222', 'autoremove': 'True'},
                     }
-                    'source': 'sshvolume-user-{_service_owner}',
+                    'source': 'sshvolume-user-{name}',
                     'target': '/home/jovyan/work'})]
 
 
