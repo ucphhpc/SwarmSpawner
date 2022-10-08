@@ -50,7 +50,7 @@ hub_image = {"path": hub_path, "tag": HUB_IMAGE_TAG, "rm": True, "pull": False}
 
 # swarm config
 # If the test host has multiple interfaces that the
-# swarm can listen, use -> advertise_addr': 'host-ip'
+# swarm can listen, use -> 'advertise_addr': 'host-ip'
 swarm_config = {}
 network_config = {
     "name": NETWORK_NAME,
