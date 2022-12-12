@@ -872,7 +872,11 @@ class SwarmSpawner(Spawner):
                             if cc["Spec"]["Name"] == c["config_name"]
                         ]
                         if not config_ids:
-                            self.log.error("A config with name {} could not be found")
+                            self.log.error(
+                                "A config with name {} could not be found".format(
+                                    c["config_name"]
+                                )
+                            )
                             raise Exception(config_error_msg)
                         c["config_id"] = config_ids[0]
 
