@@ -818,9 +818,6 @@ class SwarmSpawner(Spawner):
             if user_options.get("placement") is not None:
                 placement = user_options.get("placement")
 
-            # Image to spawn
-            image = selected_image["image"]
-
             # Image resources
             if "resource_spec" in selected_image:
                 resource_spec = selected_image["resource_spec"]
@@ -962,6 +959,8 @@ class SwarmSpawner(Spawner):
                     log_driver_options = log_driver["options"]
 
             # Create the service
+            # Image to spawn
+            image = selected_image["image"]
             container_spec = ContainerSpec(image, **container_spec)
             resources = Resources(**resource_spec)
             placement = Placement(**placement)

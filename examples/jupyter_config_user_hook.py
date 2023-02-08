@@ -6,6 +6,7 @@ user_start_id = 10000
 cur_path = os.path.join("/srv/jupyterhub/")
 db_path = os.path.join(cur_path, "user_uid.db")
 
+
 # Simple method to generate a uid for the user
 def simple_user_id(spawner):
     user = spawner.user

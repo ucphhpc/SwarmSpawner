@@ -60,4 +60,3 @@ c.SwarmSpawner.images = [
 
 # Which user state varibales should be used to format the service config
 c.SwarmSpawner.user_format_attributes = ["mount_data", "name"]
-
