@@ -155,7 +155,7 @@ def wait_for_service_task(
 
 def wait_for_service_msg(client, service, timeout=60, msg="", logs_kwargs=None):
     if not logs_kwargs:
-        logs_kw
+        logs_kwargs = {}
 
     attempts = 0
     while attempts < timeout:
