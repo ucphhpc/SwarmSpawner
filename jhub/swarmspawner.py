@@ -935,9 +935,13 @@ class SwarmSpawner(Spawner):
             if "user" in selected_image:
                 container_spec.update({"user": str(selected_image["user"])})
 
-            # Whether the image sets a workdir
+            # Global container workdir
+            if "workdir" in container_spec:
+                container_spec["workdir"] = str(container_spec["workdir"])
+
+            # Image workdir
             if "workdir" in selected_image:
-                container_spec["workdir"] = selected_image["workdir"]
+                container_spec.update({"workdir": str(selected_image["workdir"])})
 
             dynamic_value_owners = [Spawner, self, self.user]
             # Format container_spec with data from the

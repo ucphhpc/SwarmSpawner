@@ -153,6 +153,22 @@ def wait_for_service_task(
     return None
 
 
+def wait_for_service_msg(client, service, timeout=60, msg="", logs_kwargs=None):
+    if not logs_kwargs:
+        logs_kw
+
+    attempts = 0
+    while attempts < timeout:
+        logs = get_service(client, service).logs(**logs_kwargs)
+        for log in logs:
+            string_log = str(log)
+            if msg in string_log:
+                return True
+        attempts += 1
+        time.sleep(1)
+    return False
+
+
 def get_site(session, url, headers=None, valid_status_code=200):
     if not headers:
         headers = {}

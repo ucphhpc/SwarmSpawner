@@ -22,6 +22,7 @@ from util import (
     remove_volume,
     wait_for_session,
     wait_for_service_task,
+    wait_for_service_msg,
     wait_for_site,
 )
 
@@ -51,7 +52,7 @@ hub_image = {"path": hub_path, "tag": HUB_IMAGE_TAG, "rm": True, "pull": False}
 # swarm config
 # If the test host has multiple interfaces that the
 # swarm can listen, use -> 'advertise_addr': 'host-ip'
-swarm_config = {"advertise_addr": ""}
+swarm_config = {}
 network_config = {
     "name": NETWORK_NAME,
     "driver": "overlay",
@@ -121,6 +122,14 @@ def test_sshfs_mount_hub(image, swarm, network, make_service):
         login_response = s.get(auth_url, headers=auth_header)
         test_logger.info("Home response message: {}".format(login_response.text))
         assert login_response.status_code == 200
+
+        # Wait for the OpenSSH server to be ready
+        assert wait_for_service_msg(
+            client,
+            MOUNT_SERVICE_NAME,
+            msg="Running the OpenSSH Server",
+            logs_kwargs={"stdout": True, "stderr": True},
+        )
 
         private_key = ""
         # Extract mount target ssh private key
