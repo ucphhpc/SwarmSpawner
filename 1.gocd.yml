@@ -3,10 +3,10 @@ environments:
     environments:
       GIT_USER: "{{SECRET:[github][username]}}"
     pipelines:
-      - swarmspawner_main
+      - swarmspawner_master
       - swarmspawner_accelerator_selection
 pipelines:
-  swarmspawner_main:
+  swarmspawner_master:
     group: bare_metal_pypi_package
     locking: off
     materials:
@@ -14,7 +14,7 @@ pipelines:
         # says about type of material and url at once
         git: https://github.com/ucphhpc/SwarmSpawner.git
         branch: master
-        destination: swarmspawner_main
+        destination: swarmspawner_master
       publish_python_git:
         git: https://github.com/rasmunk/publish-python-scripts.git
         branch: main
@@ -23,8 +23,8 @@ pipelines:
         destination: publish-python-scripts
     parameters:
       ARGS: ''
-      SRC_DIRECTORY: swarmspawner_main
-      TEST_DIRECTORY: swarmspawner_main
+      SRC_DIRECTORY: swarmspawner_master
+      TEST_DIRECTORY: swarmspawner_master
       PUSH_DIRECTORY: publish-python-scripts
     template: bare_metal_pypi_package
   swarmspawner_accelerator_selection:
