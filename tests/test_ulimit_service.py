@@ -123,7 +123,6 @@ def test_ulimit_service(image, swarm, network, make_service):
         container = client.containers.get(running_task["Status"]["ContainerStatus"]["ContainerID"])
         # TODO, assert the ulimit
 
-
         # Remove via the web interface
         delete_headers = {"Referer": urljoin(JHUB_URL, "/hub/home"), "Origin": JHUB_URL}
 
