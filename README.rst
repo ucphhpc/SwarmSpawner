@@ -289,56 +289,6 @@ You can also specify some resource for each service
                         'mem_reservation' : int(512 * 1e6), # (int) – Memory reservation in Bytes
                         }
 
-Using user_options
---------------------
-
-To control the creation of the services you have 2 ways, using **jupyterhub_config.py** or **user_options**.
-
-Remember that at the end you are just using the `Docker Engine API <https://docs.docker.com/engine/api/>`_.
-
-**user_options, if used, will overwrite jupyter_config.py for services.**
-
-If you set ``c.SwarmSpawner.use_user_option = True`` the spawner will use the dict passed through the form or as json body when using the Hub Api.
-
-The spawner expect a dict with these keys:
-
-.. code-block:: python
-
-        user_options = {
-                'container_spec' : {
-                        # (string or list) command to run in the image.
-                        'args' : ['/usr/local/bin/start-singleuser.sh'],
-                        # name of the image
-                        'Image' : '',
-                        'mounts' : mounts,
-                        '
-                        
-                        
-                        
-                        
-                        
-                        
-                        
-                        ' : {
-                                # (int) – CPU limit in units of 10^9 CPU shares.
-                                'cpu_limit': int(1 * 1e9),
-                                # (int) – Memory limit in Bytes.
-                                'mem_limit': int(512 * 1e6),
-                                # (int) – CPU reservation in units of 10^9 CPU shares.
-                                'cpu_reservation': int(1 * 1e9),
-                                # (int) – Memory reservation in bytes
-                                'mem_reservation': int(512 * 1e6),
-                                },
-                        # dict of constraints
-                        'placement' : {'constraints': []},
-                        # list of networks
-                        'network' : [],
-                        # name of service
-                        'name' : ''
-                        }
-                }
-
-
 Names of the Jupyter notebook service inside Docker engine in Swarm mode
 --------------------------------------------------------------------------
 
