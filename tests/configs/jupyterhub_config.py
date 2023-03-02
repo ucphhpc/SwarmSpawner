@@ -16,19 +16,12 @@ c.SwarmSpawner.jupyterhub_service_name = "jupyterhub"
 
 c.SwarmSpawner.networks = ["jh_test"]
 
-# 'args' is the command to run inside the service
-# These are run inside every service
-c.SwarmSpawner.container_spec = {
-    "command": "start-notebook.sh",
-    "args": ["--NotebookApp.default_url=/lab"],
-}
-
 # Before the user can select which image to spawn,
 # user_options has to be enabled
 c.SwarmSpawner.use_user_options = True
 
 # Available docker images the user can spawn
 c.SwarmSpawner.images = [
-    {"image": "nielsbohr/base-notebook:latest", "name": "Basic Python Notebook"},
-    {"image": "nielsbohr/base-notebook:latest", "name": "Basic Python Notebook 2"},
+    {"image": "ucphhpc/base-notebook:latest", "name": "Basic Python Notebook"},
+    {"image": "ucphhpc/base-notebook:latest", "name": "Basic Python Notebook 2"},
 ]

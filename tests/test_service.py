@@ -19,7 +19,7 @@ from util import (
 )
 
 HUB_IMAGE_TAG = "hub:test"
-MOUNT_IMAGE_TAG = "nielsbohr/ssh-mount-dummy"
+MOUNT_IMAGE_TAG = "ucphhpc/ssh-mount-dummy"
 NETWORK_NAME = "jh_test"
 HUB_SERVICE_NAME = "jupyterhub"
 MOUNT_SERVICE_NAME = "mount_target"
@@ -40,7 +40,8 @@ rand_key = "".join(SystemRandom().choice("0123456789abcdef") for _ in range(32))
 hub_path = dirname(dirname(__file__))
 hub_image = {"path": hub_path, "tag": HUB_IMAGE_TAG, "rm": True, "pull": False}
 
-
+# If the test host has multiple interfaces that the
+# swarm can listen, use -> 'advertise_addr': 'host-ip'
 swarm_config = {}
 network_config = {
     "name": NETWORK_NAME,
@@ -96,7 +97,7 @@ def test_creates_service(image, swarm, network, make_service):
         assert spawn_form_resp.status_code == 200
         assert "Select a notebook image" in spawn_form_resp.text
 
-        payload = {"dockerimage": "nielsbohr/base-notebook:latest"}
+        payload = {"dockerimage": "ucphhpc/base-notebook:latest"}
         spawn_resp = s.post(JHUB_URL + "/hub/spawn", data=payload)
         test_logger.info("Spawn POST response message: {}".format(spawn_resp.text))
         assert spawn_resp.status_code == 200
@@ -110,7 +111,7 @@ def test_creates_service(image, swarm, network, make_service):
 
         # Verify that a task is succesfully running
         running_task = wait_for_service_task(
-            client, spawned_service, filters={"desired-state": "running"}
+            client, spawned_service, filters={"desired-state": "running"}, timeout=300
         )
         assert running_task
 
@@ -124,7 +125,7 @@ def test_creates_service(image, swarm, network, make_service):
         delete_url = urljoin(JHUB_URL, "/hub/api/users/{}/server".format(jhub_user))
 
         pending = True
-        num_wait, max_wait = 0, 15
+        num_wait, max_wait = 0, 30
         while pending or num_wait > max_wait:
             num_wait += 1
             resp = s.delete(delete_url, headers=delete_headers)
@@ -177,7 +178,7 @@ def test_image_selection(image, swarm, network, make_service):
         assert spawn_form_resp.status_code == 200
         assert "Select a notebook image" in spawn_form_resp.text
 
-        user_image = "nielsbohr/base-notebook:latest"
+        user_image = "ucphhpc/base-notebook:latest"
         user_image_name = "Basic Python Notebook"
 
         payload = {"name": user_image_name, "image": user_image}
@@ -201,7 +202,7 @@ def test_image_selection(image, swarm, network, make_service):
 
         # Verify that a task is succesfully running
         running_task = wait_for_service_task(
-            client, spawned_service, filters={"desired-state": "running"}
+            client, spawned_service, filters={"desired-state": "running"}, timeout=300
         )
         assert running_task
 

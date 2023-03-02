@@ -6,6 +6,7 @@ user_start_id = 10000
 cur_path = os.path.join("/srv/jupyterhub/")
 db_path = os.path.join(cur_path, "user_uid.db")
 
+
 # Simple method to generate a uid for the user
 def simple_user_id(spawner):
     user = spawner.user
@@ -67,16 +68,16 @@ c.SwarmSpawner.pre_spawn_hook = simple_user_id
 c.SwarmSpawner.images = [
     {
         "name": "Base Notebook",
-        "image": "nielsbohr/base-notebook",
+        "image": "ucphhpc/base-notebook",
         "env": {
-            "NB_USER": "{_service_owner}",
+            "NB_USER": "{service_owner}",
             "NB_UID": "{uid}",
-            "HOME": "/home/{_service_owner}",
+            "HOME": "/home/{service_owner}",
             "CHOWN_HOME": "yes",
             "GRANT_SUDO": "no",
         },
         "uid_gid": "root",
-        "command": "/bin/bash -c 'mkdir -p /home/{_service_owner}; /usr/local/bin/start-notebook.sh'",
+        "command": "/bin/bash -c 'mkdir -p /home/{service_owner}; /usr/local/bin/start-notebook.sh'",
         "args": ["--NotebookApp.default_url=/lab"],
     },
 ]

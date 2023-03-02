@@ -47,6 +47,12 @@ maintainer-clean:
 	@echo 'deletes files that may need special tools to rebuild.'
 	$(MAKE) distclean
 
+install-dev:
+	$(VENV)/pip install -r requirements-dev.txt
+
+uninstall-dev:
+	$(VENV)/pip uninstall -y -r requirements-dev.txt
+
 install-dep:
 	$(VENV)/pip install -r requirements.txt
 
@@ -60,6 +66,15 @@ uninstall:
 
 uninstallcheck:
 	$(VENV)/pip uninstall -y -r tests/requirements.txt
+	@echo
+	@echo "*** WARNING ***"
+	@echo "*** Deleting every ucphhpc/sshfs:latest volume in 10 seconds ***"
+	@echo "*** Hit Ctrl-C to abort to preserve any local user and cert data ***"
+	@echo
+	@sleep 10
+	if [ "$$(docker volume ls -q -f 'driver=ucphhpc/sshfs:latest')" != "" ]; then\
+		docker volume rm -f $$(docker volume ls -q -f 'driver=ucphhpc/sshfs:latest');\
+	fi
 	docker plugin disable ucphhpc/sshfs:latest
 	docker plugin rm ucphhpc/sshfs:latest
 

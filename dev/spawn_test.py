@@ -1,7 +1,7 @@
 import requests
 
 JHUB_URL = "http://127.0.0.1"
-IMAGE_NAME = "nielsbohr/base-notebook"
+IMAGE_NAME = "ucphhpc/base-notebook"
 
 if __name__ == "__main__":
     # Make spawn request

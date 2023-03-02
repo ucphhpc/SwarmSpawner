@@ -20,16 +20,11 @@ c.SwarmSpawner.jupyterhub_service_name = "jupyterhub"
 
 c.SwarmSpawner.networks = ["jupyterhub_default"]
 
-c.SwarmSpawner.container_spec = {
-    "command": "start-notebook.sh",
-    "args": ["--NotebookApp.default_url=/lab"],
-}
-
 c.SwarmSpawner.use_user_options = True
 
 c.SwarmSpawner.images = [
     {
-        "image": "nielsbohr/base-notebook:latest",
+        "image": "ucphhpc/base-notebook:latest",
         "name": "Default jupyter notebook",
         "endpoint_spec": {"ports": {8888: 8888}},
     }

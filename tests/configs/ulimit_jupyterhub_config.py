@@ -3,11 +3,9 @@ c = get_config()
 c.JupyterHub.ip = "0.0.0.0"
 c.JupyterHub.hub_ip = "0.0.0.0"
 
-# Authenticator -> remote user header
-c.JupyterHub.authenticator_class = "jhubauthenticators.HeaderAuthenticator"
-c.Authenticator.enable_auth_state = True
-
-c.HeaderAuthenticator.user_external_allow_attributes = ["mount_data"]
+# Authenticator
+c.JupyterHub.authenticator_class = "jhubauthenticators.DummyAuthenticator"
+c.DummyAuthenticator.password = "just magnets"
 
 c.JupyterHub.spawner_class = "jhub.SwarmSpawner"
 
@@ -24,5 +22,14 @@ c.SwarmSpawner.use_user_options = True
 
 # Available docker images the user can spawn
 c.SwarmSpawner.images = [
-    {"image": "ucphhpc/base-notebook:latest", "name": "Basic Python Notebook"}
+    {"image": "ucphhpc/base-notebook:latest", "name": "Basic Python Notebook"},
+    {"image": "ucphhpc/base-notebook:latest", "name": "Basic Python Notebook 2"},
 ]
+
+# -1 should mean unlimited
+c.SwarmSpawner.container_spec = {
+    "ulimit": {
+        "soft": "-1",
+        "hard": "-1"
+    }
+}

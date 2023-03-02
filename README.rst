@@ -130,7 +130,7 @@ The individual dictionaries also makes it possible to define whether the image s
         {'image': 'jupyter/base-notebook:30f16d52126f',
          'name': 'Minimal python notebook'},
         {'image': 'jupyter/base-notebook:latest',
-         'name': 'Image with automatic {replace_me} mount, supports Py2/3 and R,',
+         'name': 'Image with automatic mount, supports Py2/3 and R,',
          'mounts': mounts}
     ]
 
@@ -208,12 +208,12 @@ If the volume doesn't exist it will be created.
 
 Named path
 --------------
-For both types, volume and bind, you can specify a ``{username}`` inside the source:
+For both types, volume and bind, you can specify a ``{name}`` inside the source:
 
 .. code-block:: python
 
         mounts = [{'type' : 'volume',
-                'source' : 'jupyterhub-user-{username}',
+                'source' : 'jupyterhub-user-{name}',
                 'target' : 'MountPointInsideTheContainer',}]
 
 
@@ -244,12 +244,13 @@ in addition the typical sshfs flags are supported, defaults to port 22
 
         mounts = [SSHFSMounter({
                     'type': 'volume',
-                    'driver_config': 'ucphhpc/sshfs:latest',
-                    'driver_options': {'sshcmd': '{sshcmd}', 'id_rsa': '{id_rsa}',
-                                       'one_time': 'True',
+                    'driver_config': {
+                        'name': 'ucphhpc/sshfs:latest',
+                        'options' : {'sshcmd': '{sshcmd}', 'id_rsa': '{id_rsa}',
                                        'big_writes': '', 'allow_other': '',
-                                       'reconnect': '', 'port': '2222'},
-                    'source': 'sshvolume-user-{username}',
+                                       'reconnect': '', 'port': '2222', 'autoremove': 'True'},
+                    }
+                    'source': 'sshvolume-user-{name}',
                     'target': '/home/jovyan/work'})]
 
 
@@ -258,16 +259,27 @@ Automatic removal of Volumes
 
 To enact that a volume should be removed when the service is being terminated, there
 are two options available, either use a ``anonymous`` volume as shown above, which will
-remove the volume when the owning sevice is removed. Or set the default volume label
-bool flag called ``keep`` to false, e.g.
+remove the volume when the owning sevice is removed. Otherwise you can control whether volumes 
+should be removed or not with the service with the ``autoremove``
+label flag. e.g.
 
 .. code-block:: python
 
         mounts = [{'type' : 'volume',
-                'source' : 'jupyterhub-user-{username}',
+                'source' : 'jupyterhub-user-{name}',
                 'target' : 'MountPointInsideTheContainer',
-                'label': {'keep': 'False'}}]
+                'label': {'autoremove': 'True'}}]
 
+Or
+
+.. code-block:: python
+
+        mounts = [{'type' : 'volume',
+                'source' : 'jupyterhub-user-{name}',
+                'target' : 'MountPointInsideTheContainer',
+                'label': {'autoremove': 'False'}}]
+
+With the default being 'False'.
 
 Resource_spec
 ---------------

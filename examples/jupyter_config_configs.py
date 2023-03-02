@@ -31,13 +31,8 @@ c.SwarmSpawner.jupyterhub_service_name = "jupyterhub"
 
 c.SwarmSpawner.networks = ["jupyterhub_default"]
 
-c.SwarmSpawner.container_spec = {
-    "command": "start-notebook.sh",
-    "args": ["--NotebookApp.default_url=/lab"],
-}
-
 c.SwarmSpawner.configs = configs
 
 c.SwarmSpawner.images = [
-    {"image": "nielsbohr/slurm-notebook:latest", "name": "Slurm notebook"}
+    {"image": "ucphhpc/slurm-notebook:latest", "name": "Slurm notebook"}
 ]

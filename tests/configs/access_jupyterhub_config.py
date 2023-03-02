@@ -21,16 +21,11 @@ access_list = ["privileged-user"]
 
 c.SwarmSpawner.images = [
     {
-        "image": "nielsbohr/base-notebook:latest",
+        "image": "ucphhpc/base-notebook:latest",
         "name": "Basic Python Notebook",
         "access": access_list,
     }
 ]
-
-c.SwarmSpawner.container_spec = {
-    "command": "start-notebook.sh",
-    "args": ["--NotebookApp.default_url=/lab"],
-}
 
 c.JupyterHub.authenticator_class = "jhubauthenticators.DummyAuthenticator"
 c.DummyAuthenticator.password = "just magnets"

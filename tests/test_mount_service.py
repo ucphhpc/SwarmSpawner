@@ -22,11 +22,12 @@ from util import (
     remove_volume,
     wait_for_session,
     wait_for_service_task,
+    wait_for_service_msg,
     wait_for_site,
 )
 
 HUB_IMAGE_TAG = "hub:test"
-MOUNT_IMAGE_TAG = "nielsbohr/ssh-mount-dummy"
+MOUNT_IMAGE_TAG = "ucphhpc/ssh-mount-dummy"
 NETWORK_NAME = "jh_test"
 HUB_SERVICE_NAME = "jupyterhub"
 MOUNT_SERVICE_NAME = "mount_target"
@@ -49,6 +50,8 @@ hub_path = dirname(dirname(__file__))
 hub_image = {"path": hub_path, "tag": HUB_IMAGE_TAG, "rm": True, "pull": False}
 
 # swarm config
+# If the test host has multiple interfaces that the
+# swarm can listen, use -> 'advertise_addr': 'host-ip'
 swarm_config = {}
 network_config = {
     "name": NETWORK_NAME,
@@ -99,9 +102,7 @@ def test_sshfs_mount_hub(image, swarm, network, make_service):
             assert state != "failed"
 
     username = "testuser"
-    # Auth header
-    test_logger.info("Authenticating with user: {}".format(username))
-    auth_header = {"Remote-User": username}
+    # Wait for Jupyterhub is running
     assert wait_for_site(JHUB_URL, valid_status_code=401) is True
 
     mount_volume_name = "sshvolume-user-{}".format(username)
@@ -111,10 +112,24 @@ def test_sshfs_mount_hub(image, swarm, network, make_service):
         assert remove_volume(client, mount_volume_name)
 
     with requests.Session() as s:
+        # Login
+        auth_header = {"Remote-User": username}
+        login_response = s.post(JHUB_URL + "/hub/login", headers=auth_header)
+        test_logger.info("Login response message: {}".format(login_response.text))
+        assert login_response.status_code == 200
+
         auth_url = urljoin(JHUB_URL, "/hub/home")
         login_response = s.get(auth_url, headers=auth_header)
         test_logger.info("Home response message: {}".format(login_response.text))
         assert login_response.status_code == 200
+
+        # Wait for the OpenSSH server to be ready
+        assert wait_for_service_msg(
+            client,
+            MOUNT_SERVICE_NAME,
+            msg="Running the OpenSSH Server",
+            logs_kwargs={"stdout": True, "stderr": True},
+        )
 
         private_key = ""
         # Extract mount target ssh private key
@@ -125,33 +140,40 @@ def test_sshfs_mount_hub(image, swarm, network, make_service):
                 container = client.containers.get(cont_id)
                 private_key = container.exec_run(cmd)[1].decode("utf-8")
                 break
+        assert isinstance(private_key, str)
         assert private_key != ""
+        assert "BEGIN RSA PRIVATE KEY" in private_key
 
         # Spawn a notebook
         spawn_form_resp = s.get(JHUB_URL + "/hub/spawn")
         test_logger.info("Spawn page message: {}".format(spawn_form_resp.text))
         assert spawn_form_resp.status_code == 200
         assert "Select a notebook image" in spawn_form_resp.text
-        user_image = "nielsbohr/base-notebook:latest"
+        user_image = "ucphhpc/base-notebook:latest"
         user_image_name = "Base Notebook"
         payload = {"select_image": [{"image": user_image, "name": user_image_name}]}
-        json_payload = json.dumps(payload)
+        user_image_selection = json.dumps(payload)
 
-        target_user = "mountuser"
+        target_username = "mountuser"
         ssh_host_target = socket.gethostname()
-        mount_info = {
-            "HOST": "DUMMY",
-            "USERNAME": target_user,
-            "PATH": "".join(["@", ssh_host_target, ":"]),
-            "PRIVATEKEY": private_key,
+
+        user_sshfs_mount_data = {
+            "username": target_username,
+            "targetHost": ssh_host_target,
+            "targetPath": "",
+            "privateKey": private_key,
+            "port": 2222,
         }
-        mount_header = dict(Mount=str(mount_info))
-        mount_header.update(auth_header)
-        mount_resp = s.post(JHUB_URL + "/hub/data", headers=mount_header)
+        # Header values must be of str type
+        user_mount_data = json.dumps({"mount_data": user_sshfs_mount_data})
+        mount_resp = s.post(
+            JHUB_URL + "/hub/set-user-data", data=user_mount_data, headers=auth_header
+        )
+
         test_logger.info("Hub Data response message: {}".format(mount_resp.text))
         assert mount_resp.status_code == 200
         spawn_resp = s.post(
-            JHUB_URL + "/hub/spawn", data=json_payload, headers=mount_header
+            JHUB_URL + "/hub/spawn", data=user_image_selection, headers=auth_header
         )
 
         test_logger.info("Spawn POST response message: {}".format(spawn_resp.text))
@@ -164,7 +186,7 @@ def test_sshfs_mount_hub(image, swarm, network, make_service):
 
         # Verify that a task is succesfully running
         running_task = wait_for_service_task(
-            client, spawned_service, filters={"desired-state": "running"}
+            client, spawned_service, filters={"desired-state": "running"}, timeout=300
         )
         assert running_task
 
@@ -202,7 +224,7 @@ def test_sshfs_mount_hub(image, swarm, network, make_service):
         test_logger.info("Looking for xsrf in: {}".format(s.cookies))
 
         # Refresh csrf token
-        assert wait_for_session(s, jhub_service_api, require_xsrf=True)
+        assert wait_for_session(s, jhub_service_api, require_xsrf=True, timeout=300)
         assert "_xsrf" in s.cookies
         xsrf_token = s.cookies["_xsrf"]
         service_api_url = get_service_api_url(spawned_service, postfix_url="contents/")
