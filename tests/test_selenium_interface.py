@@ -27,6 +27,3 @@ def test_interface_open(image, swarm, network, make_service):
     test_logger.info("Start of testing that the interface loads")
     make_service(hub_service)
     assert wait_for_site(JHUB_URL) is True
-    # driver.get(JHUB_URL)
-
-    # driver.close()
