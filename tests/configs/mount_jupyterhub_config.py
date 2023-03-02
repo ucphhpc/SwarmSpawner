@@ -45,7 +45,7 @@ sshfs_mount = [
 
 # Before the user can select which image to spawn,
 # user_options has to be enabled
-c.SwarmSpawner.use_user_options = True
+
 
 # Available docker images the user can spawn
 # Additional settings including, access, mounts, placement

@@ -20,8 +20,6 @@ c.SwarmSpawner.jupyterhub_service_name = "jupyterhub"
 
 c.SwarmSpawner.networks = ["jupyterhub_default"]
 
-c.SwarmSpawner.use_user_options = True
-
 c.SwarmSpawner.images = [
     {
         "image": "ucphhpc/base-notebook:latest",

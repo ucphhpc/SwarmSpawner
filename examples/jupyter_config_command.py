@@ -20,8 +20,6 @@ c.SwarmSpawner.jupyterhub_service_name = "jupyterhub"
 
 c.SwarmSpawner.networks = ["jupyterhub_default"]
 
-c.SwarmSpawner.use_user_options = True
-
 mounts = [{"type": "bind", "source": "/tmp", "target": "/home/jovyan/tmpdir"}]
 
 c.SwarmSpawner.images = [

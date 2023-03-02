@@ -18,7 +18,7 @@ c.SwarmSpawner.networks = ["jh_dev"]
 
 # Before the user can select which image to spawn,
 # user_options has to be enabled
-c.SwarmSpawner.use_user_options = True
+
 
 # Available docker images the user can spawn
 c.SwarmSpawner.images = [

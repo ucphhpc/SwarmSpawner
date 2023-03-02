@@ -61,7 +61,6 @@ c.SwarmSpawner.start_timeout = 60 * 5
 c.SwarmSpawner.jupyterhub_service_name = "jupyterhub"
 c.SwarmSpawner.networks = ["jupyterhub_default"]
 
-c.SwarmSpawner.use_user_options = True
 
 c.SwarmSpawner.pre_spawn_hook = simple_user_id
 

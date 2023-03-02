@@ -167,12 +167,6 @@ To make the user able to select between multiple available images, the following
 set.
 If this is not the case, the user will simply spawn an instance of the default image. i.e. images[0]
 
-.. code-block:: python
-
-    # Before the user can select which image to spawn,
-    # user_options has to be enabled
-    c.SwarmSpawner.use_user_options = True
-
 This enables an image select form in the users /hub/home url path when a notebook hasen't been spawned already.
 
 
@@ -297,14 +291,6 @@ You can also specify some resource for each service
 
 Using user_options
 --------------------
-
-There is the possibility to set parameters using ``user_options``
-
-.. code-block:: python
-
-        # To use user_options in service creation
-        c.SwarmSpawner.use_user_options = False
-
 
 To control the creation of the services you have 2 ways, using **jupyterhub_config.py** or **user_options**.
 

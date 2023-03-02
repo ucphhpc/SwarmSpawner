@@ -19,7 +19,6 @@ c.SwarmSpawner.start_timeout = 60 * 5
 c.SwarmSpawner.jupyterhub_service_name = "jupyterhub"
 c.SwarmSpawner.networks = ["jupyterhub_default"]
 
-c.SwarmSpawner.use_user_options = True
 db_path = os.path.join("/srv/jupyterhub", "access_db.txt")
 
 c.SwarmSpawner.images = [
