@@ -1,3 +1,5 @@
+from jhub.accelerators import AcceleratorPool
+
 c = get_config()
 
 c.JupyterHub.ip = "0.0.0.0"
@@ -18,13 +20,25 @@ c.SwarmSpawner.networks = ["jh_test"]
 
 # Before the user can select which image to spawn,
 # user_options has to be enabled
-c.SwarmSpawner.use_user_options = True
+# c.SwarmSpawner.use_user_options = True
 
 # Available docker images the user can spawn
 c.SwarmSpawner.images = [
     {"image": "ucphhpc/base-notebook:latest", "name": "Basic Python Notebook"},
     {"image": "ucphhpc/base-notebook:latest", "name": "Basic Python Notebook 2"},
+    {
+        "image": "ucphhpc/gpu-notebook:latest",
+        "name": "GPU Notebook",
+        "resources_spec": {
+            "generic_resources": {
+                "NVIDIA-GPU": "MIG-a0913f40-b71e-52bf-b668-099f3ea6fd0e"
+            }
+        },
+    },
 ]
 
-# -1 should mean unlimited
-c.SwarmSpawner.container_spec = {"ulimit": {"soft": "-1", "hard": "-1"}}
+c.SwarmSpawner.accelerator_pools = [
+    AcceleratorPool(type="GPU", mappings={"NVIDIA-GPU": "0"}),
+]
+
+gpu_accelerator_pool = AcceleratorPool(type="gpu", mappings={"NVIDIA-GPU": "0"})

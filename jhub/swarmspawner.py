@@ -17,17 +17,17 @@ from docker.errors import APIError
 from docker.tls import TLSConfig
 from docker.types import (
     TaskTemplate,
-    Resources,
     ContainerSpec,
     DriverConfig,
+    Resources,
+    RestartPolicy,
     Placement,
-    ConfigReference,
-    EndpointSpec,
 )
 from docker.utils import kwargs_from_env
 from tornado import gen
 from jupyterhub.spawner import Spawner
 from traitlets import default, Dict, Unicode, List, Bool, Int
+from jhub.access import Access
 from jhub.mount import VolumeMounter
 from jhub.util import recursive_format
 
@@ -101,13 +101,10 @@ class SwarmSpawner(Spawner):
     @default("options_form")
     def _options_form(self):
         """Return the form with the drop-down menu."""
-        # User options not enabled -> return default jupyterhub form
-        if not self.use_user_options:
-            return Unicode()
         template_options = []
-        for di in self.images:
-            value = dict(image=di["image"], name=di["name"])
-            template_value = dict(name=di["name"], value=value)
+        for image in self.images:
+            value = dict(image=image["image"], name=image["name"])
+            template_value = dict(name=image["name"], value=value)
             template_options.append(self.option_template.format(**template_value))
         option_template = "".join(template_options)
         return self.form_template.format(option_template=option_template)
@@ -115,59 +112,57 @@ class SwarmSpawner(Spawner):
     def options_from_form(self, form_data):
         """Parse the submitted form data and turn it into the correct
         structures for self.user_options."""
-        # user options not enabled, just return input
-        if not self.use_user_options:
-            return form_data
-
         self.log.debug(
             "User: {} submitted spawn form: {}".format(self.user.name, form_data)
         )
         # formdata format: {'select_image': {'image': 'jupyterhub/singleuser',
         # 'id': "Basic Jupyter Notebook"}}
-        image_data = form_data.get("select_image", None)
-        if not image_data:
-            image_data = self.images[0]
-        else:
-            if len(image_data) > 1:
-                self.log.warn(
-                    "User: {} tried to spawn multiple images".format(self.user.name)
-                )
-                raise RuntimeError("You can only select 1 image to spawn")
-            image_data = ast.literal_eval(image_data[0])
+        image = None
+        selected_image_data = form_data.get("select_image", None)
+        if not selected_image_data:
+            selected_image_data = self.images[0]
 
-        if "image" not in image_data or "name" not in image_data:
-            self.log.error(
-                "Either image or name was not in the supplied "
-                "form's image data: {}".format(image_data)
+        if len(selected_image_data) > 1:
+            self.log.warn(
+                "User: {} tried to spawn multiple images".format(self.user.name)
             )
-            raise RuntimeError("An incorrect image form was supplied")
+            raise RuntimeError("You can only select 1 image to spawn")
 
-        selected_name = image_data["name"]
-        selected_image = image_data["image"]
-        if selected_name not in [image["name"] for image in self.images]:
+        image_configuration = ast.literal_eval(selected_image_data[0])
+        if "image" not in image_configuration:
+            self.log.error("An 'image' tag was not in the image configuration")
+            raise RuntimeError("An incorrect image configuration was supplied")
+
+        if "name" not in image_configuration:
+            self.log.error("An 'name' tag was not in the image configuration")
+            raise RuntimeError("An incorrect image configuration was supplied")
+
+        spawn_image_name = image_configuration["name"]
+        spawn_image_data = image_configuration["image"]
+        # Don't allow users to input their own images
+        if spawn_image_name not in [image["name"] for image in self.images]:
             self.log.warn(
                 "User: {} tried to spawn an invalid image: {}".format(
-                    self.user.name, selected_name
+                    self.user.name, spawn_image_name
                 )
             )
             raise RuntimeError(
-                "An invalid image name was selected: {}".format(selected_name)
+                "An invalid image name was selected: {}".format(spawn_image_name)
             )
 
-        if selected_image not in [image["image"] for image in self.images]:
+        if spawn_image_data not in [image["image"] for image in self.images]:
             self.log.warn(
                 "User: {} tried to spawn an invalid image: {}".format(
                     self.user.name, selected_image
                 )
             )
             raise RuntimeError(
-                "An invalid image was selected: {}".format(selected_image)
+                "An invalid image was selected: {}".format(spawn_image_data)
             )
 
-        # Don't allow users to input their own images
         options = {
-            "user_selected_name": selected_name,
-            "user_selected_image": selected_image,
+            "spawn_image_name": spawn_image_name,
+            "spawn_image_data": spawn_image_data,
         }
         return options
 
@@ -187,7 +182,6 @@ class SwarmSpawner(Spawner):
     def client(self):
         """single global client instance"""
         cls = self.__class__
-
         if cls._client is None:
             kwargs = {}
             if self.tls_config:
@@ -248,7 +242,7 @@ class SwarmSpawner(Spawner):
         ),
     ).tag(config=True)
 
-    resource_spec = Dict(
+    resources_spec = Dict(
         {},
         help=dedent(
             """
@@ -257,20 +251,29 @@ class SwarmSpawner(Spawner):
         ),
     ).tag(config=True)
 
-    accelerators = List(
+    accelerator_pools = List(
         trait=Dict(),
         help=dedent(
             """
-            Params about which accelerators should be attached to the service.
+            List of available accelerator_pools.
             """
         ),
     ).tag(config=True)
 
-    placement = Dict(
+    placement_spec = Dict(
         {},
         help=dedent(
             """
-            List of placement constraints for all images.
+            List of placement_spec constraints for all images.
+            """
+        ),
+    ).tag(config=True)
+
+    endpoint_spec = Dict(
+        {},
+        help=dedent(
+            """
+            Properties that can be configured to access and load balance a service.
             """
         ),
     ).tag(config=True)
@@ -293,16 +296,6 @@ class SwarmSpawner(Spawner):
         ),
     ).tag(config=True)
 
-    use_user_options = Bool(
-        False,
-        help=dedent(
-            """
-            The spawner will use the dict passed through the form
-                                or as json body when using the Hub Api.
-            """
-        ),
-    ).tag(config=True)
-
     jupyterhub_service_name = Unicode(
         help=dedent(
             """
@@ -317,8 +310,8 @@ class SwarmSpawner(Spawner):
         allow_none=True,
         help=dedent(
             """
-            List of JupyterHub user attributes that are used to format Spawner
-            State attributes.
+            List of JupyterHub user attributes that are used to format
+            the service configuration before it is scheduled
             """
         ),
     ).tag(config=True)
@@ -612,400 +605,186 @@ class SwarmSpawner(Spawner):
         You can specify the params for the service through
         jupyterhub_config.py or using the user_options
         """
-        self.log.debug("User: {}, start spawn".format(self.user.__dict__))
-
-        # https://github.com/jupyterhub/jupyterhub
-        # /blob/master/jupyterhub/user.py#L202
-        # By default jupyterhub calls the spawner passing user_options
-        if self.use_user_options:
-            user_options = self.user_options
-        else:
-            user_options = {}
+        self.log.debug("User: {}, start spawn".format(self.user.name))
+        if not self.user_options:
+            self.log.error("No user_options from the JupyterHub form has been set")
+            raise RuntimeError(
+                "No user options were received from the JupyterHub Spawn form"
+            )
+        user_options = self.user_options
+        self.log.debug("User options received: {}".format(user_options))
 
         service = yield self.get_service()
         if service is None:
-            # Validate state
-            if hasattr(self, "container_spec") and self.container_spec is not None:
-                container_spec = dict(**self.container_spec)
-            elif user_options == {}:
-                self.log.error(
-                    "User: {} is trying to create a service"
-                    " without a container_spec".format(self.user)
+            # Setup the global default state
+            # As defined by:
+            # https://docker-py.readthedocs.io/en/stable/api.html#docker.types.TaskTemplate
+            new_service_config = {
+                "container_spec": {
+                    "command": None,
+                    "args": None,
+                    "hostname": None,
+                    "env": None,
+                    "workdir": None,
+                    "user": None,
+                    "labels": None,
+                    "mounts": None,
+                    "stop_grace_period": None,
+                    "secrets": None,
+                    "tty": None,
+                    "groups": None,
+                    "open_stdin": None,
+                    "read_only": None,
+                    "stop_signal": None,
+                    "healthcheck": None,
+                    "hosts": None,
+                    "dns_config": None,
+                    "configs": None,
+                    "privileges": None,
+                    "isolation": None,
+                    "init": None,
+                    "cap_add": None,
+                    "cap_drop": None,
+                    "sysctls": None,
+                },
+                "resources": None,
+                "restart_policy": None,
+                "placement": None,
+                "log_driver": None,
+                "networks": None,
+                "force_update": None,
+            }
+
+            # Set the default value for each attribute
+            for key, value in new_service_config.items():
+                if hasattr(self, key):
+                    new_service_config[key] = getattr(self, key)
+                if key in user_options:
+                    new_service_config[key] = user_options[key]
+            self.log.debug(
+                "Starting spawn of user: {} with the service config: {}".format(
+                    self.user.name, new_service_config
                 )
-                raise Exception(
-                    "That notebook is missing a specification"
-                    "to launch it, contact the admin to resolve "
-                    "this issue"
-                )
+            )
 
-            # Setup service
-            container_spec.update(user_options.get("container_spec", {}))
+            # Pass on the JupyterHub environment variables
+            if not new_service_config["container_spec"]["env"]:
+                new_service_config["container_spec"]["env"] = {}
 
-            # Which image to spawn
-            if self.use_user_options and "user_selected_image" in user_options:
-                self.log.debug("User options received: {}".format(user_options))
-                image_name = user_options["user_selected_name"]
-                image_value = user_options["user_selected_image"]
-                selected_image = None
-                for di in self.images:
-                    if image_name == di["name"] and image_value == di["image"]:
-                        selected_image = copy.deepcopy(di)
-                if selected_image is None:
-                    err_msg = "User selected image: {} couldn't be found".format(
-                        image_value
-                    )
-                    self.log.error(err_msg)
-                    raise Exception(err_msg)
-                self.log.info(
-                    "Using the user selected image: {}".format(selected_image)
-                )
-            else:
-                # Default image
-                selected_image = self.images[0]
-                self.log.info("Using the default image: {}".format(selected_image))
+            new_service_config["container_spec"]["env"].update(self.get_env())
 
-            self.log.debug("Image info: {}".format(selected_image))
-            # Does that image have restricted access
-            if "access" in selected_image:
-                # Check for static or db users
-                allowed = False
-                if self.service_owner in selected_image["access"]:
-                    allowed = True
-                else:
-                    if os.path.exists(selected_image["access"]):
-                        db_path = selected_image["access"]
-                        try:
-                            self.log.info(
-                                "Checking db: {} for "
-                                "User: {}".format(db_path, self.service_owner)
-                            )
-                            with open(db_path, "r") as db:
-                                users = [
-                                    user.rstrip("\n").rstrip("\r\n") for user in db
-                                ]
-                                if self.service_owner in users:
-                                    allowed = True
-                        except IOError as err:
-                            self.log.error(
-                                "User: {} tried to open db file {},"
-                                "Failed {}".format(self.service_owner, db_path, err)
-                            )
-                if not allowed:
-                    self.log.error(
-                        "User: {} tried to launch {} without access".format(
-                            self.service_owner, selected_image["image"]
-                        )
-                    )
-                    raise Exception("You don't have permission to launch that image")
-
-            self.log.debug("Container spec: {}".format(container_spec))
-
-            # Assign the image name as a label
-            container_spec["labels"] = {"image_name": selected_image["name"]}
-
-            # Setup mounts
-            mounts = []
-            # Global mounts
-            if "mounts" in container_spec:
-                mounts.extend(container_spec["mounts"])
-            container_spec["mounts"] = []
-
-            # Image mounts
-            if "mounts" in selected_image:
-                mounts.extend(selected_image["mounts"])
-
-            # Prepare the dictionary that can be used
-            # to format the mount config
-            format_mount_kwargs = {}
+            # Prepare the attributes that can be used to format the new_service_config
+            # before we proceed
             if self.user_format_attributes:
+                format_dict = {}
                 for attr in self.user_format_attributes:
                     if hasattr(self.user, attr):
                         value = getattr(self.user, attr)
-                        if not isinstance(value, dict):
-                            value = {attr: value}
-                        format_mount_kwargs[attr] = value
+                        format_dict[attr] = value
 
-            # Mounts can be declared as regular dictionaries
-            # or as special Mountable objects (see mount.py)
-            for mount in mounts:
-                if isinstance(mount, dict):
-                    m = VolumeMounter(mount)
-                    m = yield m.create(**format_mount_kwargs)
-                else:
-                    # Custom type mount defined
-                    # Is instantiated in the config
-                    m = yield mount.create(**format_mount_kwargs)
-                container_spec["mounts"].append(m)
-
-            # Some envs are required by the single-user-image
-            if "env" in container_spec:
-                container_spec["env"].update(self.get_env())
-            else:
-                container_spec["env"] = self.get_env()
-
-            # Env of image
-            if "env" in selected_image and isinstance(selected_image["env"], dict):
-                container_spec["env"].update(selected_image["env"])
-
-            # Dynamic update of env values
-            for env_key, env_value in container_spec["env"].items():
-                stripped_value = env_value.lstrip("{").rstrip("}")
-                if hasattr(self, stripped_value) and isinstance(
-                    getattr(self, stripped_value), str
-                ):
-                    container_spec["env"][env_key] = getattr(self, stripped_value)
-                if hasattr(self.user, stripped_value) and isinstance(
-                    getattr(self.user, stripped_value), str
-                ):
-                    container_spec["env"][env_key] = getattr(self.user, stripped_value)
-                if (
-                    hasattr(self.user, "data")
-                    and hasattr(self.user.data, stripped_value)
-                    and isinstance(getattr(self.user.data, stripped_value), str)
-                ):
-                    container_spec["env"][env_key] = getattr(
-                        self.user.data, stripped_value
+            if "spawn_image_name" not in user_options:
+                self.log.error(
+                    "No 'spawn_image_name' was found in the user_options: {}".format(
+                        user_options
                     )
+                )
+                raise RuntimeError()
 
-            # Args of image
-            if "args" in selected_image and isinstance(selected_image["args"], list):
-                container_spec.update({"args": selected_image["args"]})
+            if "spawn_image_data" not in user_options:
+                self.log.error(
+                    "No 'spawn_image_data' was found in the user_options: {}".format(
+                        user_options
+                    )
+                )
+                raise RuntimeError()
 
-            if (
-                "command" in selected_image
-                and isinstance(selected_image["command"], list)
-                or "command" in selected_image
-                and isinstance(selected_image["command"], str)
-            ):
-                container_spec.update({"command": selected_image["command"]})
+            # Which image to spawn
+            spawn_image_name = user_options["spawn_image_name"]
+            spawn_image_data = user_options["spawn_image_data"]
+            selected_image_configuration = None
+            for image in self.images:
+                if (
+                    spawn_image_name == image["name"]
+                    and spawn_image_data == image["image"]
+                ):
+                    selected_image_configuration = copy.deepcopy(image)
 
-            # Log mounts config
+            if not selected_image_configuration:
+                self.log.error(
+                    "Failed to find an image configuration that matched what the user had selected"
+                )
+                raise RuntimeError(
+                    "Failed to find the specified image in the JupyterHub image configuration"
+                )
             self.log.debug(
-                "User: {} container_spec mounts: {}".format(
-                    self.user, container_spec["mounts"]
+                "User has requested the image configuration: {}".format(
+                    selected_image_configuration
                 )
             )
 
-            # Global resource_spec
-            resource_spec = {}
-            if hasattr(self, "resource_spec"):
-                resource_spec = self.resource_spec
-            resource_spec.update(user_options.get("resource_spec", {}))
-
-            networks = None
-            if hasattr(self, "networks"):
-                networks = self.networks
-            if user_options.get("networks") is not None:
-                networks = user_options.get("networks")
-
-            # Global Log driver
-            log_driver = None
-            if hasattr(self, "log_driver"):
-                log_driver = self.log_driver
-            if user_options.get("log_driver") is not None:
-                log_driver = user_options.get("log_driver")
-
-            accelerators = []
-            if hasattr(self, "accelerators"):
-                accelerators = self.accelerators
-            if user_options.get("accelerators") is not None:
-                accelerators = user_options.get("accelerators")
-
-            # Global placement
-            placement = None
-            if hasattr(self, "placement"):
-                placement = self.placement
-            if user_options.get("placement") is not None:
-                placement = user_options.get("placement")
-
-            # Image resources
-            if "resource_spec" in selected_image:
-                resource_spec = selected_image["resource_spec"]
-
-            # Accelerators attached to the image
-            if "accelerators" in selected_image:
-                accelerators = selected_image["accelerators"]
-
-            # Placement of image
-            if "placement" in selected_image:
-                placement = selected_image["placement"]
-
-            # Logdriver of image
-            if "log_driver" in selected_image:
-                log_driver = selected_image["log_driver"]
-
-            # Configs attached to image
-            if "configs" in selected_image and isinstance(
-                selected_image["configs"], list
-            ):
-                for c in selected_image["configs"]:
-                    if isinstance(c, dict):
-                        self.configs.append(c)
-
-            endpoint_spec = {}
-            if "endpoint_spec" in selected_image:
-                endpoint_spec = selected_image["endpoint_spec"]
-
-            if self.configs:
-                # Check that the supplied configs already exists
-                current_configs = yield self.docker("configs")
-                config_error_msg = (
-                    "The server has a misconfigured config, "
-                    "please contact an administrator to resolve this"
-                )
-
-                for c in self.configs:
-                    if "config_name" not in c:
-                        self.log.error(
-                            "Config: {} does not have a "
-                            "required config_name key".format(c)
-                        )
-                        raise Exception(config_error_msg)
-                    if "config_id" not in c:
-                        # Find the id from the supplied name
-                        config_ids = [
-                            cc["ID"]
-                            for cc in current_configs
-                            if cc["Spec"]["Name"] == c["config_name"]
-                        ]
-                        if not config_ids:
-                            self.log.error(
-                                "A config with name {} could not be found".format(
-                                    c["config_name"]
-                                )
-                            )
-                            raise Exception(config_error_msg)
-                        c["config_id"] = config_ids[0]
-
-                container_spec.update(
-                    {"configs": [ConfigReference(**c) for c in self.configs]}
-                )
-
-            # Prepare the accelerators and attach it to the environment
-            if accelerators:
-                for accelerator in accelerators:
-                    accelerator_id = accelerator.aquire(self.user.name)
-                    # NVIDIA_VISIBLE_DEVICES=0:0
-                    container_spec["env"]["NVIDIA_VISIBLE_DEVICES"] = "{}".format(
-                        accelerator_id
+            # Check if special restrictions are applied to that image configuration
+            if "restricted_access" in selected_image_configuration:
+                allowed = Access.allowed(self.user.name, selected_image_configuration)
+                if not allowed:
+                    raise PermissionError(
+                        "You don't have permissions to launch that image"
                     )
+                    # TODO, add possible contact info about resolving the issue
 
-            # Global container user
-            uid_gid = None
-            if "uid_gid" in container_spec:
-                uid_gid = copy.deepcopy(container_spec["uid_gid"])
-                del container_spec["uid_gid"]
-
-            # Image user
-            if "uid_gid" in selected_image:
-                uid_gid = selected_image["uid_gid"]
-
-            self.log.info("gid info {}".format(uid_gid))
-            if isinstance(uid_gid, str):
-                if ":" in uid_gid:
-                    uid, gid = uid_gid.split(":")
-                else:
-                    uid, gid = uid_gid, None
-
-                if (
-                    uid == "{uid}"
-                    and hasattr(self.user, "uid")
-                    and self.user.uid is not None
-                ):
-                    uid = self.user.uid
-
-                if (
-                    gid is not None
-                    and gid == "{gid}"
-                    and hasattr(self.user, "gid")
-                    and self.user.gid is not None
-                ):
-                    gid = self.user.gid
-
-                if uid:
-                    container_spec.update({"user": str(uid)})
-                if uid and gid:
-                    container_spec.update({"user": str(uid) + ":" + str(gid)})
-
-            # Global container user
-            if "user" in container_spec:
-                container_spec["user"] = str(container_spec["user"])
-
-            # Image user
-            if "user" in selected_image:
-                container_spec.update({"user": str(selected_image["user"])})
-
-            # Global container workdir
-            if "workdir" in container_spec:
-                container_spec["workdir"] = str(container_spec["workdir"])
-
-            # Image workdir
-            if "workdir" in selected_image:
-                container_spec.update({"workdir": str(selected_image["workdir"])})
-
-            dynamic_value_owners = [Spawner, self, self.user]
-            # Format container_spec with data from the
-            # potential dynamic owners
-            for dynamic_owner in dynamic_value_owners:
-                try:
-                    if not hasattr(dynamic_owner, "__dict__"):
-                        continue
-                    recursive_format(container_spec, dynamic_owner.__dict__)
-                except TypeError:
-                    pass
-
-            # Log driver
-            log_driver_name, log_driver_options = None, None
-            if log_driver and isinstance(log_driver, dict):
-                if "name" in log_driver:
-                    log_driver_name = log_driver["name"]
-                if "options" in log_driver:
-                    log_driver_options = log_driver["options"]
+            # Update the new service config with the selected image configuration
+            for attr, value in selected_image_configuration:
+                if attr in new_service_config["container_spec"]:
+                    # If not set, just set the value
+                    if not new_service_config["container_spec"][attr]:
+                        new_service_config["container_spec"][attr] = value
+                    # If the attribute is a dictionary, merge the two dicts
+                    if new_service_config["container_spec"][attr] and isinstance(
+                        new_service_config["container_spec"][attr], dict
+                    ):
+                        new_service_config["container_spec"][attr].update(**value)
 
             # Create the service
-            # Image to spawn
-            image = selected_image["image"]
-            container_spec = ContainerSpec(image, **container_spec)
-            resources = Resources(**resource_spec)
-            placement = Placement(**placement)
-
-            task_log_driver = None
-            if log_driver_name:
-                task_log_driver = DriverConfig(
-                    log_driver_name, options=log_driver_options
+            container_spec_kwargs = new_service_config.pop("container_spec")
+            task_template_kwargs = {
+                "container_spec": ContainerSpec(
+                    selected_image_configuration["image"], **container_spec_kwargs
                 )
-
-            task_spec = {
-                "container_spec": container_spec,
-                "resources": resources,
-                "placement": placement,
             }
 
-            if task_log_driver:
-                task_spec.update({"log_driver": task_log_driver})
+            for key, value in new_service_config.items():
+                if key == "log_driver":
+                    task_template_kwargs[key] = DriverConfig(**value)
+                if key == "resources":
+                    task_template_kwargs[key] = Resources(**value)
+                if key == "restart_policy":
+                    task_template_kwargs[key] = RestartPolicy(**value)
+                if key == "placement":
+                    task_template_kwargs[key] = Placement(**value)
+                if key == "networks" or key == "force_update":
+                    # Either just a list of ids or an int
+                    # https://docker-py.readthedocs.io/en/stable/api.html#docker.types.TaskTemplate
+                    task_template_kwargs[key] = value
 
-            task_tmpl = TaskTemplate(**task_spec)
-            self.log.debug("task temp: {}".format(task_tmpl))
-            # Set endpoint spec
-            endpoint_spec = EndpointSpec(**endpoint_spec)
-
+            task_template = TaskTemplate(**task_template_kwargs)
+            self.log.debug("scheduling task template: {}".format(task_template))
             resp = yield self.docker(
                 "create_service",
-                task_tmpl,
+                task_template,
                 name=self.service_name,
-                networks=networks,
-                endpoint_spec=endpoint_spec,
+                networks=new_service_config["networks"],
             )
+
             self.service_id = resp["ID"]
             self.log.info(
                 "Created Docker service {} (id: {}) from image {}"
                 " for user {}".format(
-                    self.service_name, self.service_id[:7], image, self.user
+                    self.service_name,
+                    self.service_id[:7],
+                    selected_image_configuration["image"],
+                    self.user.name,
                 )
             )
-
             yield self.wait_for_running_tasks()
-
         else:
             self.log.info(
                 "Found existing Docker service '{}' (id: {})".format(

@@ -15,42 +15,45 @@ class AcceleratorPool:
     _type = None
     _oversubscribe = False
     # List or file path
-    _ids = None
+    _mappings = None
 
     _free_pool = None
     _claimed_pool = None
 
-    def __init__(self, type, oversubscribe, ids=None, ids_file_path=None):
+    def __init__(
+        self, type, oversubscribe=False, mappings=None, mappings_file_path=None
+    ):
+        """Load in the type of accelerator and the associated mappings that are available"""
         self._type = type
         self._oversubscribe = oversubscribe
-        if not ids:
-            self._ids = []
+        if not mappings:
+            self._mappings = {}
 
-        if ids_file_path:
-            loaded_ids = load(ids_file_path)
-            if not loaded_ids:
-                raise LoadError("Failed to load accelerator ids")
-            self._ids = loaded_ids
+        if mappings_file_path:
+            loaded_mappings = load(mappings_file_path)
+            if not loaded_mappings:
+                raise LoadError("Failed to load accelerator mappings")
+            self._mappings = loaded_mappings
 
         if not self._free_pool:
             self._free_pool = {}
         if not self._claimed_pool:
             self._claimed_pool = {}
 
-        if self._ids:
-            for _id in self.ids:
-                self._free_pool[_id] = True
+        if self._mappings:
+            for _id, value in self.mappings.items():
+                self._free_pool[_id] = value
 
     def aquire(self, user):
         """A user requests an accelerator"""
-        # We assume that the _ids is a dictionary
+        # We assume that the _mappings is a dictionary
         # TODO, add mutex
         lock = acquire_lock(self._lock_path)
         if not self._free_pool:
             return None
 
         # Selected a random accelerator
-        free_list = list(self._free_pool)
+        free_list = list(self._free_pool.keys())
         random_accelerator = random.choice(free_list)
         selected_accelerator = self._free_pool.pop(random_accelerator)
         self._claimed_pool[selected_accelerator] = {"user": user}

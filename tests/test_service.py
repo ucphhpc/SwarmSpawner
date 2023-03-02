@@ -8,7 +8,7 @@ from random import SystemRandom
 from docker.types import EndpointSpec
 from os.path import dirname, join, realpath
 from urllib.parse import urljoin
-from util import (
+from tests.util import (
     get_service,
     get_task_image,
     get_service_labels,
@@ -27,14 +27,12 @@ PORT = 8000
 
 JHUB_URL = "http://127.0.0.1:{}".format(PORT)
 
-
 # Logger
 logging.basicConfig(level=logging.INFO)
 test_logger = logging.getLogger()
 
 # Test data
 rand_key = "".join(SystemRandom().choice("0123456789abcdef") for _ in range(32))
-
 
 # root dir
 hub_path = dirname(dirname(__file__))
