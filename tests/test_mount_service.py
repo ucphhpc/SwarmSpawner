@@ -144,15 +144,26 @@ def test_sshfs_mount_hub(image, swarm, network, make_service):
         assert private_key != ""
         assert "BEGIN RSA PRIVATE KEY" in private_key
 
+        # spawn_form_resp = s.get(JHUB_URL + "/hub/spawn")
+        # test_logger.info("Spawn page message: {}".format(spawn_form_resp.text))
+        # assert spawn_form_resp.status_code == 200
+        # assert "Select a notebook image" in spawn_form_resp.text
+        # user_image = "ucphhpc/base-notebook:latest"
+        # user_image_name = "Base Notebook"
+        # payload = {"select_image": [{"image": user_image, "name": user_image_name}]}
+        # user_image_selection = json.dumps(payload)
         # Spawn a notebook
         spawn_form_resp = s.get(JHUB_URL + "/hub/spawn")
         test_logger.info("Spawn page message: {}".format(spawn_form_resp.text))
         assert spawn_form_resp.status_code == 200
         assert "Select a notebook image" in spawn_form_resp.text
-        user_image = "ucphhpc/base-notebook:latest"
         user_image_name = "Base Notebook"
-        payload = {"select_image": [{"image": user_image, "name": user_image_name}]}
-        user_image_selection = json.dumps(payload)
+        user_image_data = "ucphhpc/base-notebook:latest"
+        spawn_payload = {
+            "select_image": json.dumps(
+                {"image": user_image_data, "name": user_image_name}
+            )
+        }
 
         target_username = "mountuser"
         ssh_host_target = socket.gethostname()
@@ -173,7 +184,7 @@ def test_sshfs_mount_hub(image, swarm, network, make_service):
         test_logger.info("Hub Data response message: {}".format(mount_resp.text))
         assert mount_resp.status_code == 200
         spawn_resp = s.post(
-            JHUB_URL + "/hub/spawn", data=user_image_selection, headers=auth_header
+            JHUB_URL + "/hub/spawn", data=spawn_payload, headers=auth_header
         )
 
         test_logger.info("Spawn POST response message: {}".format(spawn_resp.text))
@@ -201,7 +212,7 @@ def test_sshfs_mount_hub(image, swarm, network, make_service):
 
         # Ensure it is the correct image
         service_image = get_task_image(running_task)
-        assert service_image == user_image
+        assert service_image == user_image_data
 
         # Validate mounts
         test_logger.info("Current running jupyter services: {}".format(spawned_service))

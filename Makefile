@@ -93,7 +93,6 @@ endif
 check:
 	. $(VENV)/activate; python3 setup.py check -rms
 	. $(VENV)/activate; pytest -s -v tests/test_service.py
-#	. $(VENV)/activate; pytest -s -v tests/test_selenium*
-#	. $(VENV)/activate; pytest -s -v tests/
+	. $(VENV)/activate; pytest -s -v tests/test_auth_service.py
 
 include Makefile.venv

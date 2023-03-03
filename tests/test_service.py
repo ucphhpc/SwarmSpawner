@@ -40,7 +40,7 @@ hub_image = {"path": hub_path, "tag": HUB_IMAGE_TAG, "rm": True, "pull": False}
 
 # If the test host has multiple interfaces that the
 # swarm can listen, use -> 'advertise_addr': 'host-ip'
-swarm_config = {"advertise_addr": "192.168.1.212"}
+swarm_config = {}
 network_config = {
     "name": NETWORK_NAME,
     "driver": "overlay",
@@ -80,7 +80,7 @@ def test_creates_service(image, swarm, network, make_service):
     assert wait_for_site(JHUB_URL) is True
 
     with requests.Session() as s:
-        # login
+        # Login
         test_logger.info("Authenticating with user: {}".format(username))
         login_response = s.post(
             JHUB_URL + "/hub/login?next=",
@@ -88,13 +88,12 @@ def test_creates_service(image, swarm, network, make_service):
         )
         test_logger.info("Login response message: {}".format(login_response.text))
         assert login_response.status_code == 200
+        
         # Spawn a notebook
         spawn_form_resp = s.get(JHUB_URL + "/hub/spawn")
         test_logger.info("Spawn page message: {}".format(spawn_form_resp.text))
-
         assert spawn_form_resp.status_code == 200
         assert "Select a notebook image" in spawn_form_resp.text
-
         user_image_name = "Basic Python Notebook"
         user_image_data = "ucphhpc/base-notebook:latest"
         payload = {

@@ -93,11 +93,18 @@ def test_remote_auth_hub(image, swarm, network, make_service):
         assert login_response.status_code == 200
 
         # Spawn a notebook
+        # Spawn a notebook
         spawn_form_resp = s.get(JHUB_URL + "/hub/spawn")
         test_logger.info("Spawn page message: {}".format(spawn_form_resp.text))
         assert spawn_form_resp.status_code == 200
         assert "Select a notebook image" in spawn_form_resp.text
-        payload = {"dockerimage": "ucphhpc/base-notebook:latest"}
+        user_image_name = "Basic Python Notebook"
+        user_image_data = "ucphhpc/base-notebook:latest"
+        payload = {
+            "select_image": json.dumps(
+                {"image": user_image_data, "name": user_image_name}
+            )
+        }
         spawn_resp = s.post(JHUB_URL + "/hub/spawn", data=payload)
         test_logger.info("Spawn POST response message: {}".format(spawn_resp.text))
         assert spawn_resp.status_code == 200
@@ -207,7 +214,13 @@ def test_remote_auth_hub_custom_username(image, swarm, network, make_service):
         test_logger.info("Spawn page message: {}".format(spawn_form_resp.text))
         assert spawn_form_resp.status_code == 200
         assert "Select a notebook image" in spawn_form_resp.text
-        payload = {"dockerimage": "ucphhpc/base-notebook:latest"}
+        user_image_name = "Basic Python Notebook"
+        user_image_data = "ucphhpc/base-notebook:latest"
+        payload = {
+            "select_image": json.dumps(
+                {"image": user_image_data, "name": user_image_name}
+            )
+        }
         spawn_resp = s.post(JHUB_URL + "/hub/spawn", data=payload)
         test_logger.info("Spawn POST response message: {}".format(spawn_resp.text))
         assert spawn_resp.status_code == 200
