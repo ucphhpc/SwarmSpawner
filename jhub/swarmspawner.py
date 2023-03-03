@@ -7,7 +7,7 @@ import ast
 import copy
 import docker
 import hashlib
-import os
+import html
 from asyncio import sleep
 from async_generator import async_generator, yield_
 from textwrap import dedent
@@ -115,20 +115,32 @@ class SwarmSpawner(Spawner):
         self.log.debug(
             "User: {} submitted spawn form: {}".format(self.user.name, form_data)
         )
-        # formdata format: {'select_image': {'image': 'jupyterhub/singleuser',
-        # 'id': "Basic Jupyter Notebook"}}
-        image = None
-        selected_image_data = form_data.get("select_image", None)
-        if not selected_image_data:
-            selected_image_data = self.images[0]
 
-        if len(selected_image_data) > 1:
-            self.log.warn(
-                "User: {} tried to spawn multiple images".format(self.user.name)
+        # formdata format: {'select_image': [{'image': 'jupyterhub/singleuser',
+        # 'id': "Basic Jupyter Notebook"}]}
+        form_image_data = form_data.get("select_image", None)
+        if not isinstance(form_image_data, list):
+            self.log.error(
+                "User: {} submitted an incorrect form, expected a list: {}".format(
+                    self.user.name, form_image_data
+                )
             )
-            raise RuntimeError("You can only select 1 image to spawn")
+            raise ValueError("An invalid form was submitted.")
 
-        image_configuration = ast.literal_eval(selected_image_data[0])
+        try:
+            formatted_image_data = ast.literal_eval(form_image_data[0])
+        except ValueError:
+            self.log.error("Failed to literal_eval: {}".format(form_image_data[0]))
+            raise ValueError("An invalid form was submitted.")
+
+        if not isinstance(formatted_image_data, dict):
+            self.log.error(
+                "User: {} submitted an incorrect form, expected a dictionary: {}".format(
+                    self.user.name, formatted_image_data
+                )
+            )
+            raise ValueError("An invalid form was submitted.")
+        image_configuration = formatted_image_data
         if "image" not in image_configuration:
             self.log.error("An 'image' tag was not in the image configuration")
             raise RuntimeError("An incorrect image configuration was supplied")
@@ -137,8 +149,8 @@ class SwarmSpawner(Spawner):
             self.log.error("An 'name' tag was not in the image configuration")
             raise RuntimeError("An incorrect image configuration was supplied")
 
-        spawn_image_name = image_configuration["name"]
-        spawn_image_data = image_configuration["image"]
+        spawn_image_name = html.escape(image_configuration["name"])
+        spawn_image_data = html.escape(image_configuration["image"])
         # Don't allow users to input their own images
         if spawn_image_name not in [image["name"] for image in self.images]:
             self.log.warn(
@@ -153,7 +165,7 @@ class SwarmSpawner(Spawner):
         if spawn_image_data not in [image["image"] for image in self.images]:
             self.log.warn(
                 "User: {} tried to spawn an invalid image: {}".format(
-                    self.user.name, selected_image
+                    self.user.name, spawn_image_data
                 )
             )
             raise RuntimeError(
@@ -312,6 +324,17 @@ class SwarmSpawner(Spawner):
             """
             List of JupyterHub user attributes that are used to format
             the service configuration before it is scheduled
+            """
+        ),
+    ).tag(config=True)
+
+    set_service_image_name_label = Bool(
+        default_value=False,
+        help=dedent(
+            """
+            Whether the selected image name should be set as a ContainerSpec label
+            with the 'ImageName' key name. This can be used to identify the name of the image
+            configuration that was used for the service.
             """
         ),
     ).tag(config=True)
@@ -655,11 +678,12 @@ class SwarmSpawner(Spawner):
                 "force_update": None,
             }
 
+            self.log.debug("Starting new service config: {}".format(new_service_config))
             # Set the default value for each attribute
             for key, value in new_service_config.items():
-                if hasattr(self, key):
+                if hasattr(self, key) and getattr(self, key):
                     new_service_config[key] = getattr(self, key)
-                if key in user_options:
+                if key in user_options and user_options[key]:
                     new_service_config[key] = user_options[key]
             self.log.debug(
                 "Starting spawn of user: {} with the service config: {}".format(
@@ -670,7 +694,6 @@ class SwarmSpawner(Spawner):
             # Pass on the JupyterHub environment variables
             if not new_service_config["container_spec"]["env"]:
                 new_service_config["container_spec"]["env"] = {}
-
             new_service_config["container_spec"]["env"].update(self.get_env())
 
             # Prepare the attributes that can be used to format the new_service_config
@@ -732,7 +755,7 @@ class SwarmSpawner(Spawner):
                     # TODO, add possible contact info about resolving the issue
 
             # Update the new service config with the selected image configuration
-            for attr, value in selected_image_configuration:
+            for attr, value in selected_image_configuration.items():
                 if attr in new_service_config["container_spec"]:
                     # If not set, just set the value
                     if not new_service_config["container_spec"][attr]:
@@ -743,6 +766,13 @@ class SwarmSpawner(Spawner):
                     ):
                         new_service_config["container_spec"][attr].update(**value)
 
+            if self.set_service_image_name_label:
+                if not new_service_config["container_spec"]["labels"]:
+                    new_service_config["container_spec"]["labels"] = {}
+                new_service_config["container_spec"]["labels"].update(
+                    {"ImageName": selected_image_configuration["name"]}
+                )
+
             # Create the service
             container_spec_kwargs = new_service_config.pop("container_spec")
             task_template_kwargs = {
@@ -752,15 +782,15 @@ class SwarmSpawner(Spawner):
             }
 
             for key, value in new_service_config.items():
-                if key == "log_driver":
+                if key == "log_driver" and value:
                     task_template_kwargs[key] = DriverConfig(**value)
-                if key == "resources":
+                if key == "resources" and value:
                     task_template_kwargs[key] = Resources(**value)
-                if key == "restart_policy":
+                if key == "restart_policy" and value:
                     task_template_kwargs[key] = RestartPolicy(**value)
-                if key == "placement":
+                if key == "placement" and value:
                     task_template_kwargs[key] = Placement(**value)
-                if key == "networks" or key == "force_update":
+                if key == "networks" and value or key == "force_update" and value:
                     # Either just a list of ids or an int
                     # https://docker-py.readthedocs.io/en/stable/api.html#docker.types.TaskTemplate
                     task_template_kwargs[key] = value

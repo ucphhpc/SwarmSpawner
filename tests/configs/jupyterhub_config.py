@@ -21,3 +21,5 @@ c.SwarmSpawner.images = [
     {"image": "ucphhpc/base-notebook:latest", "name": "Basic Python Notebook"},
     {"image": "ucphhpc/base-notebook:latest", "name": "Basic Python Notebook 2"},
 ]
+
+c.SwarmSpawner.set_service_image_name_label = True

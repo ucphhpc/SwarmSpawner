@@ -9,7 +9,7 @@ from urllib.parse import urljoin
 from random import SystemRandom
 from docker.types import EndpointSpec
 from os.path import dirname, join, realpath
-from util import (
+from tests.util import (
     delete,
     get_service,
     get_task_mounts,
@@ -37,7 +37,7 @@ JHUB_URL = "http://127.0.0.1:{}".format(PORT)
 
 
 # Logger
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=logging.DEBUG)
 test_logger = logging.getLogger()
 
 
@@ -72,7 +72,7 @@ hub_sshfs_service = {
     "networks": [NETWORK_NAME],
     "endpoint_spec": EndpointSpec(ports={PORT: PORT}),
     "env": ["JUPYTERHUB_CRYPT_KEY=" + rand_key],
-    "command": ["jupyterhub", "-f", "/etc/jupyterhub/jupyterhub_config.py"],
+    "command": ["jupyterhub", "-f", "/etc/jupyterhub/jupyterhub_config.py", "--debug"],
 }
 
 mount_service = {

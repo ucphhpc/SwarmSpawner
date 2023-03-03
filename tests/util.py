@@ -86,7 +86,7 @@ def get_service_env(service, env_key=None):
     return None
 
 
-def get_service_labels(service, label_key=None):
+def get_service_container_labels(service, label_key=None):
     if "Labels" not in service.attrs["Spec"]["TaskTemplate"]["ContainerSpec"]:
         return None
 

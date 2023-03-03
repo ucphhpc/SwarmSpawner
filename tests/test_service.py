@@ -11,7 +11,7 @@ from urllib.parse import urljoin
 from tests.util import (
     get_service,
     get_task_image,
-    get_service_labels,
+    get_service_container_labels,
     wait_for_site,
     wait_for_service_task,
     get_service_user,
@@ -28,7 +28,7 @@ PORT = 8000
 JHUB_URL = "http://127.0.0.1:{}".format(PORT)
 
 # Logger
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=logging.DEBUG)
 test_logger = logging.getLogger()
 
 # Test data
@@ -40,7 +40,7 @@ hub_image = {"path": hub_path, "tag": HUB_IMAGE_TAG, "rm": True, "pull": False}
 
 # If the test host has multiple interfaces that the
 # swarm can listen, use -> 'advertise_addr': 'host-ip'
-swarm_config = {}
+swarm_config = {"advertise_addr": "192.168.1.212"}
 network_config = {
     "name": NETWORK_NAME,
     "driver": "overlay",
@@ -58,7 +58,7 @@ hub_service = {
     "networks": [NETWORK_NAME],
     "endpoint_spec": EndpointSpec(ports={PORT: PORT}),
     "env": ["JUPYTERHUB_CRYPT_KEY=" + rand_key],
-    "command": ["jupyterhub", "-f", "/etc/jupyterhub/jupyterhub_config.py"],
+    "command": ["jupyterhub", "-f", "/etc/jupyterhub/jupyterhub_config.py", "--debug"],
 }
 
 
@@ -95,7 +95,13 @@ def test_creates_service(image, swarm, network, make_service):
         assert spawn_form_resp.status_code == 200
         assert "Select a notebook image" in spawn_form_resp.text
 
-        payload = {"dockerimage": "ucphhpc/base-notebook:latest"}
+        user_image_name = "Basic Python Notebook"
+        user_image_data = "ucphhpc/base-notebook:latest"
+        payload = {
+            "select_image": json.dumps(
+                {"image": user_image_data, "name": user_image_name}
+            )
+        }
         spawn_resp = s.post(JHUB_URL + "/hub/spawn", data=payload)
         test_logger.info("Spawn POST response message: {}".format(spawn_resp.text))
         assert spawn_resp.status_code == 200
@@ -208,9 +214,9 @@ def test_image_selection(image, swarm, network, make_service):
         service_image = get_task_image(running_task)
         assert service_image == user_image
 
-        service_labels = get_service_labels(spawned_service)
+        service_labels = get_service_container_labels(spawned_service)
         assert service_labels is not None
-        assert service_labels["image_name"] == user_image_name
+        assert service_labels["ImageName"] == user_image_name
 
         # Delete the spawned service
         delete_headers = {"Referer": urljoin(JHUB_URL, "/hub/home"), "Origin": JHUB_URL}
@@ -262,9 +268,9 @@ def test_image_selection(image, swarm, network, make_service):
         second_service_image = get_task_image(second_running_task)
         assert second_service_image == user_image
 
-        second_service_labels = get_service_labels(second_spawned_service)
+        second_service_labels = get_service_container_labels(second_spawned_service)
         assert second_service_labels is not None
-        assert second_service_labels["image_name"] == second_image_name
+        assert second_service_labels["ImageName"] == second_image_name
 
         # Delete the second spawned service
         deleted = delete(s, delete_url, headers=delete_headers)
