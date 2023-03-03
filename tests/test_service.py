@@ -88,7 +88,7 @@ def test_creates_service(image, swarm, network, make_service):
         )
         test_logger.info("Login response message: {}".format(login_response.text))
         assert login_response.status_code == 200
-        
+
         # Spawn a notebook
         spawn_form_resp = s.get(JHUB_URL + "/hub/spawn")
         test_logger.info("Spawn page message: {}".format(spawn_form_resp.text))

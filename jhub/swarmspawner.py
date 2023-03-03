@@ -28,8 +28,8 @@ from tornado import gen
 from jupyterhub.spawner import Spawner
 from traitlets import default, Dict, Unicode, List, Bool, Int
 from jhub.access import Access
-from jhub.mount import VolumeMounter
 from jhub.util import recursive_format
+from jhub.helpers import import_from_module
 
 
 class UnicodeOrFalse(Unicode):
@@ -338,6 +338,30 @@ class SwarmSpawner(Spawner):
             """
         ),
     ).tag(config=True)
+
+    use_spawner_datatype_helpers = Bool(
+        default_value=False,
+        help=dedent(
+            """
+            Whether the spawner should use its own helper data types to
+            validate whether the supplied configs are valid.
+            The supported container spec data type helpers
+            are declared in the `supported_spawner_datatype_helpers` attribute.
+            """
+        ),
+    )
+
+    supported_spawner_datatype_helpers = List(
+        default_value=["mounts"],
+        traits=[Unicode()],
+        allow_none=True,
+        help=dedent(
+            """
+            The supported container spec data types that 
+            the spawner can help with instantiate and validate.
+            """
+        ),
+    )
 
     @property
     def tls_client(self):
@@ -698,12 +722,19 @@ class SwarmSpawner(Spawner):
 
             # Prepare the attributes that can be used to format the new_service_config
             # before we proceed
+            user_format_dict = {}
             if self.user_format_attributes:
-                format_dict = {}
                 for attr in self.user_format_attributes:
                     if hasattr(self.user, attr):
                         value = getattr(self.user, attr)
-                        format_dict[attr] = value
+                        if not isinstance(value, dict):
+                            value = {attr: value}
+                        user_format_dict[attr] = value
+                self.log.debug(
+                    "Spawner user_format_attributes prepared: {}".format(
+                        user_format_dict
+                    )
+                )
 
             if "spawn_image_name" not in user_options:
                 self.log.error(
@@ -711,7 +742,7 @@ class SwarmSpawner(Spawner):
                         user_options
                     )
                 )
-                raise RuntimeError()
+                raise RuntimeError("Missing image data to start the requested server")
 
             if "spawn_image_data" not in user_options:
                 self.log.error(
@@ -719,7 +750,7 @@ class SwarmSpawner(Spawner):
                         user_options
                     )
                 )
-                raise RuntimeError()
+                raise RuntimeError("Missing image data to start the requested server")
 
             # Which image to spawn
             spawn_image_name = user_options["spawn_image_name"]
@@ -767,11 +798,30 @@ class SwarmSpawner(Spawner):
                         new_service_config["container_spec"][attr].update(**value)
 
             if self.set_service_image_name_label:
+                self.log.debug(
+                    "Spawner set_service_image_name_label is enabled, updating container_spec labels"
+                )
                 if not new_service_config["container_spec"]["labels"]:
                     new_service_config["container_spec"]["labels"] = {}
                 new_service_config["container_spec"]["labels"].update(
                     {"ImageName": selected_image_configuration["name"]}
                 )
+
+            if self.use_spawner_datatype_helpers:
+                self.log.debug(
+                    "Spawner use_spawner_datatype_helpers enabled, checking supported spawner data types: {}".format(
+                        self.supported_spawner_datatype_helpers
+                    )
+                )
+                # Check for special new service config attributes that required
+                # custom Data Types
+                for attr in self.supported_spawner_datatype_helpers:
+                    if attr in new_service_config:
+                        datatype = import_from_module(
+                            "jhub.{}".format(attr), attr, "get_{}_datatype_helper"
+                        )
+                        instance = datatype(new_service_config[attr])
+                        new_service_config[attr] = yield instance.create()
 
             # Create the service
             container_spec_kwargs = new_service_config.pop("container_spec")

@@ -115,3 +115,7 @@ class SSHFSMounter(Mounter):
         yield self.validate_config()
         mount = yield self.create_mount()
         return mount
+
+
+def get_mount_datatype_helper():
+    return SSHFSMounter

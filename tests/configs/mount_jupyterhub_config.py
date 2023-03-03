@@ -1,5 +1,4 @@
 import os
-from jhub.mount import SSHFSMounter
 from jhubauthenticators import RegexUsernameParser
 
 c = get_config()
@@ -23,24 +22,22 @@ c.SwarmSpawner.jupyterhub_service_name = "jupyterhub"
 c.SwarmSpawner.networks = ["jh_test"]
 
 sshfs_mount = [
-    SSHFSMounter(
-        {
-            "type": "volume",
-            "driver_config": {
-                "name": "ucphhpc/sshfs:latest",
-                "options": {
-                    "sshcmd": "{username}@{targetHost}:{targetPath}",
-                    "id_rsa": "{privateKey}",
-                    "allow_other": "",
-                    "reconnect": "",
-                    "port": "{port}",
-                },
+    {
+        "type": "volume",
+        "driver_config": {
+            "name": "ucphhpc/sshfs:latest",
+            "options": {
+                "sshcmd": "{username}@{targetHost}:{targetPath}",
+                "id_rsa": "{privateKey}",
+                "allow_other": "",
+                "reconnect": "",
+                "ephemeral": True,
+                "port": "{port}",
             },
-            "source": "sshvolume-user-{name}",
-            "target": "/home/jovyan/work",
-            "labels": {"autoremove": "True"},
-        }
-    )
+        },
+        "source": "sshvolume-user-{name}",
+        "target": "/home/jovyan/work",
+    }
 ]
 
 # Before the user can select which image to spawn,
@@ -54,9 +51,12 @@ c.SwarmSpawner.images = [
         "image": "ucphhpc/base-notebook:latest",
         "name": "Base Notebook",
         "mounts": sshfs_mount,
-        "placement": {"constraints": []},
     }
 ]
 
 # Which user state varibales should be used to format the service config
 c.SwarmSpawner.user_format_attributes = ["mount_data", "name"]
+
+# Use internel SwarmSpawner Data types to validate the supplied config
+c.SwarmSpawner.use_spawner_datatype_helpers = True
+c.SwarmSpawner.supported_spawner_datatype_helpers = ["mounts"]
