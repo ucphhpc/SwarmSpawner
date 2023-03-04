@@ -92,9 +92,6 @@ endif
 # The tests requires access to the docker socket
 check:
 	. $(VENV)/activate; python3 setup.py check -rms
-	. $(VENV)/activate; pytest -s -v tests/test_service.py
-	. $(VENV)/activate; pytest -s -v tests/test_auth_service.py
-	. $(VENV)/activate; pytest -s -v tests/test_mount_service.py
-	. $(VENV)/activate; pytest -s -v tests/test_access_system.py
+	. $(VENV)/activate; pytest -s -v tests/
 
 include Makefile.venv
