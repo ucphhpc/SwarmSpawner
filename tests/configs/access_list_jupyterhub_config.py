@@ -15,6 +15,7 @@ c.SwarmSpawner.networks = ["jh_test"]
 
 # Before the user can select which image to spawn,
 # user_options has to be enabled
+c.SwarmSpawner.enable_access_system = True
 allowed_users = ["admin_user"]
 
 c.SwarmSpawner.images = [
@@ -26,7 +27,7 @@ c.SwarmSpawner.images = [
         "image": "ucphhpc/base-notebook:latest",
         "name": "Restricted Notebook",
         "access": allowed_users,
-    }
+    },
 ]
 
 c.JupyterHub.authenticator_class = "jhubauthenticators.DummyAuthenticator"

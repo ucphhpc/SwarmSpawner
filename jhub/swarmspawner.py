@@ -362,6 +362,19 @@ class SwarmSpawner(Spawner):
         ),
     ).tag(config=True)
 
+    # TODO, check if this can be merged with the JupyterHub
+    # scopes access system introduced in 3.0
+    enable_access_system = Bool(
+        default_value=False,
+        help=dedent(
+            """
+            Whether the SwarmSpawner Access System should be enabled.
+            This can be used to restrict access to certain images to
+            certain users.
+            """
+        ),
+    ).tag(config=True)
+
     @property
     def tls_client(self):
         """A tuple consisting of the TLS client certificate and key if they
@@ -775,14 +788,21 @@ class SwarmSpawner(Spawner):
                 )
             )
 
-            # Check if special restrictions are applied to that image configuration
-            if "restricted_access" in selected_image_configuration:
-                allowed = Access.allowed(self.user.name, selected_image_configuration)
-                if not allowed:
-                    raise PermissionError(
-                        "You don't have permissions to launch that image"
+            if self.enable_access_system:
+                self.log.debug(
+                    "Access system enabled, checking permissions for: {}".format(
+                        selected_image_configuration
                     )
-                    # TODO, add possible contact info about resolving the issue
+                )
+                if Access.restricted(selected_image_configuration):
+                    allowed = Access.allowed(
+                        self.user.name, selected_image_configuration
+                    )
+                    if not allowed:
+                        raise PermissionError(
+                            "Access to that Notebook is restricted, you don't currently have permission to access it"
+                        )
+                        # TODO, add possible contact info about resolving the issue
 
             # Update the new service config with the selected image configuration
             for attr, value in selected_image_configuration.items():

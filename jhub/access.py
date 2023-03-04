@@ -1,7 +1,12 @@
 class Access:
     @staticmethod
-    def allowed(user, image):
-        return True
+    def restricted(image_configuration):
+        return "access" in image_configuration
+
+    @staticmethod
+    def allowed(username, image_configuration):
+        # TODO, expand this to possibly check a file list or DB
+        return username in image_configuration["access"]
         # if "access" in selected_image:
         #     # Check for static or db users
         #     allowed = False

@@ -39,5 +39,5 @@ hub_service = {
     "networks": [NETWORK_NAME],
     "endpoint_spec": EndpointSpec(ports={PORT: PORT}),
     "env": ["JUPYTERHUB_CRYPT_KEY=" + rand_key],
-    "command": ["jupyterhub", "-f", "/etc/jupyterhub/jupyterhub_config.py"],
+    "command": ["jupyterhub", "-f", "/etc/jupyterhub/jupyterhub_config.py", "--debug"],
 }
