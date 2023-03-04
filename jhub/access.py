@@ -1,38 +1,48 @@
+from jhub.io import load, exists
+
+
 class Access:
+    db = {}
+
+    def __init__(self, db_config):
+        self.db = db_config
+
     @staticmethod
     def restricted(image_configuration):
         return "access" in image_configuration
 
-    @staticmethod
-    def allowed(username, image_configuration):
-        # TODO, expand this to possibly check a file list or DB
-        return username in image_configuration["access"]
-        # if "access" in selected_image:
-        #     # Check for static or db users
-        #     allowed = False
-        #     if self.service_owner in selected_image["access"]:
-        #         allowed = True
-        #     else:
-        #         if os.path.exists(selected_image["access"]):
-        #             db_path = selected_image["access"]
-        #             try:
-        #                 self.log.info(
-        #                     "Checking db: {} for "
-        #                     "User: {}".format(db_path, self.service_owner)
-        #                 )
-        #                 with open(db_path, "r") as db:
-        #                     users = [user.rstrip("\n").rstrip("\r\n") for user in db]
-        #                     if self.service_owner in users:
-        #                         allowed = True
-        #             except IOError as err:
-        #                 self.log.error(
-        #                     "User: {} tried to open db file {},"
-        #                     "Failed {}".format(self.service_owner, db_path, err)
-        #                 )
-        #     if not allowed:
-        #         self.log.error(
-        #             "User: {} tried to launch {} without access".format(
-        #                 self.service_owner, selected_image["image"]
-        #             )
-        #         )
-        #         raise Exception("You don't have permission to launch that image")
+    def allowed(self, username, image_configuration):
+        if "access" not in image_configuration:
+            return True
+
+        if "groups" in image_configuration["access"]:
+            for allowed_group in image_configuration["access"]["groups"]:
+                if allowed_group in self.db:
+                    for db_user in self.db[allowed_group]:
+                        if db_user == username:
+                            return True
+        if "users" in image_configuration["access"]:
+            for allowed_user in image_configuration["access"]["users"]:
+                if allowed_user == username:
+                    return True
+        return False
+
+
+class AccessLists(Access):
+    def __init__(self, db_config):
+        for key, value in db_config.items():
+            self.db[key] = value
+
+
+class AccessFiles(Access):
+    def __init__(self, db_config):
+        """Read in the users from the files"""
+        for key, value in db_config.items():
+            users = []
+            for filename in value:
+                if not exists(filename):
+                    raise IOError("Failed to find Access File: {}".format(filename))
+                users = load(filename, readlines=True)
+                if not users:
+                    raise IOError("Failed to read Access File: {}".format(filename))
+            self.db[key] = users

@@ -26,7 +26,7 @@ from docker.types import (
 from docker.utils import kwargs_from_env
 from tornado import gen
 from jupyterhub.spawner import Spawner
-from traitlets import default, Dict, Unicode, List, Bool, Int
+from traitlets import default, Dict, Unicode, List, Bool, Int, Any
 from jhub.access import Access
 from jhub.util import discover_datatype_klass
 
@@ -371,6 +371,17 @@ class SwarmSpawner(Spawner):
             Whether the SwarmSpawner Access System should be enabled.
             This can be used to restrict access to certain images to
             certain users.
+            """
+        ),
+    ).tag(config=True)
+
+    access_system = Any(
+        default_value=Access,
+        allow_none=True,
+        help=dedent(
+            """
+            The Access System type that is used to validate user permissions
+            to spawn specific image types.
             """
         ),
     ).tag(config=True)
@@ -794,8 +805,8 @@ class SwarmSpawner(Spawner):
                         selected_image_configuration
                     )
                 )
-                if Access.restricted(selected_image_configuration):
-                    allowed = Access.allowed(
+                if self.access_system.restricted(selected_image_configuration):
+                    allowed = self.access_system.allowed(
                         self.user.name, selected_image_configuration
                     )
                     if not allowed:

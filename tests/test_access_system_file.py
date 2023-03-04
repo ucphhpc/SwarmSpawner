@@ -20,11 +20,17 @@ from tests.helpers import (
 from tests.util import wait_for_site
 
 new_hub_config = join(
-    dirname(realpath(__file__)), "configs", "access_list_jupyterhub_config.py"
+    dirname(realpath(__file__)), "configs", "access_file_jupyterhub_config.py"
 )
+
+access_file = join(
+    dirname(__file__), "configs", "res", "admin_users.txt"
+)
+
 new_mounts = [
     ":".join(["/var/run/docker.sock", "/var/run/docker.sock", "rw"]),
     ":".join([new_hub_config, "/etc/jupyterhub/jupyterhub_config.py", "ro"]),
+    ":".join([access_file, "/etc/jupyterhub/access/admin_users.txt", "ro"])
 ]
 
 hub_service["mounts"] = new_mounts
