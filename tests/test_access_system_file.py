@@ -23,16 +23,13 @@ new_hub_config = join(
     dirname(realpath(__file__)), "configs", "access_file_jupyterhub_config.py"
 )
 
-access_file = join(
-    dirname(__file__), "configs", "res", "admin_users.txt"
-)
+access_file = join(dirname(__file__), "configs", "res", "admin_users.txt")
 
 new_mounts = [
     ":".join(["/var/run/docker.sock", "/var/run/docker.sock", "rw"]),
     ":".join([new_hub_config, "/etc/jupyterhub/jupyterhub_config.py", "ro"]),
-    ":".join([access_file, "/etc/jupyterhub/access/admin_users.txt", "ro"])
+    ":".join([access_file, "/etc/jupyterhub/admin_users.txt", "ro"]),
 ]
-
 hub_service["mounts"] = new_mounts
 
 # Logger
@@ -135,7 +132,7 @@ def test_acccess_admin(image, swarm, network, make_service):
         # Validate that the notebook is running
         restricted_notebook = get_running_notebook(s, username)
         assert restricted_notebook
-        assert wait_for_notebook(s, running_notebook)
+        assert wait_for_notebook(s, restricted_notebook)
 
         # Delete the spawned service
         stopped = stop_notebook(s, username)

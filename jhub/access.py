@@ -41,8 +41,10 @@ class AccessFiles(Access):
             users = []
             for filename in value:
                 if not exists(filename):
-                    raise IOError("Failed to find Access File: {}".format(filename))
+                    raise IOError("Failed to find AccessFile: {}".format(filename))
                 users = load(filename, readlines=True)
                 if not users:
-                    raise IOError("Failed to read Access File: {}".format(filename))
+                    raise ValueError()(
+                        "Nothing was read from AccessFile: {}".format(filename)
+                    )
             self.db[key] = users

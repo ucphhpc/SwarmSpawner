@@ -1,5 +1,6 @@
 """A simple jupyter config file for testing the spawner."""
 from jhub.access import AccessLists
+
 c = get_config()
 
 c.JupyterHub.hub_ip = "0.0.0.0"

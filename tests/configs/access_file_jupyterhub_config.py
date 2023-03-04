@@ -1,5 +1,6 @@
 """A simple jupyter config file for testing the spawner."""
 from jhub.access import AccessFiles
+
 c = get_config()
 
 c.JupyterHub.hub_ip = "0.0.0.0"
@@ -15,9 +16,7 @@ c.SwarmSpawner.start_timeout = 60 * 15
 c.SwarmSpawner.networks = ["jh_test"]
 
 # Access Limitations
-access_groups = {
-    "admins": ["/etc/jupyterhub/access/admin_users.txt"]
-}
+access_groups = {"admins": ["/etc/jupyterhub/admin_users.txt"]}
 c.SwarmSpawner.enable_access_system = True
 c.SwarmSpawner.access_system = AccessFiles(access_groups)
 
