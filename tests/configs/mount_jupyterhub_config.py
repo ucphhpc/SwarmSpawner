@@ -31,7 +31,7 @@ sshfs_mount = [
                 "id_rsa": "{privateKey}",
                 "allow_other": "",
                 "reconnect": "",
-                "ephemeral": True,
+                "ephemeral": "True",
                 "port": "{port}",
             },
         },
