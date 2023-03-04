@@ -850,11 +850,6 @@ class SwarmSpawner(Spawner):
                     {"ImageName": selected_image_configuration["name"]}
                 )
 
-            if self.enable_accelerator_system:
-                self.log.debug(
-                    "Spawner enable_accelerator_system enabled, checking if any accelerator should be associated with the to be spawned session"
-                )
-
             if self.use_spawner_datatype_helpers:
                 self.log.debug(
                     "Spawner use_spawner_datatype_helpers enabled, checking supported spawner data types: {}".format(
@@ -891,6 +886,12 @@ class SwarmSpawner(Spawner):
                                 new_service_config["container_spec"][attr]
                             )
                         )
+
+            if self.enable_accelerator_system:
+                self.log.debug(
+                    "Spawner enable_accelerator_system enabled, checking if any accelerator should be associated with the to be spawned session"
+                )
+
 
             # Create the service
             container_spec_kwargs = new_service_config.pop("container_spec")

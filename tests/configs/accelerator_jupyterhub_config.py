@@ -20,7 +20,6 @@ c.SwarmSpawner.networks = ["jh_test"]
 
 # Accelerator setup
 c.SwarmSpawner.enable_accelerator_system = True
-
 c.SwarmSpawner.accelerator_pools = [
     AcceleratorPool(type="GPU", mappings={"NVIDIA-GPU": "0", "NVIDIA-GPU": "1"}),
 ]
