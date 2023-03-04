@@ -28,8 +28,7 @@ from tornado import gen
 from jupyterhub.spawner import Spawner
 from traitlets import default, Dict, Unicode, List, Bool, Int
 from jhub.access import Access
-from jhub.util import recursive_format
-from jhub.helpers import import_from_module
+from jhub.util import discover_datatype_klass
 
 
 class UnicodeOrFalse(Unicode):
@@ -349,7 +348,7 @@ class SwarmSpawner(Spawner):
             are declared in the `supported_spawner_datatype_helpers` attribute.
             """
         ),
-    )
+    ).tag(config=True)
 
     supported_spawner_datatype_helpers = List(
         default_value=["mounts"],
@@ -361,7 +360,7 @@ class SwarmSpawner(Spawner):
             the spawner can help with instantiate and validate.
             """
         ),
-    )
+    ).tag(config=True)
 
     @property
     def tls_client(self):
@@ -807,6 +806,11 @@ class SwarmSpawner(Spawner):
                     {"ImageName": selected_image_configuration["name"]}
                 )
 
+            self.log.debug(
+                "Before use_spawner_datatype_helpers: {}".format(
+                    self.use_spawner_datatype_helpers
+                )
+            )
             if self.use_spawner_datatype_helpers:
                 self.log.debug(
                     "Spawner use_spawner_datatype_helpers enabled, checking supported spawner data types: {}".format(
@@ -816,12 +820,33 @@ class SwarmSpawner(Spawner):
                 # Check for special new service config attributes that required
                 # custom Data Types
                 for attr in self.supported_spawner_datatype_helpers:
-                    if attr in new_service_config:
-                        datatype = import_from_module(
-                            "jhub.{}".format(attr), attr, "get_{}_datatype_helper"
+                    if attr in new_service_config["container_spec"]:
+                        # Deep copy the existing config, because it will
+                        # be overriden
+                        config = copy.deepcopy(
+                            new_service_config["container_spec"][attr]
                         )
-                        instance = datatype(new_service_config[attr])
-                        new_service_config[attr] = yield instance.create()
+                        if isinstance(config, (list, set, tuple)):
+                            new_datatypes = []
+                            for c in config:
+                                datatype_klass = discover_datatype_klass(attr, c)
+                                instance = datatype_klass(c)
+                                # TODO, add the ability to pass user_format_attributes
+                                new_datatype = yield instance.create(**user_format_dict)
+                                new_datatypes.append(new_datatype)
+                            new_service_config["container_spec"][attr] = new_datatypes
+                        else:
+                            datatype_klass = discover_datatype_klass(attr, config)
+                            instance = datatype_klass(config)
+                            # TODO, add the ability to pass user_format_attributes
+                            new_datatype = yield instance.create(**user_format_dict)
+                            new_service_config["container_spec"][attr] = new_datatype
+
+                        self.log.debug(
+                            "Generated new datatypes: {}".format(
+                                new_service_config["container_spec"][attr]
+                            )
+                        )
 
             # Create the service
             container_spec_kwargs = new_service_config.pop("container_spec")

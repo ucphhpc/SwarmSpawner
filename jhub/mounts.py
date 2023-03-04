@@ -117,5 +117,13 @@ class SSHFSMounter(Mounter):
         return mount
 
 
-def get_mount_datatype_helper():
-    return SSHFSMounter
+def discover_mounts_datatype_klass(mount_kwargs):
+    if not isinstance(mount_kwargs, dict):
+        return None
+
+    if "driver_config" in mount_kwargs:
+        if "ucphhpc/sshfs" in mount_kwargs["driver_config"]["name"]:
+            return SSHFSMounter
+    if mount_kwargs["type"] == "volume":
+        return VolumeMounter
+    return Mounter
