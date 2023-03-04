@@ -18,9 +18,12 @@ c.SwarmSpawner.jupyterhub_service_name = "jupyterhub"
 
 c.SwarmSpawner.networks = ["jh_test"]
 
-# Before the user can select which image to spawn,
-# user_options has to be enabled
-#
+# Accelerator setup
+c.SwarmSpawner.enable_accelerator_system = True
+
+c.SwarmSpawner.accelerator_pools = [
+    AcceleratorPool(type="GPU", mappings={"NVIDIA-GPU": "0", "NVIDIA-GPU": "1"}),
+]
 
 # Available docker images the user can spawn
 c.SwarmSpawner.images = [
@@ -29,16 +32,6 @@ c.SwarmSpawner.images = [
     {
         "image": "ucphhpc/gpu-notebook:latest",
         "name": "GPU Notebook",
-        "resources_spec": {
-            "generic_resources": {
-                "NVIDIA-GPU": "MIG-a0913f40-b71e-52bf-b668-099f3ea6fd0e"
-            }
-        },
+        "accelerator_pools": [gpu_accelerator_pool],
     },
 ]
-
-c.SwarmSpawner.accelerator_pools = [
-    AcceleratorPool(type="GPU", mappings={"NVIDIA-GPU": "0"}),
-]
-
-gpu_accelerator_pool = AcceleratorPool(type="gpu", mappings={"NVIDIA-GPU": "0"})

@@ -262,15 +262,6 @@ class SwarmSpawner(Spawner):
         ),
     ).tag(config=True)
 
-    accelerator_pools = List(
-        trait=Dict(),
-        help=dedent(
-            """
-            List of available accelerator_pools.
-            """
-        ),
-    ).tag(config=True)
-
     placement_spec = Dict(
         {},
         help=dedent(
@@ -382,6 +373,28 @@ class SwarmSpawner(Spawner):
             """
             The Access System type that is used to validate user permissions
             to spawn specific image types.
+            """
+        ),
+    ).tag(config=True)
+
+    enable_accelerator_system = Bool(
+        default_value=False,
+        help=dedent(
+            """
+            Whether the SwarmSpawner Accelerator system should be enabled.
+            This system can be used to associate accelerators such as GPUs
+            with a particular or multiple image configurations.
+            """
+        ),
+    )
+
+    accelerator_pools = List(
+        default_value=[],
+        trait=Any(),
+        help=dedent(
+            """
+            List of available accelerator pools that can be associated with an 
+            image.
             """
         ),
     ).tag(config=True)
@@ -837,11 +850,11 @@ class SwarmSpawner(Spawner):
                     {"ImageName": selected_image_configuration["name"]}
                 )
 
-            self.log.debug(
-                "Before use_spawner_datatype_helpers: {}".format(
-                    self.use_spawner_datatype_helpers
+            if self.enable_accelerator_system:
+                self.log.debug(
+                    "Spawner enable_accelerator_system enabled, checking if any accelerator should be associated with the to be spawned session"
                 )
-            )
+
             if self.use_spawner_datatype_helpers:
                 self.log.debug(
                     "Spawner use_spawner_datatype_helpers enabled, checking supported spawner data types: {}".format(
