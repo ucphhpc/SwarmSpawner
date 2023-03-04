@@ -165,7 +165,7 @@ def test_image_selection(image, swarm, network, make_service):
     assert wait_for_site(JHUB_URL) is True
 
     with requests.Session() as s:
-        # login
+        # Login
         test_logger.info("Authenticating with user: {}".format(username))
         login_response = s.post(
             urljoin(JHUB_URL, "/hub/login"),

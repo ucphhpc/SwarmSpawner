@@ -15,15 +15,17 @@ c.SwarmSpawner.networks = ["jh_test"]
 
 # Before the user can select which image to spawn,
 # user_options has to be enabled
-
-
-access_list = ["privileged-user"]
+allowed_users = ["admin_user"]
 
 c.SwarmSpawner.images = [
     {
         "image": "ucphhpc/base-notebook:latest",
         "name": "Basic Python Notebook",
-        "access": access_list,
+    },
+    {
+        "image": "ucphhpc/base-notebook:latest",
+        "name": "Restricted Notebook",
+        "access": allowed_users,
     }
 ]
 
