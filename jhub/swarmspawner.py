@@ -890,10 +890,10 @@ class SwarmSpawner(Spawner):
                 self.log.debug(
                     "Spawner enable_accelerator_system enabled, checking if any accelerator should be associated with the to be spawned session"
                 )
-
                 # Check if the image has requested a Pool
                 if "accelerator_pools" in selected_image_configuration:
                     for pool in selected_image_configuration["accelerator_pools"]:
+                        self.log.debug("Looking for accelerator pool: {}".format(pool))
                         # If the user already has a request accelerator, release it first
                         # before requesting a new one
                         requested_accelerator = self.accelerator_manager.request(pool, self.user.name)

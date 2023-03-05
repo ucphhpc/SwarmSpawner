@@ -3,7 +3,7 @@ import os
 import random
 import copy
 from jhub.defaults import default_base_path
-from jhub.io import acquire_lock, load, release_lock
+from jhub.io import acquire_lock, load, release_lock, write, exists
 
 
 class AcceleratorPool:
@@ -30,10 +30,18 @@ class AcceleratorPool:
         if not mappings:
             self._mappings = {}
 
+        # Ensure that the lockfile is present
+        if not exists(self._lock_path):
+            created = write(self._lock_path, "", mkdirs=True)
+            if not created:
+                raise IOError("Failed to create the required lock file for the Accelerator Pool: {}".format(
+                    created
+                ))
+
         if mappings_file_path:
             loaded_mappings = load(mappings_file_path)
             if not loaded_mappings:
-                raise LoadError("Failed to load accelerator mappings")
+                raise LoadError("Failed to load Accelerator Pool mappings")
             self._mappings = loaded_mappings
 
         if not self._free_pool:
@@ -44,6 +52,7 @@ class AcceleratorPool:
         if self._mappings:
             for _id, value in self.mappings.items():
                 self._free_pool[_id] = value
+                
 
     def aquire(self, user):
         """A user requests to aquire an accelerator"""
@@ -83,15 +92,15 @@ class AcceleratorManager:
 
     _db = None
 
-    def __init__(self, pool_db):
-        if not isinstance(pool_db, dict):
-            raise TypeError("The AcceleratorManager requires the pool_db to a dictionary")
-        self._db = pool_db
+    def __init__(self, db):
+        if not isinstance(db, dict):
+            raise TypeError("The AcceleratorManager requires the db to a dictionary")
+        self._db = db
 
     def get_pool(self, pool_id):
         if pool_id not in self._db:
             return None
-        return self._pool_db[pool_id]
+        return self._db[pool_id]
 
     def add_pool(self, pool_id, pool):
         self._db[pool_id] = pool

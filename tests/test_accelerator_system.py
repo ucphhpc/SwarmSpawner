@@ -56,8 +56,8 @@ def test_access_restriction(image, swarm, network, make_service):
         test_logger.info("Login response message: {}".format(login_response))
 
         # Spawn a notebook
-        user_image_name = "Basic Python Notebook"
-        user_image_data = "ucphhpc/base-notebook:latest"
+        user_image_name = "GPU Notebook"
+        user_image_data = "ucphhpc/gpu-notebook:latest"
         spawned = spawn_notebook(s, username, user_image_name, user_image_data)
         assert spawned
 

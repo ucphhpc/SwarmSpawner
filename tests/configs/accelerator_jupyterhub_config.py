@@ -35,8 +35,6 @@ c.SwarmSpawner.accelerator_manager = AcceleratorManager(
 
 # Available docker images the user can spawn
 c.SwarmSpawner.images = [
-    {"image": "ucphhpc/base-notebook:latest", "name": "Basic Python Notebook"},
-    {"image": "ucphhpc/base-notebook:latest", "name": "GPU Python Notebook 2"},
     {
         "image": "ucphhpc/gpu-notebook:latest",
         "name": "GPU Notebook",
