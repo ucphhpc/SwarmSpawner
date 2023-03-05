@@ -1,6 +1,7 @@
 from http.cookiejar import LoadError
 import os
 import random
+import copy
 from jhub.defaults import default_base_path
 from jhub.io import acquire_lock, load, release_lock
 
@@ -21,7 +22,7 @@ class AcceleratorPool:
     _claimed_pool = None
 
     def __init__(
-        self, type, oversubscribe=False, mappings=None, mappings_file_path=None
+        self, type="generic", oversubscribe=False, mappings=None, mappings_file_path=None
     ):
         """Load in the type of accelerator and the associated mappings that are available"""
         self._type = type
@@ -45,7 +46,7 @@ class AcceleratorPool:
                 self._free_pool[_id] = value
 
     def aquire(self, user):
-        """A user requests an accelerator"""
+        """A user requests to aquire an accelerator"""
         # We assume that the _mappings is a dictionary
         # TODO, add mutex
         lock = acquire_lock(self._lock_path)
@@ -76,3 +77,40 @@ class AcceleratorPool:
 
         release_lock(lock)
         return True
+
+
+class AcceleratorManager:
+
+    _db = None
+
+    def __init__(self, pool_db):
+        if not isinstance(pool_db, dict):
+            raise TypeError("The AcceleratorManager requires the pool_db to a dictionary")
+        self._db = pool_db
+
+    def get_pool(self, pool_id):
+        if pool_id not in self._db:
+            return None
+        return self._pool_db[pool_id]
+
+    def add_pool(self, pool_id, pool):
+        self._db[pool_id] = pool
+
+    def remove_pool(self, pool):
+        self._db.pop(pool)
+
+    def request(self, pool_id, owner):
+        pool = self.get_pool(pool_id)
+        if not pool:
+            return None
+        return pool.aquire(owner)
+
+    def release(self, pool_id, owner):
+        pool = self.get_pool(pool_id)
+        if not pool:
+            return None
+        return pool.release(owner)
+        
+        
+
+

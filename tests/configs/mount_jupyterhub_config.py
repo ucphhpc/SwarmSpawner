@@ -40,10 +40,6 @@ sshfs_mount = [
     }
 ]
 
-# Before the user can select which image to spawn,
-# user_options has to be enabled
-
-
 # Available docker images the user can spawn
 # Additional settings including, access, mounts, placement
 c.SwarmSpawner.images = [

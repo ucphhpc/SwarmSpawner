@@ -16,10 +16,6 @@ c.SwarmSpawner.jupyterhub_service_name = "jupyterhub"
 
 c.SwarmSpawner.networks = ["jh_dev"]
 
-# Before the user can select which image to spawn,
-# user_options has to be enabled
-
-
 # Available docker images the user can spawn
 c.SwarmSpawner.images = [
     {

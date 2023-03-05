@@ -27,7 +27,6 @@ from docker.utils import kwargs_from_env
 from tornado import gen
 from jupyterhub.spawner import Spawner
 from traitlets import default, Dict, Unicode, List, Bool, Int, Any
-from jhub.access import Access
 from jhub.util import discover_datatype_klass
 
 
@@ -367,7 +366,7 @@ class SwarmSpawner(Spawner):
     ).tag(config=True)
 
     access_system = Any(
-        default_value=Access,
+        default_value=None,
         allow_none=True,
         help=dedent(
             """
@@ -386,15 +385,15 @@ class SwarmSpawner(Spawner):
             with a particular or multiple image configurations.
             """
         ),
-    )
+    ).tag(config=True)
 
-    accelerator_pools = List(
-        default_value=[],
-        trait=Any(),
+    accelerator_manager = Any(
+        default_value=None,
+        allow_none=True,
         help=dedent(
             """
-            List of available accelerator pools that can be associated with an 
-            image.
+            The Accelerator Manager that manages the requests and lifetime of the available
+            set of Accelerator Pools.
             """
         ),
     ).tag(config=True)
@@ -892,6 +891,19 @@ class SwarmSpawner(Spawner):
                     "Spawner enable_accelerator_system enabled, checking if any accelerator should be associated with the to be spawned session"
                 )
 
+                # Check if the image has requested a Pool
+                if "accelerator_pools" in selected_image_configuration:
+                    for pool in selected_image_configuration["accelerator_pools"]:
+                        # If the user already has a request accelerator, release it first
+                        # before requesting a new one
+                        requested_accelerator = self.accelerator_manager.request(pool, self.user.name)
+                        self.log.debug(
+                            "Spawner tried to acquire accelerator resource from pool: {} - result: {}".format(pool, requested_accelerator)
+                        )
+                        if requested_accelerator:
+                            self.log.debug("Found requested acceelertor: {}".format(requested_accelerator))
+                        else:
+                            self.log.error("Failed to get request accelerator resource from pool: {} - result: {}".format(pool, requested_accelerator))
 
             # Create the service
             container_spec_kwargs = new_service_config.pop("container_spec")

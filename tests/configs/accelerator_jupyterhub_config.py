@@ -1,4 +1,4 @@
-from jhub.accelerators import AcceleratorPool
+from jhub.accelerators import AcceleratorPool, AcceleratorManager
 
 c = get_config()
 
@@ -20,17 +20,26 @@ c.SwarmSpawner.networks = ["jh_test"]
 
 # Accelerator setup
 c.SwarmSpawner.enable_accelerator_system = True
-c.SwarmSpawner.accelerator_pools = [
-    AcceleratorPool(type="GPU", mappings={"NVIDIA-GPU": "0", "NVIDIA-GPU": "1"}),
-]
+mig_gpu_pool = AcceleratorPool(
+    type="GPU",
+    oversubscribe=False,
+    mappings={
+        "0": "MIG-1",
+        "1": "MIG-2",
+        "2": "MIG-3"
+    }
+)
+c.SwarmSpawner.accelerator_manager = AcceleratorManager(
+    {"mig_gpu_pool": mig_gpu_pool}
+)
 
 # Available docker images the user can spawn
 c.SwarmSpawner.images = [
     {"image": "ucphhpc/base-notebook:latest", "name": "Basic Python Notebook"},
-    {"image": "ucphhpc/base-notebook:latest", "name": "Basic Python Notebook 2"},
+    {"image": "ucphhpc/base-notebook:latest", "name": "GPU Python Notebook 2"},
     {
         "image": "ucphhpc/gpu-notebook:latest",
         "name": "GPU Notebook",
-        "accelerator_pools": [gpu_accelerator_pool],
+        "accelerator_pools": ["mig_gpu_pool"],
     },
 ]

@@ -18,10 +18,6 @@ c.SwarmSpawner.jupyterhub_service_name = "jupyterhub"
 
 c.SwarmSpawner.networks = ["jh_test"]
 
-# Before the user can select which image to spawn,
-# user_options has to be enabled
-
-
 # Available docker images the user can spawn
 c.SwarmSpawner.images = [
     {"image": "ucphhpc/base-notebook:latest", "name": "Basic Python Notebook"}

@@ -13,10 +13,6 @@ c.SwarmSpawner.start_timeout = 60 * 15
 # The name of the overlay network that everything's connected to
 c.SwarmSpawner.networks = ["jh_test"]
 
-# Before the user can select which image to spawn,
-# user_options has to be enabled
-
-
 c.SwarmSpawner.images = [
     {
         "image": "ucphhpc/base-notebook:latest",
