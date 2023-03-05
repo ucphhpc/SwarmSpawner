@@ -1,7 +1,6 @@
 from http.cookiejar import LoadError
 import os
 import random
-import copy
 from jhub.defaults import default_base_path
 from jhub.io import acquire_lock, load, release_lock, write, exists
 
@@ -29,6 +28,8 @@ class AcceleratorPool:
         self._oversubscribe = oversubscribe
         if not mappings:
             self._mappings = {}
+        else:
+            self._mappings = mappings
 
         # Ensure that the lockfile is present
         if not exists(self._lock_path):
@@ -50,16 +51,17 @@ class AcceleratorPool:
             self._claimed_pool = {}
 
         if self._mappings:
-            for _id, value in self.mappings.items():
+            for _id, value in self._mappings.items():
                 self._free_pool[_id] = value
-                
 
-    def aquire(self, user):
+    def aquire(self, user, logger=None):
         """A user requests to aquire an accelerator"""
         # We assume that the _mappings is a dictionary
         # TODO, add mutex
         lock = acquire_lock(self._lock_path)
         if not self._free_pool:
+            if logger:
+                logger.debug("Free pool is empty {}".format(self._free_pool))
             return None
 
         # Selected a random accelerator
@@ -69,9 +71,11 @@ class AcceleratorPool:
         self._claimed_pool[selected_accelerator] = {"user": user}
 
         release_lock(lock)
+        if logger:
+            logger.debug("Selected accelerator: {}".format(selected_accelerator))
         return selected_accelerator
 
-    def release(self, user):
+    def release(self, user, logger=None):
         """A user releases an accelerator"""
         lock = acquire_lock(self._lock_path)
 
@@ -79,6 +83,9 @@ class AcceleratorPool:
         for accelerator, data in self._claimed_pool.items():
             if user in data:
                 user_accelerators.append(accelerator)
+
+        if logger:
+            logger.debug("Releasing user accelerator: {}".format(user_accelerators))
 
         for accelerator in user_accelerators:
             self._claimed_pool.pop(accelerator)
@@ -97,7 +104,6 @@ class AcceleratorManager:
             raise TypeError("The AcceleratorManager requires the db to a dictionary")
         self._db = db
 
-
     def get_pool(self, pool_id):
         if pool_id not in self._db:
             return None
@@ -109,17 +115,17 @@ class AcceleratorManager:
     def remove_pool(self, pool):
         self._db.pop(pool)
 
-    def request(self, pool_id, owner):
+    def request(self, pool_id, owner, logger=None):
         pool = self.get_pool(pool_id)
         if not pool:
             return None
-        return pool.aquire(owner)
+        return pool.aquire(owner, logger=logger)
 
-    def release(self, pool_id, owner):
+    def release(self, pool_id, owner, logger=None):
         pool = self.get_pool(pool_id)
         if not pool:
             return None
-        return pool.release(owner)
+        return pool.release(owner, logger=logger)
         
         
 

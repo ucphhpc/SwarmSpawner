@@ -27,7 +27,7 @@ mig_gpu_pool = AcceleratorPool(
         "0": "MIG-1",
         "1": "MIG-2",
         "2": "MIG-3"
-    }
+    },
 )
 c.SwarmSpawner.accelerator_manager = AcceleratorManager(
     {"mig_gpu_pool": mig_gpu_pool}

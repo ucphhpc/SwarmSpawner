@@ -897,14 +897,14 @@ class SwarmSpawner(Spawner):
                         self.log.debug("Looking for accelerator pool: {}".format(pool))
                         # If the user already has a request accelerator, release it first
                         # before requesting a new one
-                        requested_accelerator = self.accelerator_manager.request(pool, self.user.name)
+                        assigned_accelerator = self.accelerator_manager.request(pool, self.user.name, logger=self.log)
                         self.log.debug(
-                            "Spawner tried to acquire accelerator resource from pool: {} - result: {}".format(pool, requested_accelerator)
+                            "Spawner tried to acquire accelerator resource from pool: {} - result: {}".format(pool, assigned_accelerator)
                         )
-                        if requested_accelerator:
-                            self.log.debug("Found requested acceelertor: {}".format(requested_accelerator))
+                        if assigned_accelerator:
+                            self.log.debug("Found requested acceelertor: {}".format(assigned_accelerator))
                         else:
-                            self.log.error("Failed to get request accelerator resource from pool: {} - result: {}".format(pool, requested_accelerator))
+                            self.log.error("Failed to get request accelerator resource from pool: {} - result: {}".format(pool, assigned_accelerator))
 
             # Create the service
             container_spec_kwargs = new_service_config.pop("container_spec")
