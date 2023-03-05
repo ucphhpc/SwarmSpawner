@@ -97,6 +97,7 @@ class AcceleratorManager:
             raise TypeError("The AcceleratorManager requires the db to a dictionary")
         self._db = db
 
+
     def get_pool(self, pool_id):
         if pool_id not in self._db:
             return None

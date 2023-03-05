@@ -890,6 +890,7 @@ class SwarmSpawner(Spawner):
                 self.log.debug(
                     "Spawner enable_accelerator_system enabled, checking if any accelerator should be associated with the to be spawned session"
                 )
+                self.log.debug("Spawner AcceleratorManager current db contains: {}".format(self.accelerator_manager._db))
                 # Check if the image has requested a Pool
                 if "accelerator_pools" in selected_image_configuration:
                     for pool in selected_image_configuration["accelerator_pools"]:
