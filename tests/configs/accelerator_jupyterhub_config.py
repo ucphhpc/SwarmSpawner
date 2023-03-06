@@ -21,7 +21,7 @@ c.SwarmSpawner.networks = ["jh_test"]
 # Accelerator setup
 c.SwarmSpawner.enable_accelerator_system = True
 mig_gpu_pool = AcceleratorPool(
-    type="GPU",
+    type="NVIDIA-GPU",
     oversubscribe=False,
     mappings={
         "0": "MIG-1",

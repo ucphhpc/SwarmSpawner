@@ -235,7 +235,33 @@ class SwarmSpawner(Spawner):
     ).tag(config=True)
 
     container_spec = Dict(
-        {},
+        {
+            "command": None,
+            "args": None,
+            "hostname": None,
+            "env": None,
+            "workdir": None,
+            "user": None,
+            "labels": None,
+            "mounts": None,
+            "stop_grace_period": None,
+            "secrets": None,
+            "tty": None,
+            "groups": None,
+            "open_stdin": None,
+            "read_only": None,
+            "stop_signal": None,
+            "healthcheck": None,
+            "hosts": None,
+            "dns_config": None,
+            "configs": None,
+            "privileges": None,
+            "isolation": None,
+            "init": None,
+            "cap_add": None,
+            "cap_drop": None,
+            "sysctls": None
+        },
         help=dedent(
             """
             Params to create the service.
@@ -252,7 +278,7 @@ class SwarmSpawner(Spawner):
         ),
     ).tag(config=True)
 
-    resources_spec = Dict(
+    resources = Dict(
         {},
         help=dedent(
             """
@@ -261,11 +287,11 @@ class SwarmSpawner(Spawner):
         ),
     ).tag(config=True)
 
-    placement_spec = Dict(
+    placement = Dict(
         {},
         help=dedent(
             """
-            List of placement_spec constraints for all images.
+            List of placement constraints for all images.
             """
         ),
     ).tag(config=True)
@@ -740,7 +766,7 @@ class SwarmSpawner(Spawner):
             self.log.debug("Starting new service config: {}".format(new_service_config))
             # Set the default value for each attribute
             for key, value in new_service_config.items():
-                if hasattr(self, key) and getattr(self, key):
+                if hasattr(self, key):
                     new_service_config[key] = getattr(self, key)
                 if key in user_options and user_options[key]:
                     new_service_config[key] = user_options[key]
@@ -902,7 +928,16 @@ class SwarmSpawner(Spawner):
                             "Spawner tried to acquire accelerator resource from pool: {} - result: {}".format(pool, assigned_accelerator)
                         )
                         if assigned_accelerator:
-                            self.log.debug("Found requested acceelertor: {}".format(assigned_accelerator))
+                            accelerator_type = self.accelerator_manager.get_pool_type(pool)
+                            self.log.debug("Found acceelertor: {}".format(assigned_accelerator))
+                            # Docker Swarm expects that GPU resources are set in th
+                            # Resources.generic_resources.
+                            # TODO, abstract the NVIDIA-GPU id
+                            if not "generic_resources" in new_service_config["resources"]:
+                                new_service_config["resources"]["generic_resources"] = {}
+                            new_service_config["resources"]["generic_resources"] = {
+                                accelerator_type: assigned_accelerator
+                            }
                         else:
                             self.log.error("Failed to get request accelerator resource from pool: {} - result: {}".format(pool, assigned_accelerator))
 

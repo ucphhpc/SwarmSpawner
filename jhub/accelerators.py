@@ -94,6 +94,9 @@ class AcceleratorPool:
         release_lock(lock)
         return True
 
+    def get_pool_type(self):
+        return self._type
+
 
 class AcceleratorManager:
 
@@ -108,6 +111,11 @@ class AcceleratorManager:
         if pool_id not in self._db:
             return None
         return self._db[pool_id]
+
+    def get_pool_type(self, pool_id):
+        if pool_id not in self._db:
+            return None
+        return self._db[pool_id].get_pool_type()
 
     def add_pool(self, pool_id, pool):
         self._db[pool_id] = pool
@@ -126,7 +134,6 @@ class AcceleratorManager:
         if not pool:
             return None
         return pool.release(owner, logger=logger)
-        
         
 
 
