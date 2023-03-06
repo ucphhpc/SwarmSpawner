@@ -16,7 +16,7 @@ def get_service(client, service_name, filters=None):
     return services[0]
 
 
-def get_service_tasks(client, service, filters=None, target_state="running"):
+def get_service_tasks(service, filters=None, target_state="running"):
     if not filters:
         filters = {}
     try:
@@ -45,6 +45,8 @@ def get_task_mounts(client, task, filters=None):
             mounts.append(mount)
     return mounts
 
+def get_service_resources(service):
+    return service["Spec"]["ContainerSpec"]["Resources"]
 
 def get_task_image(task):
     return task["Spec"]["ContainerSpec"]["Image"]
@@ -141,8 +143,7 @@ def wait_for_service_task(
 ):
     attempts = 0
     while attempts < timeout:
-        tasks = get_service_tasks(
-            client, service, filters=filters, target_state=target_state
+        tasks = get_service_tasks(service, filters=filters, target_state=target_state
         )
         for task in tasks:
             task_state = get_task_state(task)

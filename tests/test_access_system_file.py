@@ -66,7 +66,7 @@ def test_access_restriction(image, swarm, network, make_service):
         assert spawned
 
         # Wait for it to start
-        running_notebook = get_running_notebook(s, username)
+        running_notebook = get_running_notebook(username)
         assert running_notebook
         assert wait_for_notebook(s, running_notebook)
 
@@ -80,7 +80,7 @@ def test_access_restriction(image, swarm, network, make_service):
         spawned = spawn_notebook(s, username, user_image_name, user_image_data)
 
         # Validate that the notebook is not running
-        notebook = get_running_notebook(s, username)
+        notebook = get_running_notebook(username)
         assert not notebook
 
 
@@ -113,7 +113,7 @@ def test_acccess_admin(image, swarm, network, make_service):
         assert spawned
 
         # Wait for it to start
-        running_notebook = get_running_notebook(s, username)
+        running_notebook = get_running_notebook(username)
         assert running_notebook
         assert wait_for_notebook(s, running_notebook)
 
@@ -130,7 +130,7 @@ def test_acccess_admin(image, swarm, network, make_service):
         assert restricted_spawned
 
         # Validate that the notebook is running
-        restricted_notebook = get_running_notebook(s, username)
+        restricted_notebook = get_running_notebook(username)
         assert restricted_notebook
         assert wait_for_notebook(s, restricted_notebook)
 

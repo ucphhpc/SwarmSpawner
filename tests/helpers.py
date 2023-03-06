@@ -25,7 +25,7 @@ def spawn_notebook(session, username, image_name, image_data, valid_return_code=
     return spawn_resp
 
 
-def get_running_notebook(session, username):
+def get_running_notebook(username):
     client = docker.from_env()
     target_service_name = "{}-{}-{}".format("jupyter", username, "1")
     running_notebook = get_service(client, target_service_name)

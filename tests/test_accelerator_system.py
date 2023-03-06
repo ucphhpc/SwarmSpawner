@@ -17,7 +17,7 @@ from tests.helpers import (
     stop_notebook,
     wait_for_notebook,
 )
-from tests.util import wait_for_site
+from tests.util import wait_for_site, get_service_resources
 
 new_hub_config = join(
     dirname(realpath(__file__)), "configs", "accelerator_jupyterhub_config.py"
@@ -62,21 +62,31 @@ def test_access_restriction(image, swarm, network, make_service):
         assert spawned
 
         # Wait for it to start
-        running_notebook = get_running_notebook(s, username)
+        running_notebook = get_running_notebook(username)
         assert running_notebook
         assert wait_for_notebook(s, running_notebook)
 
-        # Validate that the accelerator is associated
+        # TODO, validate that the accelerator is associated
+        resources = get_service_resources(running_notebook)
+        assert resources
+        generic_resources = resources["Reservations"]["GenericResources"]
+        found_accelerator_reservation = False
+        for resource in generic_resources:
+            resource_spec = resource["NamedResourceSpec"]
+            if "NVIDIA-GPU" in resource_spec:
+                found_accelerator_reservation = True
 
-        # # Delete the spawned service
-        # stopped = stop_notebook(s, username)
-        # assert stopped
+        assert found_accelerator_reservation
 
-        # # Try to start a restricted notebook
-        # user_image_name = "Restricted Notebook"
-        # user_image_data = "ucphhpc/base-notebook:latest"
-        # spawned = spawn_notebook(s, username, user_image_name, user_image_data)
+        # Delete the spawned service
+        stopped = stop_notebook(s, username)
+        assert stopped
 
-        # # Validate that the notebook is not running
-        # notebook = get_running_notebook(s, username)
-        # assert not notebook
+        # Try to start a restricted notebook
+        user_image_name = "Restricted Notebook"
+        user_image_data = "ucphhpc/base-notebook:latest"
+        spawned = spawn_notebook(s, username, user_image_name, user_image_data)
+
+        # Validate that the notebook is not running
+        notebook = get_running_notebook(username)
+        assert not notebook
