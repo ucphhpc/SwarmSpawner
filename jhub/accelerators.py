@@ -21,7 +21,11 @@ class AcceleratorPool:
     _claimed_pool = None
 
     def __init__(
-        self, type="generic", oversubscribe=False, mappings=None, mappings_file_path=None
+        self,
+        type="generic",
+        oversubscribe=False,
+        mappings=None,
+        mappings_file_path=None,
     ):
         """Load in the type of accelerator and the associated mappings that are available"""
         self._type = type
@@ -35,9 +39,11 @@ class AcceleratorPool:
         if not exists(self._lock_path):
             created = write(self._lock_path, "", mkdirs=True)
             if not created:
-                raise IOError("Failed to create the required lock file for the Accelerator Pool: {}".format(
-                    created
-                ))
+                raise IOError(
+                    "Failed to create the required lock file for the Accelerator Pool: {}".format(
+                        created
+                    )
+                )
 
         if mappings_file_path:
             loaded_mappings = load(mappings_file_path)
@@ -99,7 +105,6 @@ class AcceleratorPool:
 
 
 class AcceleratorManager:
-
     _db = None
 
     def __init__(self, db):
@@ -134,6 +139,3 @@ class AcceleratorManager:
         if not pool:
             return None
         return pool.release(owner, logger=logger)
-        
-
-

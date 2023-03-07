@@ -23,15 +23,9 @@ c.SwarmSpawner.enable_accelerator_system = True
 mig_gpu_pool = AcceleratorPool(
     type="NVIDIA-GPU",
     oversubscribe=False,
-    mappings={
-        "0": "MIG-1",
-        "1": "MIG-2",
-        "2": "MIG-3"
-    },
+    mappings={"0": "MIG-1", "1": "MIG-2", "2": "MIG-3"},
 )
-c.SwarmSpawner.accelerator_manager = AcceleratorManager(
-    {"mig_gpu_pool": mig_gpu_pool}
-)
+c.SwarmSpawner.accelerator_manager = AcceleratorManager({"mig_gpu_pool": mig_gpu_pool})
 
 # Available docker images the user can spawn
 c.SwarmSpawner.images = [
