@@ -260,7 +260,7 @@ class SwarmSpawner(Spawner):
             "init": None,
             "cap_add": None,
             "cap_drop": None,
-            "sysctls": None
+            "sysctls": None,
         },
         help=dedent(
             """
@@ -916,30 +916,51 @@ class SwarmSpawner(Spawner):
                 self.log.debug(
                     "Spawner enable_accelerator_system enabled, checking if any accelerator should be associated with the to be spawned session"
                 )
-                self.log.debug("Spawner AcceleratorManager current db contains: {}".format(self.accelerator_manager._db))
+                self.log.debug(
+                    "Spawner AcceleratorManager current db contains: {}".format(
+                        self.accelerator_manager._db
+                    )
+                )
                 # Check if the image has requested a Pool
                 if "accelerator_pools" in selected_image_configuration:
                     for pool in selected_image_configuration["accelerator_pools"]:
                         self.log.debug("Looking for accelerator pool: {}".format(pool))
                         # If the user already has a request accelerator, release it first
                         # before requesting a new one
-                        assigned_accelerator = self.accelerator_manager.request(pool, self.user.name, logger=self.log)
+                        assigned_accelerator = self.accelerator_manager.request(
+                            pool, self.user.name, logger=self.log
+                        )
                         self.log.debug(
-                            "Spawner tried to acquire accelerator resource from pool: {} - result: {}".format(pool, assigned_accelerator)
+                            "Spawner tried to acquire accelerator resource from pool: {} - result: {}".format(
+                                pool, assigned_accelerator
+                            )
                         )
                         if assigned_accelerator:
-                            accelerator_type = self.accelerator_manager.get_pool_type(pool)
-                            self.log.debug("Found acceelertor: {}".format(assigned_accelerator))
+                            accelerator_type = self.accelerator_manager.get_pool_type(
+                                pool
+                            )
+                            self.log.debug(
+                                "Found acceelertor: {}".format(assigned_accelerator)
+                            )
                             # Docker Swarm expects that GPU resources are set in th
                             # Resources.generic_resources.
                             # TODO, abstract the NVIDIA-GPU id
-                            if not "generic_resources" in new_service_config["resources"]:
-                                new_service_config["resources"]["generic_resources"] = {}
+                            if (
+                                not "generic_resources"
+                                in new_service_config["resources"]
+                            ):
+                                new_service_config["resources"][
+                                    "generic_resources"
+                                ] = {}
                             new_service_config["resources"]["generic_resources"] = {
                                 accelerator_type: assigned_accelerator
                             }
                         else:
-                            self.log.error("Failed to get request accelerator resource from pool: {} - result: {}".format(pool, assigned_accelerator))
+                            self.log.error(
+                                "Failed to get request accelerator resource from pool: {} - result: {}".format(
+                                    pool, assigned_accelerator
+                                )
+                            )
 
             # Create the service
             container_spec_kwargs = new_service_config.pop("container_spec")

@@ -18,6 +18,7 @@ from tests.util import (
     get_service_url,
     get_service_api_url,
     get_service_user,
+    get_service_tasks,
     refresh_csrf,
     remove_volume,
     wait_for_session,
@@ -89,12 +90,13 @@ def test_sshfs_mount_hub(image, swarm, network, make_service):
     """Test that spawning a jhub service works"""
     test_logger.info("Start of mount service testing")
     make_service(hub_sshfs_service)
-    mount_target = make_service(mount_service)
+    _ = make_service(mount_service)
     client = docker.from_env()
     services_before_spawn = client.services.list()
     test_logger.info("Pre test services: {}".format(services_before_spawn))
 
-    # Both services should be running here
+    
+    # Both the hub and mount service should both be running here
     for service in services_before_spawn:
         while service.tasks() and service.tasks()[0]["Status"]["State"] != "running":
             time.sleep(1)
@@ -132,14 +134,19 @@ def test_sshfs_mount_hub(image, swarm, network, make_service):
         )
 
         private_key = ""
+        # Get the running task
+        mountable_service = get_service(client, MOUNT_SERVICE_NAME)
+        assert mountable_service
+        running_mountable_tasks = get_service_tasks(mount_service)
+        assert running_mountable_tasks
+
         # Extract mount target ssh private key
-        for task in mount_target.tasks():
-            if task["Status"]["State"] == "running":
-                cont_id = task["Status"]["ContainerStatus"]["ContainerID"]
-                cmd = "".join(["cat ", "/home/mountuser/.ssh/id_rsa"])
-                container = client.containers.get(cont_id)
-                private_key = container.exec_run(cmd)[1].decode("utf-8")
-                break
+        for task in running_mountable_tasks:
+            cont_id = task["Status"]["ContainerStatus"]["ContainerID"]
+            cmd = "".join(["cat ", "/home/mountuser/.ssh/id_rsa"])
+            container = client.containers.get(cont_id)
+            private_key = container.exec_run(cmd)[1].decode("utf-8")
+            break
         assert isinstance(private_key, str)
         assert private_key != ""
         assert "BEGIN RSA PRIVATE KEY" in private_key
