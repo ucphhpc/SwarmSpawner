@@ -136,7 +136,7 @@ def test_sshfs_mount_hub(image, swarm, network, make_service):
         # Get the running task
         mountable_service = get_service(client, MOUNT_SERVICE_NAME)
         assert mountable_service
-        running_mountable_tasks = get_service_tasks(mount_service)
+        running_mountable_tasks = get_service_tasks(mountable_service)
         assert running_mountable_tasks
 
         # Extract mount target ssh private key
