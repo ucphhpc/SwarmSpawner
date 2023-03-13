@@ -348,8 +348,8 @@ class SwarmSpawner(Spawner):
         help=dedent(
             """
             Whether the selected image name should be set as a ContainerSpec label
-            with the 'ImageName' key name. This can be used to identify the name of the image
-            configuration that was used for the service.
+            with the 'ImageName' key name. This can be used to identify the name of the
+            image configuration that was used for the service.
             """
         ),
     ).tag(config=True)
@@ -372,7 +372,7 @@ class SwarmSpawner(Spawner):
         allow_none=True,
         help=dedent(
             """
-            The supported container spec data types that 
+            The supported container spec data types that
             the spawner can help with instantiate and validate.
             """
         ),
@@ -418,8 +418,8 @@ class SwarmSpawner(Spawner):
         allow_none=True,
         help=dedent(
             """
-            The Accelerator Manager that manages the requests and lifetime of the available
-            set of Accelerator Pools.
+            The Accelerator Manager that manages the requests and lifetime of the
+            available set of Accelerator Pools.
             """
         ),
     ).tag(config=True)
@@ -826,10 +826,12 @@ class SwarmSpawner(Spawner):
 
             if not selected_image_configuration:
                 self.log.error(
-                    "Failed to find an image configuration that matched what the user had selected"
+                    "Failed to find an image configuration that "
+                    "matched what the user had selected"
                 )
                 raise RuntimeError(
-                    "Failed to find the specified image in the JupyterHub image configuration"
+                    "Failed to find the specified image in the "
+                    "JupyterHub image configuration"
                 )
             self.log.debug(
                 "User has requested the image configuration: {}".format(
@@ -849,7 +851,8 @@ class SwarmSpawner(Spawner):
                     )
                     if not allowed:
                         raise PermissionError(
-                            "Access to that Notebook is restricted, you don't currently have permission to access it"
+                            "Access to that Notebook is restricted, you don't currently "
+                            "have permission to access it"
                         )
                         # TODO, add possible contact info about resolving the issue
 
@@ -867,7 +870,8 @@ class SwarmSpawner(Spawner):
 
             if self.set_service_image_name_label:
                 self.log.debug(
-                    "Spawner set_service_image_name_label is enabled, updating container_spec labels"
+                    "Spawner set_service_image_name_label is enabled, "
+                    "updating container_spec labels"
                 )
                 if not new_service_config["container_spec"]["labels"]:
                     new_service_config["container_spec"]["labels"] = {}
@@ -877,7 +881,8 @@ class SwarmSpawner(Spawner):
 
             if self.use_spawner_datatype_helpers:
                 self.log.debug(
-                    "Spawner use_spawner_datatype_helpers enabled, checking supported spawner data types: {}".format(
+                    "Spawner use_spawner_datatype_helpers enabled, "
+                    "checking supported spawner data types: {}".format(
                         self.supported_spawner_datatype_helpers
                     )
                 )
@@ -914,7 +919,13 @@ class SwarmSpawner(Spawner):
 
             if self.enable_accelerator_system:
                 self.log.debug(
-                    "Spawner enable_accelerator_system enabled, checking if any accelerator should be associated with the to be spawned session"
+                    "Spawner enable_accelerator_system enabled, checking if any "
+                    "accelerator should be associated with the to be spawned session"
+                )
+                self.log.debug(
+                    "Spawner AcceleratorManager current db contains: {}".format(
+                        self.accelerator_manager._db
+                    )
                 )
                 self.log.debug(
                     "Spawner AcceleratorManager current db contains: {}".format(
@@ -940,14 +951,14 @@ class SwarmSpawner(Spawner):
                                 pool
                             )
                             self.log.debug(
-                                "Found acceelertor: {}".format(assigned_accelerator)
+                                "Found acceelertor: {}".format(accelerator_type)
                             )
                             # Docker Swarm expects that GPU resources are set in th
                             # Resources.generic_resources.
                             # TODO, abstract the NVIDIA-GPU id
                             if (
-                                not "generic_resources"
-                                in new_service_config["resources"]
+                                "generic_resources"
+                                not in new_service_config["resources"]
                             ):
                                 new_service_config["resources"][
                                     "generic_resources"
@@ -957,9 +968,8 @@ class SwarmSpawner(Spawner):
                             }
                         else:
                             self.log.error(
-                                "Failed to get request accelerator resource from pool: {} - result: {}".format(
-                                    pool, assigned_accelerator
-                                )
+                                "Failed to get request accelerator resource from pool:"
+                                " {} - result: {}".format(pool, assigned_accelerator)
                             )
 
             # Create the service
@@ -1060,6 +1070,11 @@ class SwarmSpawner(Spawner):
                     self.service_name, self.service_id[:7]
                 )
             )
+            # if self.enable_accelerator_system:
+            #     # Release any associated accelerators
+            #     # TODO, discover the used pool
+            #     self.accelerator_manager.release(pool, self.user.name, logger=self.log)
+
             if volumes is not None:
                 for volume in volumes:
                     labels = volume.get("VolumeOptions", {}).get("Labels", {})

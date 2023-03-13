@@ -95,7 +95,6 @@ def test_sshfs_mount_hub(image, swarm, network, make_service):
     services_before_spawn = client.services.list()
     test_logger.info("Pre test services: {}".format(services_before_spawn))
 
-    
     # Both the hub and mount service should both be running here
     for service in services_before_spawn:
         while service.tasks() and service.tasks()[0]["Status"]["State"] != "running":
