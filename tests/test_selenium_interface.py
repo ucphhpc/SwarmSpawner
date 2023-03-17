@@ -9,10 +9,10 @@ from tests.defaults import (
 )
 from tests.util import wait_for_site
 from selenium import webdriver
-
-# from selenium.webdriver.common.keys import Keys
-from selenium.webdriver.common.by import By
 from selenium.common.exceptions import NoSuchElementException
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.firefox.service import Service as FirefoxService
 from webdriver_manager.firefox import GeckoDriverManager
 
@@ -101,10 +101,14 @@ def test_interface_start_stop(image, swarm, network, make_service):
         except NoSuchElementException:
             loading = False
 
-    # Wait for the jupyterhub slash animation
-    # Find the top panel and click the Hub button
-    # top_panel = driver.find_element(By.ID, "jp-top-panel")
-    # assert top_panel
+    # Wait for the jupyterhub splash animation has finished
+    # Look for the top panel bar
+    splashed = WebDriverWait(driver, 30).until(
+        EC.presence_of_element_located((By.ID, "jp-top-panel"))
+    )
+    assert splashed
+
+    # TODO, Jump back to the JupyterHub page and shutdown the instance
     # file_btn = driver.find_element(By.CLASS_NAME, "lm-MenuBar-itemLabel p-MenuBar-itemLabel")
     driver.close()
 
