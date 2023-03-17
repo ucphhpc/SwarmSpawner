@@ -98,5 +98,6 @@ check:
 	. $(VENV)/activate; pytest -s -v tests/test_access_system_list.py
 	. $(VENV)/activate; pytest -s -v tests/test_access_system_file.py
 	. $(VENV)/activate; pytest -s -v tests/test_accelerator_system.py
+	. $(VENV)/activate; pytest -s -v tests/test_selenium_interface.py
 
 include Makefile.venv
