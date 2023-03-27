@@ -1,3 +1,4 @@
+SHELL:=/bin/bash
 PACKAGE_NAME=jhub-swarmspawner
 PACKAGE_NAME_FORMATTED=$(subst -,_,$(PACKAGE_NAME))
 OWNER=ucphhpc
