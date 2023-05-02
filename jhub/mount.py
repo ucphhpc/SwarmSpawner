@@ -27,6 +27,7 @@ class Mounter(LoggingConfigurable):
         self.log.debug("formatting mount config: {} with: {}".format(config, kwargs))
         for key, value in kwargs.items():
             recursive_format(config, value)
+        self.log.debug("new formatted config: {}".format(config))
 
 
 class VolumeMounter(Mounter):
@@ -45,9 +46,9 @@ class VolumeMounter(Mounter):
             "Creating VolumeMount with options {}".format(format_config_kwargs)
         )
         new_config = yield self.gen_config_copy()
-        formatted_config = yield self.format_config(new_config, **format_config_kwargs)
-        yield self.validate_config(formatted_config)
-        mount = yield self.create_mount(formatted_config)
+        yield self.format_config(new_config, **format_config_kwargs)
+        yield self.validate_config(new_config)
+        mount = yield self.create_mount(new_config)
         return mount
 
     @gen.coroutine
@@ -118,7 +119,7 @@ class SSHFSMounter(Mounter):
     @gen.coroutine
     def create(self, **format_config_kwargs):
         new_config = yield self.gen_config_copy()
-        formatted_config = yield self.format_config(new_config, **format_config_kwargs)
-        yield self.validate_config(formatted_config)
-        mount = yield self.create_mount(formatted_config)
+        yield self.format_config(new_config, **format_config_kwargs)
+        yield self.validate_config(new_config)
+        mount = yield self.create_mount(new_config)
         return mount
