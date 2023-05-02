@@ -31,14 +31,14 @@ sshfs_mount = [
                 "options": {
                     "sshcmd": "{username}@{targetHost}:{targetPath}",
                     "id_rsa": "{privateKey}",
+                    "port": "{port}",
+                    "ephemeral": "True",
                     "allow_other": "",
                     "reconnect": "",
-                    "port": "{port}",
                 },
             },
             "source": "sshvolume-user-{name}",
             "target": "/home/jovyan/work",
-            "labels": {"autoremove": "True"},
         }
     )
 ]

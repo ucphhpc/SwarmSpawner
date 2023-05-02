@@ -14,14 +14,19 @@ class Mounter(LoggingConfigurable):
             raise Exception("A non-zero sized dictionary is expected")
         # Ensure that we don't change the passed in config,
         # But only use it. Deep copy is allowed if it is of type Config
+        self.log.debug("instantiating Mounter with config: {}".format(config))
         self.config = copy.deepcopy(Config(config))
 
     @gen.coroutine
-    def format_config(self, **kwargs):
+    def gen_config_copy(self):
+        return copy.deepcopy(self.config)
+
+    @gen.coroutine
+    def format_config(self, config, **kwargs):
         # Dynamically overload the mount config
-        self.log.debug("formatting mount config with {}".format(kwargs))
+        self.log.debug("formatting mount config: {} with: {}".format(config, kwargs))
         for key, value in kwargs.items():
-            recursive_format(self.config, value)
+            recursive_format(config, value)
 
 
 class VolumeMounter(Mounter):
@@ -29,9 +34,9 @@ class VolumeMounter(Mounter):
         Mounter.__init__(self, config)
 
     @gen.coroutine
-    def create_mount(self):
+    def create_mount(self, config):
         mount = {}
-        mount.update(self.config)
+        mount.update(config)
         return Mount(**mount)
 
     @gen.coroutine
@@ -39,16 +44,17 @@ class VolumeMounter(Mounter):
         self.log.debug(
             "Creating VolumeMount with options {}".format(format_config_kwargs)
         )
-        yield self.format_config(**format_config_kwargs)
-        yield self.validate_config()
-        mount = yield self.create_mount()
+        new_config = yield self.gen_config_copy()
+        formatted_config = yield self.format_config(new_config, **format_config_kwargs)
+        yield self.validate_config(formatted_config)
+        mount = yield self.create_mount(formatted_config)
         return mount
 
     @gen.coroutine
-    def validate_config(self):
+    def validate_config(self, config):
         self.log.debug("validate_config")
         required_config_keys = ["source", "target"]
-        missing_keys = [key for key in required_config_keys if key not in self.config]
+        missing_keys = [key for key in required_config_keys if key not in config]
 
         if missing_keys:
             self.log.error("Missing configure keys {}".format(",".join(missing_keys)))
@@ -57,7 +63,7 @@ class VolumeMounter(Mounter):
             )
 
         required_config_values = ["target"]
-        empty_values = [key for key in required_config_values if not self.config[key]]
+        empty_values = [key for key in required_config_values if not config[key]]
         if empty_values:
             self.log.error(
                 "Missing configuring values {}".format(",".join(empty_values))
@@ -72,26 +78,26 @@ class SSHFSMounter(Mounter):
         Mounter.__init__(self, config)
 
     @gen.coroutine
-    def create_mount(self):
-        self.log.debug("create_mount from config: {}".format(self.config))
+    def create_mount(self, config):
+        self.log.debug("create_mount from config: {}".format(config))
         # Adapt mount options into appropriate types
         driver_config = DriverConfig(
-            self.config["driver_config"]["name"],
-            self.config["driver_config"]["options"],
+            config["driver_config"]["name"],
+            config["driver_config"]["options"],
         )
 
         mount_config = {}
-        mount_config.update(self.config)
+        mount_config.update(config)
         # Override the DriverConfig to be the correct type
         # as expected by the Docker module.
         mount_config["driver_config"] = driver_config
         return Mount(**mount_config)
 
     @gen.coroutine
-    def validate_config(self):
+    def validate_config(self, config):
         self.log.debug("validate_config")
         required_config_keys = ["source", "target", "type", "driver_config"]
-        missing_keys = [key for key in required_config_keys if key not in self.config]
+        missing_keys = [key for key in required_config_keys if key not in config]
 
         if missing_keys:
             self.log.error("Missing configure keys {}".format(",".join(missing_keys)))
@@ -100,7 +106,7 @@ class SSHFSMounter(Mounter):
             )
 
         required_config_values = ["type", "driver_config", "target"]
-        empty_values = [key for key in required_config_values if not self.config[key]]
+        empty_values = [key for key in required_config_values if not config[key]]
         if empty_values:
             self.log.error(
                 "Missing configuring values {}".format(",".join(empty_values))
@@ -111,7 +117,8 @@ class SSHFSMounter(Mounter):
 
     @gen.coroutine
     def create(self, **format_config_kwargs):
-        yield self.format_config(**format_config_kwargs)
-        yield self.validate_config()
-        mount = yield self.create_mount()
+        new_config = yield self.gen_config_copy()
+        formatted_config = yield self.format_config(new_config, **format_config_kwargs)
+        yield self.validate_config(formatted_config)
+        mount = yield self.create_mount(formatted_config)
         return mount

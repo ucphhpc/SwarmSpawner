@@ -727,18 +727,13 @@ class SwarmSpawner(Spawner):
 
             # Mounts can be declared as regular dictionaries
             # or as special Mountable objects (see mount.py)
-
-            # Ensure that the formatted mount config does not persist
-            # across user sessions
-            mount_templates = copy.deepcopy(mounts)
-            for mount in mount_templates:
+            for mount in mounts:
                 if isinstance(mount, dict):
                     m = VolumeMounter(mount)
                     m = yield m.create(**format_mount_kwargs)
                 else:
                     # Custom type mount defined
                     # Is instantiated in the config
-
                     m = yield mount.create(**format_mount_kwargs)
                 container_spec["mounts"].append(m)
 
