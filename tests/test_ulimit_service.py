@@ -120,7 +120,9 @@ def test_ulimit_service(image, swarm, network, make_service):
         assert home_resp.status_code == 200
 
         # Check that the ulimit for the service is set to unlimited
-        container = client.containers.get(running_task["Status"]["ContainerStatus"]["ContainerID"])
+        container = client.containers.get(
+            running_task["Status"]["ContainerStatus"]["ContainerID"]
+        )
         # TODO, assert the ulimit
 
         # Remove via the web interface

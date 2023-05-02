@@ -27,9 +27,4 @@ c.SwarmSpawner.images = [
 ]
 
 # -1 should mean unlimited
-c.SwarmSpawner.container_spec = {
-    "ulimit": {
-        "soft": "-1",
-        "hard": "-1"
-    }
-}
+c.SwarmSpawner.container_spec = {"ulimit": {"soft": "-1", "hard": "-1"}}
