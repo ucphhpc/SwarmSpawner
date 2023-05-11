@@ -145,7 +145,7 @@ E.g.
     c.SwarmSpawner.images = [
         {'image': 'jupyter/base-notebook:30f16d52126f',
          'name': 'Minimal python notebook',
-         'placement': {'constraint': ['node.hostname==worker1']}},
+         'placement': {'constraints': ['node.hostname==worker1']}},
     ]
 
 
