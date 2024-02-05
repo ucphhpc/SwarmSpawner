@@ -1083,9 +1083,9 @@ class SwarmSpawner(Spawner):
                             )
 
     @gen.coroutine
-    def wait_for_running_tasks(self, max_attempts=20):
+    def wait_for_running_tasks(self, max_attempts=20, max_preparing=30):
         preparing, running = False, False
-        attempt = 0
+        num_preparing, attempt = 0, 0
         while not running:
             service = yield self.get_service()
             task_filter = {"service": service["Spec"]["Name"]}
@@ -1106,4 +1106,8 @@ class SwarmSpawner(Spawner):
                     return False
             if not preparing:
                 attempt += 1
+            else:
+                num_preparing += 1
+            if num_preparing > max_preparing:
+                return False
             yield gen.sleep(1)
