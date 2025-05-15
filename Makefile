@@ -1,13 +1,13 @@
 SHELL:=/bin/bash
 PACKAGE_NAME=jhub-swarmspawner
-PACKAGE_NAME_FORMATTED=$(subst -,_,$(PACKAGE_NAME))
+PACKAGE_NAME_FORMATTED=$(subst -,_,${PACKAGE_NAME})
 OWNER=ucphhpc
-IMAGE=$(PACKAGE_NAME)
+IMAGE=${PACKAGE_NAME}
 # Enable that the builder should use buildkit
 # https://docs.docker.com/develop/develop-images/build_enhancements/
 DOCKER_BUILDKIT=1
 # NOTE: dynamic lookup with docker as default and fallback to podman
-DOCKER = $(shell which docker 2>/dev/null || which podman 2>/dev/null)
+DOCKER=$(shell which docker 2>/dev/null || which podman 2>/dev/null)
 TAG=edge
 ARGS=
 
@@ -48,7 +48,7 @@ dist: venv
 
 .PHONY: distclean
 distclean:
-	rm -fr dist build $(PACKAGE_NAME).egg-info $(PACKAGE_NAME_FORMATTED).egg-info
+	rm -fr dist build ${PACKAGE_NAME}.egg-info ${PACKAGE_NAME_FORMATTED}.egg-info
 
 .PHONY: maintainer-clean
 maintainer-clean:
@@ -75,7 +75,7 @@ install: install-dep
 .PHONY: uninstall
 uninstall: venv
 	$(VENV)/pip uninstall -y -r requirements.txt
-	$(VENV)/pip uninstall -y -r $(PACKAGE_NAME)
+	$(VENV)/pip uninstall -y -r ${PACKAGE_NAME}
 
 .PHONY: uninstalltest
 uninstalltest: venv
@@ -96,7 +96,7 @@ uninstalltest: venv
 installtest: venv
 	$(VENV)/pip install -r tests/requirements.txt
 	@echo "Checking for the required ucphhpc/sshfs docker plugin for testing"
-ifeq ($(MOUNT_PLUGIN), 1)
+ifeq (${MOUNT_PLUGIN}, 1)
 	@echo "The ucphhpc/sshfs docker plugin was not found"
 	@echo "Installing the missing ucphhpc/sshfs docker plugin"
 	@docker plugin install ucphhpc/sshfs:latest --grant-all-permissions
