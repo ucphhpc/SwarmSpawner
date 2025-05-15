@@ -1,8 +1,5 @@
-version: '3.7'
-
 # Before jupyterhub spawner can launch anything,
 # the host needs to be a docker swarm manager
-
 services:
   jupyterhub:
     image: ucphhpc/jhub-swarmspawner:edge
