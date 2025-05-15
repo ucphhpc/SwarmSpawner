@@ -87,8 +87,15 @@ def test_remote_auth_hub(image, swarm, network, make_service):
     assert wait_for_site(JHUB_URL, valid_status_code=401) is True
 
     with requests.Session() as s:
+       # Refresh cookies
+        s.get(JHUB_URL)
+
         # Login
-        login_response = s.post(JHUB_URL + "/hub/login", headers=headers)
+        login_response = s.post(
+            JHUB_URL + "/hub/login",
+            headers=headers,
+            params={"_xsrf": s.cookies["_xsrf"]}
+        )
         test_logger.info("Login response message: {}".format(login_response.text))
         assert login_response.status_code == 200
 
@@ -98,7 +105,11 @@ def test_remote_auth_hub(image, swarm, network, make_service):
         assert spawn_form_resp.status_code == 200
         assert "Select a notebook image" in spawn_form_resp.text
         payload = {"dockerimage": "ucphhpc/base-notebook:latest"}
-        spawn_resp = s.post(JHUB_URL + "/hub/spawn", data=payload)
+        spawn_resp = s.post(
+            JHUB_URL + "/hub/spawn",
+            data=payload,
+            params={"_xsrf": s.cookies["_xsrf"]},
+        )
         test_logger.info("Spawn POST response message: {}".format(spawn_resp.text))
         assert spawn_resp.status_code == 200
 
@@ -208,7 +219,11 @@ def test_remote_auth_hub_custom_username(image, swarm, network, make_service):
         assert spawn_form_resp.status_code == 200
         assert "Select a notebook image" in spawn_form_resp.text
         payload = {"dockerimage": "ucphhpc/base-notebook:latest"}
-        spawn_resp = s.post(JHUB_URL + "/hub/spawn", data=payload)
+        spawn_resp = s.post(
+            JHUB_URL + "/hub/spawn",
+            data=payload,
+            params={"_xsrf": s.cookies["_xsrf"]},
+        )
         test_logger.info("Spawn POST response message: {}".format(spawn_resp.text))
         assert spawn_resp.status_code == 200
 
