@@ -1,5 +1,5 @@
-FROM jupyterhub/jupyterhub:3.1.1
-LABEL MAINTAINER Rasmus Munk <rasmus.munk@nbi.ku.dk>
+FROM jupyterhub/jupyterhub:4.1.6
+LABEL MAINTAINER="Rasmus Munk <rasmus.munk@di.ku.dk>"
 
 WORKDIR /app
 
