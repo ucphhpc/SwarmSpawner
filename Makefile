@@ -3,16 +3,20 @@ PACKAGE_NAME=jhub-swarmspawner
 PACKAGE_NAME_FORMATTED=$(subst -,_,$(PACKAGE_NAME))
 OWNER=ucphhpc
 IMAGE=$(PACKAGE_NAME)
+# Enable that the builder should use buildkit
+# https://docs.docker.com/develop/develop-images/build_enhancements/
+DOCKER_BUILDKIT=1
+# NOTE: dynamic lookup with docker as default and fallback to podman
+DOCKER = $(shell which docker 2>/dev/null || which podman 2>/dev/null)
 TAG=edge
 ARGS=
 
-MOUNT_PLUGIN := $(shell docker plugin inspect ucphhpc/sshfs:latest > /dev/null 2>&1  && echo 0 || echo 1)
+MOUNT_PLUGIN := $(shell ${DOCKER} plugin inspect ucphhpc/sshfs:latest > /dev/null 2>&1  && echo 0 || echo 1)
 
-.PHONY: all init dockerbuild dockerclean dockerpush clean dist distclean maintainer-clean
-.PHONY: install uninstall installcheck check
-
+.PHONY: all
 all: venv install-dep init dockerbuild
 
+.PHONY: init
 init:
 ifeq ($(shell test -e defaults.env && echo yes), yes)
 ifneq ($(shell test -e .env && echo yes), yes)
@@ -20,52 +24,61 @@ ifneq ($(shell test -e .env && echo yes), yes)
 endif
 endif
 
+.PHONY: dockerbuild
 dockerbuild:
-	docker build -t $(OWNER)/$(IMAGE):$(TAG) $(ARGS) .
+	${DOCKER} build -t ${OWNER}/${IMAGE}:${TAG} .
 
+.PHONY: dockerclean
 dockerclean:
-	docker rmi -f $(OWNER)/$(IMAGE):$(TAG)
+	${DOCKER} rmi -f ${OWNER}/${IMAGE}:${TAG}
 
+.PHONY: dockerpush
 dockerpush:
-	docker push $(OWNER)/$(IMAGE):$(TAG)
+	${DOCKER} push ${OWNER}/${IMAGE}:${TAG}
 
-clean:
-	$(MAKE) dockerclean
-	$(MAKE) distclean
-	$(MAKE) venv-clean
+.PHONY: clean
+clean: dockerclean distclean venv-clean
 	rm -fr .env
 	rm -fr .pytest_cache
 	rm -fr tests/__pycache__
 
-dist:
+.PHONY: dist
+dist: venv
 	$(VENV)/python setup.py sdist bdist_wheel
 
+.PHONY: distclean
 distclean:
 	rm -fr dist build $(PACKAGE_NAME).egg-info $(PACKAGE_NAME_FORMATTED).egg-info
 
+.PHONY: maintainer-clean
 maintainer-clean:
 	@echo 'This command is intended for maintainers to use; it'
 	@echo 'deletes files that may need special tools to rebuild.'
 	$(MAKE) distclean
 
-install-dev:
+.PHONY: install-dev
+install-dev: venv
 	$(VENV)/pip install -r requirements-dev.txt
 
-uninstall-dev:
+.PHONY: uninstall-dev
+uninstall-dev: venv
 	$(VENV)/pip uninstall -y -r requirements-dev.txt
 
-install-dep:
+.PHONY: install-dep
+install-dep: venv
 	$(VENV)/pip install -r requirements.txt
 
-install:
-	$(MAKE) install-dep
+.PHONY: install
+install: install-dep
 	$(VENV)/pip install .
 
-uninstall:
+.PHONY: uninstall
+uninstall: venv
 	$(VENV)/pip uninstall -y -r requirements.txt
 	$(VENV)/pip uninstall -y -r $(PACKAGE_NAME)
 
-uninstallcheck:
+.PHONY: uninstalltest
+uninstalltest: venv
 	$(VENV)/pip uninstall -y -r tests/requirements.txt
 	@echo
 	@echo "*** WARNING ***"
@@ -79,7 +92,8 @@ uninstallcheck:
 	docker plugin disable ucphhpc/sshfs:latest
 	docker plugin rm ucphhpc/sshfs:latest
 
-installcheck:
+.PHONY: installtest
+installtest: venv
 	$(VENV)/pip install -r tests/requirements.txt
 	@echo "Checking for the required ucphhpc/sshfs docker plugin for testing"
 ifeq ($(MOUNT_PLUGIN), 1)
@@ -91,7 +105,8 @@ else
 endif
 
 # The tests requires access to the docker socket
-check:
+.PHONY: test
+test: installtest
 	. $(VENV)/activate; python3 setup.py check -rms
 	. $(VENV)/activate; pytest -s -v tests/
 
