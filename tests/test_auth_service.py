@@ -87,14 +87,14 @@ def test_remote_auth_hub(image, swarm, network, make_service):
     assert wait_for_site(JHUB_URL, valid_status_code=401) is True
 
     with requests.Session() as s:
-       # Refresh cookies
+        # Refresh cookies
         s.get(JHUB_URL)
 
         # Login
         login_response = s.post(
             JHUB_URL + "/hub/login",
             headers=headers,
-            params={"_xsrf": s.cookies["_xsrf"]}
+            params={"_xsrf": s.cookies["_xsrf"]},
         )
         test_logger.info("Login response message: {}".format(login_response.text))
         assert login_response.status_code == 200
@@ -143,9 +143,7 @@ def test_remote_auth_hub(image, swarm, network, make_service):
         # Write to home
         xsrf_headers = {"X-XSRFToken": xsrf_token}
         resp = s.put(
-            "".join([jhub_service_content, new_file]),
-            data=data,
-            headers=xsrf_headers,
+            "".join([jhub_service_content, new_file]), data=data, headers=xsrf_headers
         )
         assert resp.status_code == 201
 

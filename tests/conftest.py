@@ -1,4 +1,5 @@
 """Define fixtures for SwarmSpawner tests."""
+
 import time
 import docker
 import pytest

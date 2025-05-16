@@ -27,7 +27,7 @@ from docker.types import (
 from docker.utils import kwargs_from_env
 from tornado import gen
 from jupyterhub.spawner import Spawner
-from traitlets import default, Dict, Unicode, List, Bool, Int
+from traitlets import default, Dict, Unicode, List, Bool, Int, Union
 from jhub.mount import VolumeMounter
 from jhub.util import recursive_format
 
@@ -87,14 +87,7 @@ class SwarmSpawner(Spawner):
         ),
     ).tag(config=True)
 
-    option_template = Unicode(
-        """<option value="{value}">{name}</option>""",
-        help=dedent(
-            """
-            Template for html form options.
-        """
-        ),
-    ).tag(config=True)
+    option_template = """<option value="{value}">{name}</option>"""
 
     _executor = None
 
@@ -103,7 +96,7 @@ class SwarmSpawner(Spawner):
         """Return the form with the drop-down menu."""
         # User options not enabled -> return default jupyterhub form
         if not self.use_user_options:
-            return Unicode()
+            return ""
         template_options = []
         for di in self.images:
             value = dict(image=di["image"], name=di["name"])

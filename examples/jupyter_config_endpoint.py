@@ -29,3 +29,12 @@ c.SwarmSpawner.images = [
         "endpoint_spec": {"ports": {8888: 8888}},
     }
 ]
+
+
+c.SwarmSpawner.container_spec = {
+    "args": [
+        "/usr/local/bin/start-singleuser.sh",
+        "--ServerApp.ip=0.0.0.0",
+        "--ServerApp.port=8888",
+    ]
+}

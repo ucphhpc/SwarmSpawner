@@ -1,4 +1,5 @@
 """A simple jupyter config file for testing the spawner."""
+
 c = get_config()
 
 c.JupyterHub.hub_ip = "0.0.0.0"
@@ -29,3 +30,12 @@ c.SwarmSpawner.images = [
 
 c.JupyterHub.authenticator_class = "jhubauthenticators.DummyAuthenticator"
 c.DummyAuthenticator.password = "just magnets"
+
+
+c.SwarmSpawner.container_spec = {
+    "args": [
+        "/usr/local/bin/start-singleuser.sh",
+        "--ServerApp.ip=0.0.0.0",
+        "--ServerApp.port=8888",
+    ]
+}

@@ -60,3 +60,12 @@ c.SwarmSpawner.images = [
 
 # Which user state varibales should be used to format the service config
 c.SwarmSpawner.user_format_attributes = ["mount_data", "name"]
+
+
+c.SwarmSpawner.container_spec = {
+    "args": [
+        "/usr/local/bin/start-singleuser.sh",
+        "--ServerApp.ip=0.0.0.0",
+        "--ServerApp.port=8888",
+    ]
+}
