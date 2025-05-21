@@ -25,13 +25,14 @@ c.SwarmSpawner.use_user_options = True
 # Available docker images the user can spawn
 c.SwarmSpawner.images = [
     {
-        "image": "quay.io/jupyter/base-notebook:lab-4.1.6",
+        "image": "ucphhpc/base-notebook:latest",
         "name": "Basic Python Notebook",
     }
 ]
 
 c.SwarmSpawner.container_spec = {
     "args": [
+        "/usr/local/bin/start-singleuser.sh",
         "--ServerApp.ip=0.0.0.0",
         "--ServerApp.port=8888",
     ]

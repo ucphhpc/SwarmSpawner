@@ -38,7 +38,7 @@ sshfs_mount = [
                 },
             },
             "source": "sshvolume-user-{name}",
-            "target": "/home/jovyan/work",
+            "target": notebook_dir,
         }
     )
 ]

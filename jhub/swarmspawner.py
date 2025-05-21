@@ -27,7 +27,7 @@ from docker.types import (
 from docker.utils import kwargs_from_env
 from tornado import gen
 from jupyterhub.spawner import Spawner
-from traitlets import default, Dict, Unicode, List, Bool, Int, Union
+from traitlets import default, Dict, Unicode, List, Bool, Int
 from jhub.mount import VolumeMounter
 from jhub.util import recursive_format
 

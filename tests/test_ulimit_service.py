@@ -1,6 +1,4 @@
 import docker
-import json
-import time
 import requests
 import logging
 import pytest
@@ -10,8 +8,6 @@ from os.path import dirname, join, realpath
 from urllib.parse import urljoin
 from util import (
     get_service,
-    get_task_image,
-    get_service_labels,
     wait_for_site,
     wait_for_service_task,
     get_service_user,
@@ -82,30 +78,39 @@ def test_ulimit_service(image, swarm, network, make_service):
     assert wait_for_site(JHUB_URL) is True
 
     with requests.Session() as s:
-        # login
+        # Refresh cookies
+        s.get(JHUB_URL)
+
+        # Login
         test_logger.info("Authenticating with user: {}".format(username))
         login_response = s.post(
-            JHUB_URL + "/hub/login?next=",
+            urljoin(JHUB_URL, "/hub/login?next="),
             data={"username": username, "password": password},
+            params={"_xsrf": s.cookies["_xsrf"]},
         )
         test_logger.info("Login response message: {}".format(login_response.text))
         assert login_response.status_code == 200
+
         # Spawn a notebook
-        spawn_form_resp = s.get(JHUB_URL + "/hub/spawn")
+        spawn_form_resp = s.get(urljoin(JHUB_URL, "/hub/spawn"))
         test_logger.info("Spawn page message: {}".format(spawn_form_resp.text))
 
         assert spawn_form_resp.status_code == 200
         assert "Select a notebook image" in spawn_form_resp.text
 
         payload = {"dockerimage": "ucphhpc/base-notebook:latest"}
-        spawn_resp = s.post(JHUB_URL + "/hub/spawn", data=payload)
+        spawn_resp = s.post(
+            urljoin(JHUB_URL, "/hub/spawn"),
+            data=payload,
+            params={"_xsrf": s.cookies["_xsrf"]},
+        )
         test_logger.info("Spawn POST response message: {}".format(spawn_resp.text))
         assert spawn_resp.status_code == 200
 
         services = client.services.list()
         test_logger.info("Post spawn services: {}".format(services))
 
-        target_service_name = "{}-{}-{}".format("jupyter", username, "1")
+        target_service_name = "{}-".format("jupyter")
         spawned_service = get_service(client, target_service_name)
         assert spawned_service is not None
 
@@ -116,7 +121,7 @@ def test_ulimit_service(image, swarm, network, make_service):
         assert running_task
 
         # wait for user home
-        home_resp = s.get(JHUB_URL + "/user/{}/tree?".format(username))
+        home_resp = s.get(urljoin(JHUB_URL, "/user/{}/tree?".format(username)))
         assert home_resp.status_code == 200
 
         # Check that the ulimit for the service is set to unlimited
@@ -131,19 +136,14 @@ def test_ulimit_service(image, swarm, network, make_service):
         jhub_user = get_service_user(spawned_service)
         delete_url = urljoin(JHUB_URL, "/hub/api/users/{}/server".format(jhub_user))
 
-        pending = True
-        num_wait, max_wait = 0, 30
-        while pending or num_wait > max_wait:
-            num_wait += 1
-            resp = s.delete(delete_url, headers=delete_headers)
-            test_logger.info(
-                "Response from removing the user server: {}".format(resp.text)
-            )
-            if resp.status_code == 204:
-                pending = False
-            time.sleep(1)
-
-        assert resp.status_code == 204
+        # Wait for the server to finish deleting
+        deleted = delete(
+            s,
+            delete_url,
+            headers=delete_headers,
+            params={"_xsrf": s.cookies["_xsrf"]},
+        )
+        assert deleted
 
         # double check it is gone
         deleted_service = get_service(client, target_service_name)
