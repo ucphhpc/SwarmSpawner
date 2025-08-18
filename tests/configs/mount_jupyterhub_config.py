@@ -48,7 +48,7 @@ sshfs_mount = [
 c.SwarmSpawner.use_user_options = True
 
 # Available docker images the user can spawn
-# Additional settings including, access, mounts, placement
+# Additional settings including, mounts, placement
 c.SwarmSpawner.images = [
     {
         "image": "ucphhpc/base-notebook:latest",

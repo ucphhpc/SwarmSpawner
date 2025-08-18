@@ -149,20 +149,6 @@ E.g.
     ]
 
 
-Beyond placement policy, it is also possible to specify a 'whitelist' of users who have
-permission to start a specific image via the 'access' key. Such that only mentioned
-usernames are able to spawn that particular image.
-
-.. code-block:: python
-
-    # Available docker images the user can spawn
-    c.SwarmSpawner.images = [
-        {'image': 'jupyter/base-notebook:30f16d52126f',
-         'name': 'Minimal python notebook',
-         'access': ['admin']},
-    ]
-
-
 To make the user able to select between multiple available images, the following must be
 set.
 If this is not the case, the user will simply spawn an instance of the default image. i.e. images[0]

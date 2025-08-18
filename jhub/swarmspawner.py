@@ -7,7 +7,6 @@ import ast
 import copy
 import docker
 import hashlib
-import os
 from asyncio import sleep
 from async_generator import async_generator, yield_
 from textwrap import dedent
@@ -23,6 +22,7 @@ from docker.types import (
     Placement,
     ConfigReference,
     EndpointSpec,
+    Config,
 )
 from docker.utils import kwargs_from_env
 from tornado import gen
@@ -30,6 +30,29 @@ from jupyterhub.spawner import Spawner
 from traitlets import default, Dict, Unicode, List, Bool, Int
 from jhub.mount import VolumeMounter
 from jhub.util import recursive_format
+
+
+def get_user_uid_gid(dictionary, delimiter=":"):
+    uid_gid = dictionary.get("uid_gid", {})
+    if not uid_gid:
+        return None, None
+
+    if delimiter not in uid_gid:
+        return None, None
+
+    uid, gid = uid_gid.split(delimiter)
+    return uid, gid
+
+
+def create_user_config(config_name, data, user_config_kwargs=None):
+    if not user_config_kwargs:
+        user_config_kwargs = {}
+    return Config(config_name, data, **user_config_kwargs)
+
+
+def prepare_user_config_reference(config_name, filename=None, uid=1000, gid=1000):
+    """Create a user config with a file associated with it"""
+    return dict(config_name, filename=filename, uid=uid, gid=gid)
 
 
 class UnicodeOrFalse(Unicode):
@@ -616,26 +639,35 @@ class SwarmSpawner(Spawner):
             user_options = {}
 
         service = yield self.get_service()
-        if service is None:
-            # Validate state
-            if hasattr(self, "container_spec") and self.container_spec is not None:
-                container_spec = dict(**self.container_spec)
-            elif user_options == {}:
-                self.log.error(
-                    "User: {} is trying to create a service"
-                    " without a container_spec".format(self.user)
+        if service:
+            self.log.info(
+                "Found existing Docker service '{}' (id: {})".format(
+                    self.service_name, self.service_id[:7]
                 )
-                raise Exception(
-                    "That notebook is missing a specification"
-                    "to launch it, contact the admin to resolve "
-                    "this issue"
-                )
+            )
+            # Handle re-using API token.
+            # Get the API token from the environment variables
+            # of the running service:
+            envs = service["Spec"]["TaskTemplate"]["ContainerSpec"]["Env"]
+            for line in envs:
+                if line.startswith("JPY_API_TOKEN="):
+                    self.api_token = line.split("=", 1)[1]
+                    break
+        else:
+            # Create a new service
+            self.log.info(
+                "Creating a new Docker service for user: {}".format(self.user.name)
+            )
+            container_spec = copy.deepcopy(self.container_spec)
 
-            # Setup service
-            container_spec.update(user_options.get("container_spec", {}))
+            if isinstance(container_spec, dict) and container_spec:
+                container_spec.update(user_options.get("container_spec", {}))
 
             # Which image to spawn
-            if self.use_user_options and "user_selected_image" in user_options:
+            if (
+                "user_selected_image" in user_options
+                and "user_selected_name" in user_options
+            ):
                 self.log.debug("User options received: {}".format(user_options))
                 image_name = user_options["user_selected_name"]
                 image_value = user_options["user_selected_image"]
@@ -657,41 +689,33 @@ class SwarmSpawner(Spawner):
                 selected_image = self.images[0]
                 self.log.info("Using the default image: {}".format(selected_image))
 
-            self.log.debug("Image info: {}".format(selected_image))
-            # Does that image have restricted access
-            if "access" in selected_image:
-                # Check for static or db users
-                allowed = False
-                if self.service_owner in selected_image["access"]:
-                    allowed = True
-                else:
-                    if os.path.exists(selected_image["access"]):
-                        db_path = selected_image["access"]
-                        try:
-                            self.log.info(
-                                "Checking db: {} for "
-                                "User: {}".format(db_path, self.service_owner)
-                            )
-                            with open(db_path, "r") as db:
-                                users = [
-                                    user.rstrip("\n").rstrip("\r\n") for user in db
-                                ]
-                                if self.service_owner in users:
-                                    allowed = True
-                        except IOError as err:
-                            self.log.error(
-                                "User: {} tried to open db file {},"
-                                "Failed {}".format(self.service_owner, db_path, err)
-                            )
-                if not allowed:
-                    self.log.error(
-                        "User: {} tried to launch {} without access".format(
-                            self.service_owner, selected_image["image"]
-                        )
-                    )
-                    raise Exception("You don't have permission to launch that image")
+            # Extract the UID and GID to use inside the container
+            uid, gid = get_user_uid_gid(container_spec)
+            if "uid_gid" in selected_image:
+                uid, gid = get_user_uid_gid(selected_image["uid_gid"])
+            # uid_gid is not a supported option in the container_spec
+            container_spec.pop("uid_gid")
 
-            self.log.debug("Container spec: {}".format(container_spec))
+            if uid:
+                container_spec.update({"user": "{}".format(uid)})
+            if uid and gid:
+                container_spec.update({"user": "{}:{}".format(uid, gid)})
+
+            # Check if the user supplied a user_install_file to create a ConfigReference from
+            # that can be used to install into the user's container upon spawning.
+            if (
+                "user_install_file" in user_options
+                and user_options["user_install_file"]
+            ):
+                user_config_name = "jupyter-{}".format(self.user.name)
+                user_config = create_user_config(
+                    user_config_name, user_options["user_install_file"]
+                )
+                if user_config:
+                    user_install_config = prepare_user_config_reference(
+                        user_config_name, uid=uid, gid=gid
+                    )
+                    self.configs.append(user_install_config)
 
             # Assign the image name as a label
             container_spec["labels"] = {"image_name": selected_image["name"]}
@@ -708,7 +732,7 @@ class SwarmSpawner(Spawner):
                 mounts.extend(selected_image["mounts"])
 
             # Prepare the dictionary that can be used
-            # to format the mount config
+            # to format the container_spec
             format_mount_kwargs = {}
             if self.user_format_attributes:
                 for attr in self.user_format_attributes:
@@ -884,43 +908,6 @@ class SwarmSpawner(Spawner):
                     )
 
             # Global container user
-            uid_gid = None
-            if "uid_gid" in container_spec:
-                uid_gid = copy.deepcopy(container_spec["uid_gid"])
-                del container_spec["uid_gid"]
-
-            # Image user
-            if "uid_gid" in selected_image:
-                uid_gid = selected_image["uid_gid"]
-
-            self.log.info("gid info {}".format(uid_gid))
-            if isinstance(uid_gid, str):
-                if ":" in uid_gid:
-                    uid, gid = uid_gid.split(":")
-                else:
-                    uid, gid = uid_gid, None
-
-                if (
-                    uid == "{uid}"
-                    and hasattr(self.user, "uid")
-                    and self.user.uid is not None
-                ):
-                    uid = self.user.uid
-
-                if (
-                    gid is not None
-                    and gid == "{gid}"
-                    and hasattr(self.user, "gid")
-                    and self.user.gid is not None
-                ):
-                    gid = self.user.gid
-
-                if uid:
-                    container_spec.update({"user": str(uid)})
-                if uid and gid:
-                    container_spec.update({"user": str(uid) + ":" + str(gid)})
-
-            # Global container user
             if "user" in container_spec:
                 container_spec["user"] = str(container_spec["user"])
 
@@ -998,21 +985,6 @@ class SwarmSpawner(Spawner):
             )
 
             yield self.wait_for_running_tasks()
-
-        else:
-            self.log.info(
-                "Found existing Docker service '{}' (id: {})".format(
-                    self.service_name, self.service_id[:7]
-                )
-            )
-            # Handle re-using API token.
-            # Get the API token from the environment variables
-            # of the running service:
-            envs = service["Spec"]["TaskTemplate"]["ContainerSpec"]["Env"]
-            for line in envs:
-                if line.startswith("JPY_API_TOKEN="):
-                    self.api_token = line.split("=", 1)[1]
-                    break
 
         ip = self.service_name
         port = self.service_port

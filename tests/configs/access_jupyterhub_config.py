@@ -18,16 +18,6 @@ c.SwarmSpawner.networks = ["jh_test"]
 # user_options has to be enabled
 c.SwarmSpawner.use_user_options = True
 
-access_list = ["privileged-user"]
-
-c.SwarmSpawner.images = [
-    {
-        "image": "ucphhpc/base-notebook:latest",
-        "name": "Basic Python Notebook",
-        "access": access_list,
-    }
-]
-
 c.JupyterHub.authenticator_class = "jhubauthenticators.DummyAuthenticator"
 c.DummyAuthenticator.password = "just magnets"
 
