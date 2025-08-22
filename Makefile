@@ -18,6 +18,7 @@ endif
 $(echo ${DOCKER_COMPOSE} >/dev/null)
 
 TAG=edge
+BUILD_ARGS=
 ARGS=
 
 MOUNT_PLUGIN := $(shell ${DOCKER} plugin inspect ucphhpc/sshfs:latest > /dev/null 2>&1  && echo 0 || echo 1)
@@ -35,7 +36,7 @@ endif
 
 .PHONY: dockerbuild
 dockerbuild:
-	${DOCKER} build -t ${OWNER}/${IMAGE}:${TAG} .
+	${DOCKER} build -t ${OWNER}/${IMAGE}:${TAG} ${BUILD_ARGS} .
 
 .PHONY: dockerclean
 dockerclean:

@@ -14,6 +14,6 @@ RUN cd SwarmSpawner \
     && touch README.rst \
     && pip3 install .
 
-WORKDIR /etc/jupyterhub
+WORKDIR /srv/jupyterhub
 
 CMD ["jupyterhub"]
