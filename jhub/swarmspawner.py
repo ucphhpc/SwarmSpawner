@@ -22,7 +22,6 @@ from docker.types import (
     Placement,
     ConfigReference,
     EndpointSpec,
-    Config,
 )
 from docker.utils import kwargs_from_env
 from tornado import gen
@@ -44,24 +43,78 @@ def get_user_uid_gid(dictionary, delimiter=":"):
     return uid, gid
 
 
-def create_user_config(config_name, data, user_config_kwargs=None):
+def create_user_config(docker_client, config_name, data, user_config_kwargs=None):
     if not user_config_kwargs:
         user_config_kwargs = {}
-    return Config(config_name, data, **user_config_kwargs)
+    return
 
 
-def prepare_user_config_reference(config_name, filename=None, uid=1000, gid=1000):
+def prepare_user_config_reference(
+    config_id, config_name, filename=None, uid=1000, gid=1000
+):
     """Create a user config with a file associated with it"""
-    return dict(config_name, filename=filename, uid=uid, gid=gid)
+    return dict(
+        config_id=config_id,
+        config_name=config_name,
+        filename=filename,
+        uid=uid,
+        gid=gid,
+    )
 
 
-class UnicodeOrFalse(Unicode):
-    info_text = "a unicode string or False"
+def get_docker_client(api_client_kwargs=None, tls_kwargs=None):
+    if not api_client_kwargs:
+        api_client_kwargs = {}
+    if not tls_kwargs:
+        tls_kwargs = {}
 
-    def validate(self, obj, value):
-        if not value:
-            return value
-        return super(UnicodeOrFalse, self).validate(obj, value)
+    kwargs = {}
+    if api_client_kwargs:
+        kwargs.update(api_client_kwargs)
+
+    if tls_kwargs:
+        kwargs["tls"] = TLSConfig(**tls_kwargs)
+
+    kwargs.update(kwargs_from_env())
+    return docker.APIClient(version="auto", **kwargs)
+
+
+def run_docker(method_name, *args, logger=None, **kwargs):
+    client = get_docker_client()
+    docker_method = get_instance_function(client, method_name)
+    if not docker_method:
+        return False
+    return run_with_executor(docker_method, *args, **kwargs)
+
+
+def prune_config(config_name_or_id, logger=None):
+    logger.debug("Running prune on {}".format(config_name_or_id))
+    try:
+        found = run_docker("inspect_config", config_name_or_id, logger=logger)
+        if found:
+            run_docker("remove_config", config_name_or_id, logger=logger)
+        return True
+    except docker.errors.NotFound:
+        if logger:
+            logger.error(
+                "Can't remove config: {} because it does not exist".format(
+                    config_name_or_id
+                )
+            )
+        return False
+    return False
+
+
+def run_with_executor(func, *args, **kwargs):
+    """Run a function in a thread pool executor"""
+    with ThreadPoolExecutor(max_workers=1) as executor:
+        return executor.submit(func, *args, **kwargs)
+
+
+def get_instance_function(instance, func_name):
+    if hasattr(instance, func_name):
+        return getattr(instance, func_name)
+    return None
 
 
 class SwarmSpawner(Spawner):
@@ -110,7 +163,39 @@ class SwarmSpawner(Spawner):
         ),
     ).tag(config=True)
 
-    option_template = """<option value="{value}">{name}</option>"""
+    option_template = Unicode(
+        """<option value="{value}">{name}</option>""",
+        help=dedent(
+            """
+            Option template for value and name options when rendering the form_template
+            """
+        ),
+    ).tag(config=True)
+
+    user_upload_form = Unicode(
+        """
+        <div class="upload-form" style="padding-top: 2em;">
+            <div class="form-group">
+                <label for="user-upload">Upload Install File (requirements.txt or environment.yml)</label>
+                <input type="file" name="user-upload" id="user-upload" class="form-control"/>
+            </div>
+        </div>
+        """,
+        help=dedent(
+            """ Form for allowing user upload of install files that can be used to prepare the
+            specified environment.
+            """
+        ),
+    ).tag(config=True)
+
+    enable_user_upload_install_files = Bool(
+        False,
+        help=dedent(
+            """
+            Allow users to upload install files that can be used to prepare the requsted environment.
+            """
+        ),
+    ).tag(config=True)
 
     _executor = None
 
@@ -126,7 +211,10 @@ class SwarmSpawner(Spawner):
             template_value = dict(name=di["name"], value=value)
             template_options.append(self.option_template.format(**template_value))
         option_template = "".join(template_options)
-        return self.form_template.format(option_template=option_template)
+        user_form = self.form_template.format(option_template=option_template)
+        if self.enable_user_upload_install_files:
+            user_form += self.user_upload_form
+        return user_form
 
     def options_from_form(self, form_data):
         """Parse the submitted form data and turn it into the correct
@@ -185,13 +273,32 @@ class SwarmSpawner(Spawner):
             "user_selected_name": selected_name,
             "user_selected_image": selected_image,
         }
+
+        # Whether user upload install files form should be parsed
+        if self.enable_user_upload_install_files:
+            # Check for uploaded file
+            user_uploaded_content = form_data.get("user-upload_file", None)
+            self.log.debug(
+                "Processing user uploaded content {}".format(user_uploaded_content)
+            )
+            user_install_files = []
+            if user_uploaded_content:
+                for upload_file in user_uploaded_content:
+                    if "filename" in upload_file and "body" in upload_file:
+                        user_install_files.append(
+                            {
+                                "filename": upload_file.get("filename", None),
+                                "data": upload_file.get("body", None),
+                            }
+                        )
+            options["user_install_files"] = user_install_files
         return options
 
     @property
     def executor(self, max_workers=1):
         """single global executor"""
         cls = self.__class__
-        if cls._executor is None:
+        if not cls._executor:
             cls._executor = ThreadPoolExecutor(max_workers)
         return cls._executor
 
@@ -380,6 +487,19 @@ class SwarmSpawner(Spawner):
         return "{}-{}-{}".format(self.service_prefix, self.service_owner, server_name)
 
     @property
+    def user_config_name_base(self):
+        """
+        Base config name for any configs that the service_owner uploads
+        """
+        if hasattr(self, "user_upload_name") and self.user_upload_name:
+            user_upload_name = self.user_upload_name
+        else:
+            user_upload_name = "upload"
+        return "{}-{}-{}".format(
+            self.service_prefix, self.service_owner, user_upload_name
+        )
+
+    @property
     def tasks(self):
         return self._tasks
 
@@ -392,6 +512,7 @@ class SwarmSpawner(Spawner):
         self.service_id = state.get("service_id", "")
 
     def get_state(self):
+        state = super().get_state()
         state = super().get_state()
         if self.service_id:
             state["service_id"] = self.service_id
@@ -693,29 +814,47 @@ class SwarmSpawner(Spawner):
             uid, gid = get_user_uid_gid(container_spec)
             if "uid_gid" in selected_image:
                 uid, gid = get_user_uid_gid(selected_image["uid_gid"])
-            # uid_gid is not a supported option in the container_spec
-            container_spec.pop("uid_gid")
+                # uid_gid is not a supported option in the container_spec
+            if "uid_gid" in container_spec:
+                container_spec.pop("uid_gid")
 
             if uid:
                 container_spec.update({"user": "{}".format(uid)})
             if uid and gid:
                 container_spec.update({"user": "{}:{}".format(uid, gid)})
 
-            # Check if the user supplied a user_install_file to create a ConfigReference from
+            # Check if the user supplied a user_install_files to create a ConfigReference from
             # that can be used to install into the user's container upon spawning.
             if (
-                "user_install_file" in user_options
-                and user_options["user_install_file"]
+                "user_install_files" in user_options
+                and user_options["user_install_files"]
             ):
-                user_config_name = "jupyter-{}".format(self.user.name)
-                user_config = create_user_config(
-                    user_config_name, user_options["user_install_file"]
-                )
-                if user_config:
-                    user_install_config = prepare_user_config_reference(
-                        user_config_name, uid=uid, gid=gid
-                    )
-                    self.configs.append(user_install_config)
+                for idx, user_install_file in enumerate(
+                    user_options.get("user_install_files", [])
+                ):
+                    if "filename" in user_install_file and "data" in user_install_file:
+                        config_name = "{}-{}".format(self.user_config_name_base, idx)
+                        # If an existing config_name already exists, remove
+                        # the old one before creating a new one
+                        if not prune_config(config_name, logger=self.log):
+                            err_msg = (
+                                "Failed to remove an existing uploaded install config"
+                            )
+                            self.log.error(err_msg)
+                            raise Exception(err_msg)
+
+                        user_config_result = yield self.docker(
+                            "create_config", config_name, user_install_file["data"]
+                        )
+                        if (
+                            isinstance(user_config_result, dict)
+                            and "ID" in user_config_result
+                        ):
+                            user_config_id = user_config_result.get("ID")
+                            user_install_config = prepare_user_config_reference(
+                                user_config_id, config_name, uid=uid, gid=gid
+                            )
+                            self.configs.append(user_install_config)
 
             # Assign the image name as a label
             container_spec["labels"] = {"image_name": selected_image["name"]}
@@ -1013,10 +1152,21 @@ class SwarmSpawner(Spawner):
             self.log.warn("Docker service not found")
             return
 
+        self.log.debug("Docker service {}".format(service["Spec"]))
         # lookup mounts before removing the service
-        volumes = None
+        volumes = []
         if "Mounts" in service["Spec"]["TaskTemplate"]["ContainerSpec"]:
             volumes = service["Spec"]["TaskTemplate"]["ContainerSpec"]["Mounts"]
+
+        # lookup user configs before removing the service
+        user_upload_configs = []
+        service_configs = service["Spec"]["TaskTemplate"]["ContainerSpec"].get(
+            "Configs", []
+        )
+        for config in service_configs:
+            config_name = config.get("ConfigName", None)
+            if config_name and self.user_config_name_base in config_name:
+                user_upload_configs.append(config)
 
         # Even though it returns the service is gone
         # the underlying containers are still being removed
@@ -1027,25 +1177,32 @@ class SwarmSpawner(Spawner):
                     self.service_name, self.service_id[:7]
                 )
             )
-            if volumes is not None:
-                for volume in volumes:
-                    labels = volume.get("VolumeOptions", {}).get("Labels", {})
-                    # Whether the volume should be kept
-                    if "autoremove" in labels and labels["autoremove"] != "False":
-                        self.log.debug("Volume {} is not kept".format(volume))
-                        if "Source" in volume:
-                            # Validate the volume exists
-                            try:
-                                yield self.docker("inspect_volume", volume["Source"])
-                            except docker.errors.NotFound:
-                                self.log.info("No volume named: " + volume["Source"])
-                            else:
-                                yield self.remove_volume(volume["Source"])
+            for volume in volumes:
+                labels = volume.get("VolumeOptions", {}).get("Labels", {})
+                # Whether the volume should be kept
+                if "autoremove" in labels and labels["autoremove"] != "False":
+                    self.log.debug("Volume {} is not kept".format(volume))
+                    if "Source" in volume:
+                        # Validate the volume exists
+                        try:
+                            yield self.docker("inspect_volume", volume["Source"])
+                        except docker.errors.NotFound:
+                            self.log.info("No volume named: " + volume["Source"])
                         else:
-                            self.log.error(
-                                "Volume {} didn't have a 'Source' key so it "
-                                "can't be removed".format(volume)
-                            )
+                            yield self.remove_volume(volume["Source"])
+                    else:
+                        self.log.error(
+                            "Volume {} didn't have a 'Source' key so it "
+                            "can't be removed".format(volume)
+                        )
+            for config in user_upload_configs:
+                self.log.info("Removing config: {}".format(config))
+                if not prune_config(config["ConfigName"], logger=self.log):
+                    self.log.error(
+                        "Can't remove config: {} because it does not exist".format(
+                            config["ConfigName"]
+                        )
+                    )
 
     @gen.coroutine
     def wait_for_running_tasks(self, max_attempts=20, max_preparing=30):
