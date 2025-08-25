@@ -7,6 +7,7 @@ import ast
 import copy
 import docker
 import hashlib
+import os
 from asyncio import sleep
 from async_generator import async_generator, yield_
 from textwrap import dedent
@@ -41,12 +42,6 @@ def get_user_uid_gid(dictionary, delimiter=":"):
 
     uid, gid = uid_gid.split(delimiter)
     return uid, gid
-
-
-def create_user_config(docker_client, config_name, data, user_config_kwargs=None):
-    if not user_config_kwargs:
-        user_config_kwargs = {}
-    return
 
 
 def prepare_user_config_reference(
@@ -194,6 +189,15 @@ class SwarmSpawner(Spawner):
             """
             Allow users to upload install files that can be used to prepare the requsted environment.
             """
+        ),
+    ).tag(config=True)
+
+    user_upload_destination_directory = Unicode(
+        os.path.join(os.sep, "user-installs"),
+        help=dedent(
+            """
+            Directory where user install files will be stored inside the spawned container.
+        """
         ),
     ).tag(config=True)
 
@@ -851,8 +855,15 @@ class SwarmSpawner(Spawner):
                             and "ID" in user_config_result
                         ):
                             user_config_id = user_config_result.get("ID")
+                            config_mount_path = os.path.join(
+                                self.user_upload_destination_directory, config_name
+                            )
                             user_install_config = prepare_user_config_reference(
-                                user_config_id, config_name, uid=uid, gid=gid
+                                user_config_id,
+                                config_name,
+                                filename=config_mount_path,
+                                uid=uid,
+                                gid=gid,
                             )
                             self.configs.append(user_install_config)
 
