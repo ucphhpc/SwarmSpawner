@@ -171,8 +171,8 @@ class SwarmSpawner(Spawner):
         """
         <div class="upload-form" style="padding-top: 2em;">
             <div class="form-group">
-                <label for="user-upload">Upload Install File (requirements.txt or environment.yml)</label>
-                <input type="file" name="user-upload" id="user-upload" class="form-control"/>
+                <label for="user-upload">Optional Upload Install File (requirements.txt)</label>
+                <input type="file" name="user-upload" id="user-upload" accept=".txt,.yml" class="form-control"/>
             </div>
         </div>
         """,
@@ -188,6 +188,16 @@ class SwarmSpawner(Spawner):
         help=dedent(
             """
             Allow users to upload install files that can be used to prepare the requsted environment.
+            """
+        ),
+    ).tag(config=True)
+
+    allowed_user_upload_extensions = List(
+        trait=Unicode(),
+        default_value=[".txt"],
+        help=dedent(
+            """
+            Allowed file extensions for user upload of install files
             """
         ),
     ).tag(config=True)
@@ -289,9 +299,41 @@ class SwarmSpawner(Spawner):
             if user_uploaded_content:
                 for upload_file in user_uploaded_content:
                     if "filename" in upload_file and "body" in upload_file:
+                        filename = upload_file.get("filename", None)
+                        if "." not in filename:
+                            self.log.error(
+                                "User: {} tried to upload an invalid file: {}".format(
+                                    self.user.name, filename
+                                )
+                            )
+                            raise RuntimeError(
+                                "An invalid file was uploaded, missing a valid extension, the allowed ones are: {}".format(
+                                    " ".join(self.allowed_user_upload_extensions)
+                                )
+                            )
+
+                        # Allow for multiple extensions
+                        name, extension = (
+                            ".".join(filename.split(".")[:-1]),
+                            ".{}".format(filename.split(".")[-1]),
+                        )
+                        if extension not in self.allowed_user_upload_extensions:
+                            self.log.error(
+                                "User: {} upload filename extension {} was not in the allowed set of: {}".format(
+                                    self.user.name,
+                                    extension,
+                                    self.allowed_user_upload_extensions,
+                                )
+                            )
+                            raise RuntimeError(
+                                "An invalid file extension used, the allowed ones are: {}".format(
+                                    " ".join(self.allowed_user_upload_extensions)
+                                )
+                            )
                         user_install_files.append(
                             {
-                                "filename": upload_file.get("filename", None),
+                                "name": name,
+                                "extension": extension,
                                 "data": upload_file.get("body", None),
                             }
                         )
@@ -836,36 +878,37 @@ class SwarmSpawner(Spawner):
                 for idx, user_install_file in enumerate(
                     user_options.get("user_install_files", [])
                 ):
-                    if "filename" in user_install_file and "data" in user_install_file:
-                        config_name = "{}-{}".format(self.user_config_name_base, idx)
-                        # If an existing config_name already exists, remove
-                        # the old one before creating a new one
-                        if not prune_config(config_name, logger=self.log):
-                            err_msg = (
-                                "Failed to remove an existing uploaded install config"
-                            )
-                            self.log.error(err_msg)
-                            raise Exception(err_msg)
+                    file_name = user_install_file["name"]
+                    file_extension = user_install_file["extension"]
 
-                        user_config_result = yield self.docker(
-                            "create_config", config_name, user_install_file["data"]
+                    config_name = "{}-{}".format(self.user_config_name_base, idx)
+                    # If an existing config_name already exists, remove
+                    # the old one before creating a new one
+                    if not prune_config(config_name, logger=self.log):
+                        err_msg = "Failed to remove an existing uploaded install config"
+                        self.log.error(err_msg)
+                        raise Exception(err_msg)
+
+                    user_config_result = yield self.docker(
+                        "create_config", config_name, user_install_file["data"]
+                    )
+                    if (
+                        isinstance(user_config_result, dict)
+                        and "ID" in user_config_result
+                    ):
+                        user_config_id = user_config_result.get("ID")
+                        config_mount_path = os.path.join(
+                            self.user_upload_destination_directory,
+                            file_name + file_extension,
                         )
-                        if (
-                            isinstance(user_config_result, dict)
-                            and "ID" in user_config_result
-                        ):
-                            user_config_id = user_config_result.get("ID")
-                            config_mount_path = os.path.join(
-                                self.user_upload_destination_directory, config_name
-                            )
-                            user_install_config = prepare_user_config_reference(
-                                user_config_id,
-                                config_name,
-                                filename=config_mount_path,
-                                uid=uid,
-                                gid=gid,
-                            )
-                            self.configs.append(user_install_config)
+                        user_install_config = prepare_user_config_reference(
+                            user_config_id,
+                            config_name,
+                            filename=config_mount_path,
+                            uid=uid,
+                            gid=gid,
+                        )
+                        self.configs.append(user_install_config)
 
             # Assign the image name as a label
             container_spec["labels"] = {"image_name": selected_image["name"]}
