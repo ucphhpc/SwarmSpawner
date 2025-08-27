@@ -291,53 +291,53 @@ class SwarmSpawner(Spawner):
         # Whether user upload install files form should be parsed
         if self.enable_user_upload_install_files:
             # Check for uploaded file
-            user_uploaded_content = form_data.get("user-upload_file", None)
+            user_uploaded_content = form_data.get("user-upload_file", [])
             self.log.debug(
                 "Processing user uploaded content {}".format(user_uploaded_content)
             )
             user_install_files = []
-            if user_uploaded_content:
-                for upload_file in user_uploaded_content:
-                    if "filename" in upload_file and "body" in upload_file:
-                        filename = upload_file.get("filename", None)
-                        if "." not in filename:
-                            self.log.error(
-                                "User: {} tried to upload an invalid file: {}".format(
-                                    self.user.name, filename
-                                )
+            for upload_file in user_uploaded_content:
+                if "filename" in upload_file and "body" in upload_file:
+                    filename = upload_file.get("filename", None)
+                    if "." not in filename:
+                        self.log.error(
+                            "User: {} tried to upload an invalid file: {}".format(
+                                self.user.name, filename
                             )
-                            raise RuntimeError(
-                                "An invalid file was uploaded, missing a valid extension, the allowed ones are: {}".format(
-                                    " ".join(self.allowed_user_upload_extensions)
-                                )
+                        )
+                        raise RuntimeError(
+                            "An invalid file was uploaded, missing a valid extension, the allowed ones are: {}".format(
+                                " ".join(self.allowed_user_upload_extensions)
                             )
+                        )
 
-                        # Allow for multiple extensions
-                        name, extension = (
-                            ".".join(filename.split(".")[:-1]),
-                            ".{}".format(filename.split(".")[-1]),
-                        )
-                        if extension not in self.allowed_user_upload_extensions:
-                            self.log.error(
-                                "User: {} upload filename extension {} was not in the allowed set of: {}".format(
-                                    self.user.name,
-                                    extension,
-                                    self.allowed_user_upload_extensions,
-                                )
+                    # Allow for multiple extensions
+                    name, extension = (
+                        ".".join(filename.split(".")[:-1]),
+                        ".{}".format(filename.split(".")[-1]),
+                    )
+                    if extension not in self.allowed_user_upload_extensions:
+                        self.log.error(
+                            "User: {} upload filename extension {} was not in the allowed set of: {}".format(
+                                self.user.name,
+                                extension,
+                                self.allowed_user_upload_extensions,
                             )
-                            raise RuntimeError(
-                                "An invalid file extension used, the allowed ones are: {}".format(
-                                    " ".join(self.allowed_user_upload_extensions)
-                                )
-                            )
-                        user_install_files.append(
-                            {
-                                "name": name,
-                                "extension": extension,
-                                "data": upload_file.get("body", None),
-                            }
                         )
+                        raise RuntimeError(
+                            "An invalid file extension used, the allowed ones are: {}".format(
+                                " ".join(self.allowed_user_upload_extensions)
+                            )
+                        )
+                    user_install_files.append(
+                        {
+                            "name": name,
+                            "extension": extension,
+                            "data": upload_file.get("body", None),
+                        }
+                    )
             options["user_install_files"] = user_install_files
+        self.log.debug("Options from form {}".format(options))
         return options
 
     @property

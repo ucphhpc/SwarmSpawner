@@ -269,6 +269,18 @@ def put(session, url, timeout=60, valid_status_code=201, **request_kwargs):
     return False
 
 
+def get(session, url, headers=None, valid_status_code=200, params=None):
+    if not headers:
+        headers = {}
+    try:
+        resp = session.get(url, headers=headers, params=params)
+        if resp.status_code == valid_status_code:
+            return resp
+    except requests.exceptions.ConnectionError:
+        pass
+    return False
+
+
 def delete(session, url, timeout=60, headers=None, valid_status_code=204, params=None):
     if not headers:
         headers = {}
@@ -289,3 +301,14 @@ def refresh_csrf(session, url, timeout=60, headers=None):
     if not headers:
         headers = {}
     return wait_for_session(session, url, timeout=timeout, require_xsrf=True)
+
+
+def load(path, mode="r", readlines=False):
+    try:
+        with open(path, mode) as fh:
+            if readlines:
+                return fh.readlines()
+            return fh.read()
+    except Exception as err:
+        print("Failed to load file: {} - {}".format(path, err))
+    return False
