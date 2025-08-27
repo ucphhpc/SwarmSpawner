@@ -1,5 +1,4 @@
 import copy
-from tornado import gen
 from traitlets.config import LoggingConfigurable
 from docker.types import DriverConfig, Mount
 from jhub.util import recursive_format
@@ -31,12 +30,10 @@ class Mounter(LoggingConfigurable):
         )
         self._mount_config = mount_config
 
-    @gen.coroutine
-    def gen_config_copy(self):
+    async def gen_config_copy(self):
         return copy.deepcopy(self.mount_config)
 
-    @gen.coroutine
-    def format_config(self, mount_config, **kwargs):
+    async def format_config(self, mount_config, **kwargs):
         # Dynamically overload the mount config
         self.log.debug(
             "formatting mount config: {} with: {}".format(mount_config, kwargs)
@@ -50,25 +47,22 @@ class VolumeMounter(Mounter):
     def __init__(self, mount_config):
         Mounter.__init__(self, mount_config)
 
-    @gen.coroutine
-    def create_mount(self, mount_config):
+    async def create_mount(self, mount_config):
         mount_settings = {}
         mount_settings.update(mount_config)
         return Mount(**mount_settings)
 
-    @gen.coroutine
-    def create(self, **format_mount_config_kwargs):
+    async def create(self, **format_mount_config_kwargs):
         self.log.debug(
             "Creating VolumeMount with options {}".format(format_mount_config_kwargs)
         )
-        new_mount_config = yield self.gen_config_copy()
-        yield self.format_config(new_mount_config, **format_mount_config_kwargs)
-        yield self.validate_config(new_mount_config)
-        mount = yield self.create_mount(new_mount_config)
+        new_mount_config = await self.gen_config_copy()
+        await self.format_config(new_mount_config, **format_mount_config_kwargs)
+        await self.validate_config(new_mount_config)
+        mount = await self.create_mount(new_mount_config)
         return mount
 
-    @gen.coroutine
-    def validate_config(self, mount_config):
+    async def validate_config(self, mount_config):
         self.log.debug("validate_config")
         required_config_keys = ["source", "target"]
         missing_keys = [key for key in required_config_keys if key not in mount_config]
@@ -94,8 +88,7 @@ class SSHFSMounter(Mounter):
     def __init__(self, mount_options):
         Mounter.__init__(self, mount_options)
 
-    @gen.coroutine
-    def create_mount(self, mount_config):
+    async def create_mount(self, mount_config):
         self.log.debug("create_mount from config: {}".format(mount_config))
         # Adapt mount options into appropriate types
         driver_config = DriverConfig(
@@ -110,8 +103,7 @@ class SSHFSMounter(Mounter):
         mount_settings["driver_config"] = driver_config
         return Mount(**mount_settings)
 
-    @gen.coroutine
-    def validate_config(self, mount_config):
+    async def validate_config(self, mount_config):
         self.log.debug("validate_config")
         required_config_keys = ["source", "target", "type", "driver_config"]
         missing_keys = [key for key in required_config_keys if key not in mount_config]
@@ -132,10 +124,9 @@ class SSHFSMounter(Mounter):
                 "A mount configuration error was encountered, due to missing values"
             )
 
-    @gen.coroutine
-    def create(self, **format_mount_config_kwargs):
-        new_config = yield self.gen_config_copy()
-        yield self.format_config(new_config, **format_mount_config_kwargs)
-        yield self.validate_config(new_config)
-        mount = yield self.create_mount(new_config)
+    async def create(self, **format_mount_config_kwargs):
+        new_config = await self.gen_config_copy()
+        await self.format_config(new_config, **format_mount_config_kwargs)
+        await self.validate_config(new_config)
+        mount = await self.create_mount(new_config)
         return mount

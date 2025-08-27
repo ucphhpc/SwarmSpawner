@@ -9,7 +9,6 @@ import docker
 import hashlib
 import os
 from asyncio import sleep
-from async_generator import async_generator, yield_
 from textwrap import dedent
 from concurrent.futures import ThreadPoolExecutor
 from pprint import pformat
@@ -25,7 +24,6 @@ from docker.types import (
     EndpointSpec,
 )
 from docker.utils import kwargs_from_env
-from tornado import gen
 from jupyterhub.spawner import Spawner
 from traitlets import default, Dict, Unicode, List, Bool, Int
 from jhub.mount import VolumeMounter
@@ -98,6 +96,16 @@ def prune_config(config_name_or_id, logger=None):
             )
         return False
     return False
+
+
+def remove_volume(name):
+    try:
+        run_docker("remove_volume", name=name)
+        return True, "removed volume: {}".format(name)
+    except APIError as err:
+        if err.response.status_code == 409:
+            return False, "Failed to remove volume: {}".format(name)
+    return False, "Unknown error occured while removing volume: {}".format(name)
 
 
 def run_with_executor(func, *args, **kwargs):
@@ -611,15 +619,15 @@ class SwarmSpawner(Spawner):
         """
         return self.executor.submit(self._docker, method, *args, **kwargs)
 
-    @gen.coroutine
-    def get_service(self):
+    async def get_service(self):
         self.log.debug(
             "Getting Docker service '{}' with id: '{}'".format(
                 self.service_name, self.service_id
             )
         )
         try:
-            service = yield self.docker("inspect_service", self.service_name)
+            service = run_docker("inspect_service", self.service_name)
+            self.log.debug("Inspect service response: {}".format(service))
             self.service_id = service["ID"]
         except APIError as err:
             if err.response.status_code == 404:
@@ -636,16 +644,15 @@ class SwarmSpawner(Spawner):
                 raise
         return service
 
-    @gen.coroutine
-    def poll(self):
+    async def poll(self):
         """Check for a task state like `docker service ps id`"""
-        service = yield self.get_service()
+        service = await self.get_service()
         if service is None:
             self.log.warn("Docker service not found")
             return 0
 
         task_filter = {"service": service["Spec"]["Name"]}
-        self.tasks = yield self.docker("tasks", task_filter)
+        self.tasks = run_docker("tasks", task_filter)
 
         running_task = None
         for task in self.tasks:
@@ -670,12 +677,11 @@ class SwarmSpawner(Spawner):
                     )
                 )
                 # If the tasks is rejected -> remove it
-                yield self.stop()
+                await self.stop()
 
         if running_task is not None:
             return None
-        else:
-            return 0
+        return 0
 
     async def check_update(self, image, tag="latest"):
         full_image = "".join([image, ":", tag])
@@ -684,13 +690,10 @@ class SwarmSpawner(Spawner):
         total_download = 0
         for download in self.client.pull(image, tag=tag, stream=True, decode=True):
             if not initial_output:
-                await yield_(
-                    {
-                        "progress": 70,
-                        "message": "Downloading new update "
-                        "for {}".format(full_image),
-                    }
-                )
+                yield {
+                    "progress": 70,
+                    "message": "Downloading new update " "for {}".format(full_image),
+                }
                 initial_output = True
             if "id" and "progress" in download:
                 _id = download["id"]
@@ -709,14 +712,12 @@ class SwarmSpawner(Spawner):
                         total_download += tracker["progressDetail"]["total"] * pow(
                             10, -6
                         )
-                        await yield_(
-                            {
-                                "progress": 80,
-                                "message": "Downloaded {} MB of {}".format(
-                                    total_download, full_image
-                                ),
-                            }
-                        )
+                        yield {
+                            "progress": 80,
+                            "message": "Downloaded {} MB of {}".format(
+                                total_download, full_image
+                            ),
+                        }
                         # return to web processing
                         await sleep(1)
 
@@ -728,7 +729,6 @@ class SwarmSpawner(Spawner):
                     != tracker["progressDetail"]["total"]
                 }
 
-    @async_generator
     async def progress(self):
         if self.tasks:
             top_task = self.tasks[0]
@@ -741,40 +741,21 @@ class SwarmSpawner(Spawner):
             else:
                 _image = image
             if task_status == "preparing":
-                await yield_(
-                    {
-                        "progress": 50,
-                        "message": "Preparing a server "
-                        "with {} the image".format(image),
-                    }
-                )
-                await yield_(
-                    {
-                        "progress": 60,
-                        "message": "Checking for new version of {}".format(image),
-                    }
-                )
+                yield {
+                    "progress": 50,
+                    "message": "Preparing a server " "with {} the image".format(image),
+                }
+                yield {
+                    "progress": 60,
+                    "message": "Checking for new version of {}".format(image),
+                }
                 if _tag is not None:
                     await self.check_update(_image, _tag)
                 else:
                     await self.check_update(_image)
                 self.log.info("Finished progress from spawning {}".format(image))
 
-    @gen.coroutine
-    def removed_volume(self, name):
-        result = False
-        try:
-            yield self.docker("remove_volume", name=name)
-            self.log.info("Removed volume: {}".format(name))
-            result = True
-        except APIError as err:
-            if err.response.status_code == 409:
-                self.log.info("Can't remove volume: {} yet".format(name)),
-
-        return result
-
-    @gen.coroutine
-    def remove_volume(self, name, max_attempts=15):
+    async def attempt_volume_remove(self, name, max_attempts=15):
         attempt = 0
         removed = False
         # Volumes can only be removed after the service is gone
@@ -783,14 +764,18 @@ class SwarmSpawner(Spawner):
                 self.log.info("Failed to remove volume {}".format(name))
                 break
             self.log.info("Removing volume {}".format(name))
-            removed = yield self.removed_volume(name=name)
-            yield gen.sleep(1)
+            removed, remove_response = remove_volume(name)
+            if not removed:
+                self.log.info(
+                    "User: {} remove volume response: {}".format(
+                        self.user.name, remove_response
+                    )
+                )
+            await sleep(1)
             attempt += 1
-
         return removed
 
-    @gen.coroutine
-    def start(self):
+    async def start(self):
         """Start the single-user server in a docker service.
         You can specify the params for the service through
         jupyterhub_config.py or using the user_options
@@ -805,7 +790,7 @@ class SwarmSpawner(Spawner):
         else:
             user_options = {}
 
-        service = yield self.get_service()
+        service = await self.get_service()
         if service:
             self.log.info(
                 "Found existing Docker service '{}' (id: {})".format(
@@ -889,7 +874,7 @@ class SwarmSpawner(Spawner):
                         self.log.error(err_msg)
                         raise Exception(err_msg)
 
-                    user_config_result = yield self.docker(
+                    user_config_result = run_docker(
                         "create_config", config_name, user_install_file["data"]
                     )
                     if (
@@ -940,11 +925,11 @@ class SwarmSpawner(Spawner):
             for mount in mounts:
                 if isinstance(mount, dict):
                     m = VolumeMounter(mount)
-                    m = yield m.create(**format_mount_kwargs)
+                    m = await m.create(**format_mount_kwargs)
                 else:
                     # Custom type mount defined
                     # Is instantiated in the config
-                    m = yield mount.create(**format_mount_kwargs)
+                    m = await mount.create(**format_mount_kwargs)
                 container_spec["mounts"].append(m)
 
             # Some envs are required by the single-user-image
@@ -1058,7 +1043,7 @@ class SwarmSpawner(Spawner):
 
             if self.configs:
                 # Check that the supplied configs already exists
-                current_configs = yield self.docker("configs")
+                current_configs = run_docker("configs")
                 config_error_msg = (
                     "The server has a misconfigured config, "
                     "please contact an administrator to resolve this"
@@ -1162,7 +1147,7 @@ class SwarmSpawner(Spawner):
             # Set endpoint spec
             endpoint_spec = EndpointSpec(**endpoint_spec)
 
-            resp = yield self.docker(
+            resp = run_docker(
                 "create_service",
                 task_tmpl,
                 name=self.service_name,
@@ -1177,7 +1162,7 @@ class SwarmSpawner(Spawner):
                 )
             )
 
-            yield self.wait_for_running_tasks()
+            await self.wait_for_running_tasks()
 
         ip = self.service_name
         port = self.service_port
@@ -1190,8 +1175,7 @@ class SwarmSpawner(Spawner):
         # service_port is actually equal to 8888
         return ip, port
 
-    @gen.coroutine
-    def stop(self, now=False):
+    async def stop(self, now=False):
         """Stop and remove the service
         Consider using stop/start when Docker adds support
         """
@@ -1201,7 +1185,7 @@ class SwarmSpawner(Spawner):
             )
         )
 
-        service = yield self.get_service()
+        service = await self.get_service()
         if not service:
             self.log.warn("Docker service not found")
             return
@@ -1224,7 +1208,7 @@ class SwarmSpawner(Spawner):
 
         # Even though it returns the service is gone
         # the underlying containers are still being removed
-        removed_service = yield self.docker("remove_service", service["ID"])
+        removed_service = run_docker("remove_service", service["ID"])
         if removed_service:
             self.log.info(
                 "Docker service {} (id: {}) removed".format(
@@ -1239,11 +1223,11 @@ class SwarmSpawner(Spawner):
                     if "Source" in volume:
                         # Validate the volume exists
                         try:
-                            yield self.docker("inspect_volume", volume["Source"])
+                            run_docker("inspect_volume", volume["Source"])
                         except docker.errors.NotFound:
                             self.log.info("No volume named: " + volume["Source"])
                         else:
-                            yield self.remove_volume(volume["Source"])
+                            await self.attempt_volume_remove(volume["Source"])
                     else:
                         self.log.error(
                             "Volume {} didn't have a 'Source' key so it "
@@ -1258,14 +1242,13 @@ class SwarmSpawner(Spawner):
                         )
                     )
 
-    @gen.coroutine
-    def wait_for_running_tasks(self, max_attempts=20, max_preparing=30):
-        preparing, running = False, False
+    async def wait_for_running_tasks(self, max_attempts=20, max_preparing=30):
+        running = False
         num_preparing, attempt = 0, 0
         while not running:
-            service = yield self.get_service()
+            service = await self.get_service()
             task_filter = {"service": service["Spec"]["Name"]}
-            self.tasks = yield self.docker("tasks", task_filter)
+            self.tasks = run_docker("tasks", task_filter)
             preparing = False
             for task in self.tasks:
                 task_state = task["Status"]["State"]
@@ -1286,4 +1269,4 @@ class SwarmSpawner(Spawner):
                 num_preparing += 1
             if num_preparing > max_preparing:
                 return False
-            yield gen.sleep(1)
+            await sleep(1)
