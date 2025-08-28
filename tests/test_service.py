@@ -129,6 +129,9 @@ def test_creates_service(image, swarm, network, make_service):
         # wait for user home
         home_resp = s.get(urljoin(JHUB_URL, "/user/{}/tree?".format(username)))
         assert home_resp.status_code == 200
+
+        # Refresh cookies
+        s.get(JHUB_URL)
         # Remove via the web interface
         delete_headers = {"Referer": urljoin(JHUB_URL, "/hub/home"), "Origin": JHUB_URL}
 

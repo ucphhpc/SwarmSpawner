@@ -9,6 +9,7 @@ import docker
 import hashlib
 import os
 from asyncio import sleep
+from async_generator import async_generator, yield_
 from textwrap import dedent
 from concurrent.futures import ThreadPoolExecutor
 from pprint import pformat
@@ -72,7 +73,7 @@ def get_docker_client(api_client_kwargs=None, tls_kwargs=None):
     return docker.APIClient(version="auto", **kwargs)
 
 
-def run_docker(method_name, *args, logger=None, **kwargs):
+def run_docker(method_name, *args, **kwargs):
     client = get_docker_client()
     docker_method = get_instance_function(client, method_name)
     if not docker_method:
@@ -80,22 +81,24 @@ def run_docker(method_name, *args, logger=None, **kwargs):
     return run_with_executor(docker_method, *args, **kwargs).result()
 
 
-def prune_config(config_name_or_id, logger=None):
-    logger.debug("Running prune on {}".format(config_name_or_id))
+def get_config(config_name_or_id):
     try:
-        found = run_docker("inspect_config", config_name_or_id, logger=logger)
-        if found:
-            run_docker("remove_config", config_name_or_id, logger=logger)
-        return True
+        found = run_docker("inspect_config", config_name_or_id)
+        return True, found
     except docker.errors.NotFound:
-        if logger:
-            logger.error(
-                "Can't remove config: {} because it does not exist".format(
-                    config_name_or_id
-                )
-            )
-        return False
-    return False
+        return False, "Docker config: {} does not exist".format(config_name_or_id)
+    return False, "Unknown error for finding the config"
+
+
+def prune_config(config_name_or_id):
+    try:
+        removed = run_docker("remove_config", config_name_or_id)
+        return True, removed
+    except docker.errors.NotFound:
+        return False, "Can't remove config: {} because it does not exist".format(
+            config_name_or_id
+        )
+    return False, "Failed to remove config: {}, unknown error".format(config_name_or_id)
 
 
 def remove_volume(name):
@@ -218,8 +221,6 @@ class SwarmSpawner(Spawner):
         """
         ),
     ).tag(config=True)
-
-    _executor = None
 
     @default("options_form")
     def _options_form(self):
@@ -348,17 +349,7 @@ class SwarmSpawner(Spawner):
         self.log.debug("Options from form {}".format(options))
         return options
 
-    @property
-    def executor(self, max_workers=1):
-        """single global executor"""
-        cls = self.__class__
-        if not cls._executor:
-            cls._executor = ThreadPoolExecutor(max_workers)
-        return cls._executor
-
     _client = None
-
-    _tasks = None
 
     @property
     def client(self):
@@ -366,14 +357,10 @@ class SwarmSpawner(Spawner):
         cls = self.__class__
 
         if cls._client is None:
-            kwargs = {}
-            if self.tls_config:
-                kwargs["tls"] = TLSConfig(**self.tls_config)
-            kwargs.update(kwargs_from_env())
-            client = docker.APIClient(version="auto", **kwargs)
-
-            cls._client = client
+            cls._client = get_docker_client()
         return cls._client
+
+    _tasks = None
 
     service_id = Unicode()
 
@@ -500,15 +487,6 @@ class SwarmSpawner(Spawner):
         ),
     ).tag(config=True)
 
-    @property
-    def tls_client(self):
-        """A tuple consisting of the TLS client certificate and key if they
-        have been provided, otherwise None.
-        """
-        if self.tls_cert and self.tls_key:
-            return (self.tls_cert, self.tls_key)
-        return None
-
     _service_owner = None
 
     @property
@@ -604,21 +582,6 @@ class SwarmSpawner(Spawner):
         env["JPY_HUB_API_URL"] = self._public_hub_api_url()
         return env
 
-    def _docker(self, method, *args, **kwargs):
-        """wrapper for calling docker methods
-
-        to be passed to ThreadPoolExecutor
-        """
-        m = getattr(self.client, method)
-        return m(*args, **kwargs)
-
-    def docker(self, method, *args, **kwargs):
-        """Call a docker method in a background thread
-
-        returns a Future
-        """
-        return self.executor.submit(self._docker, method, *args, **kwargs)
-
     async def get_service(self):
         self.log.debug(
             "Getting Docker service '{}' with id: '{}'".format(
@@ -690,10 +653,13 @@ class SwarmSpawner(Spawner):
         total_download = 0
         for download in self.client.pull(image, tag=tag, stream=True, decode=True):
             if not initial_output:
-                yield {
-                    "progress": 70,
-                    "message": "Downloading new update " "for {}".format(full_image),
-                }
+                await yield_(
+                    {
+                        "progress": 70,
+                        "message": "Downloading new update "
+                        "for {}".format(full_image),
+                    }
+                )
                 initial_output = True
             if "id" and "progress" in download:
                 _id = download["id"]
@@ -712,12 +678,14 @@ class SwarmSpawner(Spawner):
                         total_download += tracker["progressDetail"]["total"] * pow(
                             10, -6
                         )
-                        yield {
-                            "progress": 80,
-                            "message": "Downloaded {} MB of {}".format(
-                                total_download, full_image
-                            ),
-                        }
+                        await yield_(
+                            {
+                                "progress": 80,
+                                "message": "Downloaded {} MB of {}".format(
+                                    total_download, full_image
+                                ),
+                            }
+                        )
                         # return to web processing
                         await sleep(1)
 
@@ -729,26 +697,34 @@ class SwarmSpawner(Spawner):
                     != tracker["progressDetail"]["total"]
                 }
 
+    @async_generator
     async def progress(self):
+        self.log.info("Checking for progress")
         if self.tasks:
             top_task = self.tasks[0]
             image = top_task["Spec"]["ContainerSpec"]["Image"]
             self.log.info("Spawning progress of {} with image".format(self.service_id))
             task_status = top_task["Status"]["State"]
+            self.log.info("Progress task status: {}".format(task_status))
             _tag = None
             if ":" in image:
                 _image, _tag = image.split(":")
             else:
                 _image = image
             if task_status == "preparing":
-                yield {
-                    "progress": 50,
-                    "message": "Preparing a server " "with {} the image".format(image),
-                }
-                yield {
-                    "progress": 60,
-                    "message": "Checking for new version of {}".format(image),
-                }
+                await yield_(
+                    {
+                        "progress": 50,
+                        "message": "Preparing a server "
+                        "with {} the image".format(image),
+                    }
+                )
+                await yield_(
+                    {
+                        "progress": 60,
+                        "message": "Checking for new version of {}".format(image),
+                    }
+                )
                 if _tag is not None:
                     await self.check_update(_image, _tag)
                 else:
@@ -869,10 +845,11 @@ class SwarmSpawner(Spawner):
                     config_name = "{}-{}".format(self.user_config_name_base, idx)
                     # If an existing config_name already exists, remove
                     # the old one before creating a new one
-                    if not prune_config(config_name, logger=self.log):
-                        err_msg = "Failed to remove an existing uploaded install config"
-                        self.log.error(err_msg)
-                        raise Exception(err_msg)
+                    if get_config(config_name)[0]:
+                        pruned, pruned_response = prune_config(config_name)
+                        if not pruned:
+                            self.log.error(pruned_response)
+                            raise Exception(pruned_response)
 
                     user_config_result = run_docker(
                         "create_config", config_name, user_install_file["data"]
@@ -1161,7 +1138,6 @@ class SwarmSpawner(Spawner):
                     self.service_name, self.service_id[:7], image, self.user
                 )
             )
-
             await self.wait_for_running_tasks()
 
         ip = self.service_name
