@@ -77,7 +77,7 @@ def run_docker(method_name, *args, logger=None, **kwargs):
     docker_method = get_instance_function(client, method_name)
     if not docker_method:
         return False
-    return run_with_executor(docker_method, *args, **kwargs)
+    return run_with_executor(docker_method, *args, **kwargs).result()
 
 
 def prune_config(config_name_or_id, logger=None):
@@ -1167,7 +1167,9 @@ class SwarmSpawner(Spawner):
         ip = self.service_name
         port = self.service_port
         self.log.debug(
-            "Active service: '{}' with user '{}'".format(self.service_name, self.user)
+            "Active service: '{}' with user '{}'".format(
+                self.service_name, self.user.name
+            )
         )
 
         # we use service_name instead of ip
@@ -1180,8 +1182,8 @@ class SwarmSpawner(Spawner):
         Consider using stop/start when Docker adds support
         """
         self.log.info(
-            "Stopping and removing Docker service {} (id: {})".format(
-                self.service_name, self.service_id[:7]
+            "Stopping and removing Docker service {} (id: {}) owned by: {}".format(
+                self.service_name, self.service_id[:7], self.user.name
             )
         )
 
