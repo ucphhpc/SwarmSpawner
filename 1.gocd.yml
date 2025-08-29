@@ -2,6 +2,7 @@ environments:
   bare_metal_pypi_package:
     environments:
       GIT_USER: "{{SECRET:[github][username]}}"
+
     pipelines:
       - swarmspawner
       - swarmspawner_accelerator_selection
