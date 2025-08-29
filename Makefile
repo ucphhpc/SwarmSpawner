@@ -19,9 +19,10 @@ $(echo ${DOCKER_COMPOSE} >/dev/null)
 
 TAG=edge
 BUILD_ARGS=
+PLUGIN_TAG=latest
 ARGS=
 
-MOUNT_PLUGIN := $(shell ${DOCKER} plugin inspect ucphhpc/sshfs:latest > /dev/null 2>&1  && echo 0 || echo 1)
+MOUNT_PLUGIN := $(shell ${DOCKER} plugin inspect ucphhpc/sshfs:${PLUGIN_TAG} > /dev/null 2>&1  && echo 0 || echo 1)
 
 .PHONY: all
 all: venv install-dep init dockerbuild
@@ -100,15 +101,15 @@ uninstalltest: venv
 	$(VENV)/pip uninstall -y -r tests/requirements.txt
 	@echo
 	@echo "*** WARNING ***"
-	@echo "*** Deleting every ucphhpc/sshfs:latest volume in 10 seconds ***"
+	@echo "*** Deleting every ucphhpc/sshfs:${PLUGIN_TAG} volume in 10 seconds ***"
 	@echo "*** Hit Ctrl-C to abort to preserve any local user and cert data ***"
 	@echo
 	@sleep 10
-	if [ "$$(docker volume ls -q -f 'driver=ucphhpc/sshfs:latest')" != "" ]; then\
-		docker volume rm -f $$(docker volume ls -q -f 'driver=ucphhpc/sshfs:latest');\
+	if [ "$$(docker volume ls -q -f 'driver=ucphhpc/sshfs${PLUGIN_TAG}')" != "" ]; then\
+		docker volume rm -f $$(docker volume ls -q -f 'driver=ucphhpc/sshfs${PLUGIN_TAG}');\
 	fi
-	docker plugin disable ucphhpc/sshfs:latest
-	docker plugin rm ucphhpc/sshfs:latest
+	docker plugin disable ucphhpc/sshfs${PLUGIN_TAG}
+	docker plugin rm ucphhpc/sshfs${PLUGIN_TAG}
 
 .PHONY: installtest
 installtest: venv
@@ -117,7 +118,7 @@ installtest: venv
 ifeq (${MOUNT_PLUGIN}, 1)
 	@echo "The ucphhpc/sshfs docker plugin was not found"
 	@echo "Installing the missing ucphhpc/sshfs docker plugin"
-	@docker plugin install ucphhpc/sshfs:latest --grant-all-permissions
+	@docker plugin install ucphhpc/sshfs${PLUGIN_TAG} --grant-all-permissions
 else
 	@echo "Found the ucphhpc/sshfs docker plugin"
 endif
