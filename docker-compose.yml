@@ -1,14 +1,11 @@
-version: '3.7'
-
 # Before jupyterhub spawner can launch anything,
 # the host needs to be a docker swarm manager
-
 services:
   jupyterhub:
     image: ucphhpc/jhub-swarmspawner:edge
     container_name: jupyterhub
     ports:
-      - "80:8000/tcp"
+      - "8000:8000/tcp"
     volumes:
       - ./examples/jupyter_config_basic.py:/srv/jupyterhub/jupyter_config.py:ro
       - /var/run/docker.sock:/var/run/docker.sock:rw

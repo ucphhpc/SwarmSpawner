@@ -16,22 +16,23 @@ c.SwarmSpawner.jupyterhub_service_name = "jupyterhub"
 
 c.SwarmSpawner.networks = ["jh_test"]
 
-# Before the user can select which ima5ge to spawn,
+# Before the user can select which image to spawn,
 # user_options has to be enabled
 c.SwarmSpawner.use_user_options = True
+# Allows users to upload packages that will available in the container
+c.SwarmSpawner.user_upload_destination_directory = "/home/jovyan/user-installs"
+c.SwarmSpawner.enable_user_upload_install_files = True
 
 # Available docker images the user can spawn
 c.SwarmSpawner.images = [
-    {"image": "ucphhpc/base-notebook:latest", "name": "Basic Python Notebook"}
+    {"image": "ucphhpc/base-notebook:latest", "name": "Basic Python Notebook"},
+    {"image": "ucphhpc/base-notebook:latest", "name": "Basic Python Notebook 2"},
 ]
 
-# -1 should mean unlimited
 c.SwarmSpawner.container_spec = {
-    # TODO incorrect, this is not working
-    #    "ulimit": {"soft": "-1", "hard": "-1"},
     "args": [
         "/usr/local/bin/start-singleuser.sh",
         "--ServerApp.ip=0.0.0.0",
         "--ServerApp.port=8888",
-    ],
+    ]
 }

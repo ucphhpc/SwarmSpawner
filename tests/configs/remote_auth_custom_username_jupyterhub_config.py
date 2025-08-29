@@ -29,3 +29,11 @@ c.SwarmSpawner.networks = ["jh_test"]
 c.SwarmSpawner.images = [
     {"image": "ucphhpc/base-notebook:latest", "name": "Basic Python Notebook"}
 ]
+
+c.SwarmSpawner.container_spec = {
+    "args": [
+        "/usr/local/bin/start-singleuser.sh",
+        "--ServerApp.ip=0.0.0.0",
+        "--ServerApp.port=8888",
+    ]
+}

@@ -36,3 +36,12 @@ c.SwarmSpawner.configs = configs
 c.SwarmSpawner.images = [
     {"image": "ucphhpc/slurm-notebook:latest", "name": "Slurm notebook"}
 ]
+
+
+c.SwarmSpawner.container_spec = {
+    "args": [
+        "/usr/local/bin/start-singleuser.sh",
+        "--ServerApp.ip=0.0.0.0",
+        "--ServerApp.port=8888",
+    ]
+}

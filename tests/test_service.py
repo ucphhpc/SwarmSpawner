@@ -1,6 +1,5 @@
 import docker
 import json
-import time
 import requests
 import logging
 import pytest
@@ -58,7 +57,11 @@ hub_service = {
     "networks": [NETWORK_NAME],
     "endpoint_spec": EndpointSpec(ports={PORT: PORT}),
     "env": ["JUPYTERHUB_CRYPT_KEY=" + rand_key],
-    "command": ["jupyterhub", "-f", "/etc/jupyterhub/jupyterhub_config.py", "--debug"],
+    "command": [
+        "jupyterhub",
+        "-f",
+        "/etc/jupyterhub/jupyterhub_config.py",
+    ],
 }
 
 
@@ -80,66 +83,67 @@ def test_creates_service(image, swarm, network, make_service):
     assert wait_for_site(JHUB_URL) is True
 
     with requests.Session() as s:
+        # Refresh cookies
+        s.get(JHUB_URL)
+
         # Login
         test_logger.info("Authenticating with user: {}".format(username))
         login_response = s.post(
-            JHUB_URL + "/hub/login?next=",
+            urljoin(JHUB_URL, "/hub/login?next="),
             data={"username": username, "password": password},
+            params={"_xsrf": s.cookies["_xsrf"]},
         )
         test_logger.info("Login response message: {}".format(login_response.text))
         assert login_response.status_code == 200
 
         # Spawn a notebook
-        spawn_form_resp = s.get(JHUB_URL + "/hub/spawn")
+        spawn_form_resp = s.get(urljoin(JHUB_URL, "/hub/spawn"))
         test_logger.info("Spawn page message: {}".format(spawn_form_resp.text))
         assert spawn_form_resp.status_code == 200
         assert "Select a notebook image" in spawn_form_resp.text
-        user_image_name = "Basic Python Notebook"
-        user_image_data = "ucphhpc/base-notebook:latest"
-        payload = {
-            "select_image": json.dumps(
-                {"image": user_image_data, "name": user_image_name}
-            )
-        }
-        spawn_resp = s.post(JHUB_URL + "/hub/spawn", data=payload)
+
+        payload = {"dockerimage": "ucphhpc/base-notebook:latest"}
+        spawn_resp = s.post(
+            urljoin(JHUB_URL, "/hub/spawn"),
+            data=payload,
+            params={"_xsrf": s.cookies["_xsrf"]},
+        )
         test_logger.info("Spawn POST response message: {}".format(spawn_resp.text))
         assert spawn_resp.status_code == 200
 
         services = client.services.list()
         test_logger.info("Post spawn services: {}".format(services))
 
-        target_service_name = "{}-{}-{}".format("jupyter", username, "1")
+        target_service_name = "{}-".format("jupyter")
         spawned_service = get_service(client, target_service_name)
         assert spawned_service is not None
 
-        # Verify that a task is succesfully running
+        # Wait for the spawned service to be running
         running_task = wait_for_service_task(
             client, spawned_service, filters={"desired-state": "running"}, timeout=300
         )
         assert running_task
 
         # wait for user home
-        home_resp = s.get(JHUB_URL + "/user/{}/tree?".format(username))
+        home_resp = s.get(urljoin(JHUB_URL, "/user/{}/tree?".format(username)))
         assert home_resp.status_code == 200
+
+        # Refresh cookies
+        s.get(JHUB_URL)
         # Remove via the web interface
         delete_headers = {"Referer": urljoin(JHUB_URL, "/hub/home"), "Origin": JHUB_URL}
 
         jhub_user = get_service_user(spawned_service)
         delete_url = urljoin(JHUB_URL, "/hub/api/users/{}/server".format(jhub_user))
 
-        pending = True
-        num_wait, max_wait = 0, 30
-        while pending or num_wait > max_wait:
-            num_wait += 1
-            resp = s.delete(delete_url, headers=delete_headers)
-            test_logger.info(
-                "Response from removing the user server: {}".format(resp.text)
-            )
-            if resp.status_code == 204:
-                pending = False
-            time.sleep(1)
-
-        assert resp.status_code == 204
+        # Wait for the server to finish deleting
+        deleted = delete(
+            s,
+            delete_url,
+            headers=delete_headers,
+            params={"_xsrf": s.cookies["_xsrf"]},
+        )
+        assert deleted
 
         # double check it is gone
         deleted_service = get_service(client, target_service_name)
@@ -165,41 +169,45 @@ def test_image_selection(image, swarm, network, make_service):
     assert wait_for_site(JHUB_URL) is True
 
     with requests.Session() as s:
+        # Refresh cookies
+        s.get(JHUB_URL)
+
         # Login
         test_logger.info("Authenticating with user: {}".format(username))
         login_response = s.post(
             urljoin(JHUB_URL, "/hub/login"),
             data={"username": username, "password": password},
+            params={"_xsrf": s.cookies["_xsrf"]},
         )
         test_logger.info("Login response message: {}".format(login_response.text))
         assert login_response.status_code == 200
 
         # Spawn a notebook
-        spawn_form_resp = s.get(JHUB_URL + "/hub/spawn")
+        spawn_form_resp = s.get(urljoin(JHUB_URL, "/hub/spawn"))
         test_logger.info("Spawn page message: {}".format(spawn_form_resp.text))
-
         assert spawn_form_resp.status_code == 200
         assert "Select a notebook image" in spawn_form_resp.text
 
         user_image = "ucphhpc/base-notebook:latest"
         user_image_name = "Basic Python Notebook"
-
         payload = {"name": user_image_name, "image": user_image}
         json_payload = json.dumps(payload)
+
         spawn_resp = s.post(
-            JHUB_URL + "/hub/spawn/{}".format(username),
+            urljoin(JHUB_URL, "/hub/spawn"),
             files={
                 "select_image": (
                     None,
                     json_payload,
                 )
             },
+            params={"_xsrf": s.cookies["_xsrf"]},
         )
-
         test_logger.info("Spawn POST response message: {}".format(spawn_resp.text))
         assert spawn_resp.status_code == 200
 
-        target_service_name = "{}-{}-{}".format("jupyter", username, "1")
+        # Get spawned service
+        target_service_name = "{}-".format("jupyter")
         spawned_service = get_service(client, target_service_name)
         assert spawned_service is not None
 
@@ -223,7 +231,9 @@ def test_image_selection(image, swarm, network, make_service):
         jhub_user = get_service_user(spawned_service)
         delete_url = urljoin(JHUB_URL, "/hub/api/users/{}/server".format(jhub_user))
 
-        deleted = delete(s, delete_url, headers=delete_headers)
+        deleted = delete(
+            s, delete_url, headers=delete_headers, params={"_xsrf": s.cookies["_xsrf"]}
+        )
         assert deleted
 
         deleted_service = get_service(client, target_service_name)
@@ -231,7 +241,7 @@ def test_image_selection(image, swarm, network, make_service):
 
         # Spawn a second service with a different name but the same image ##
         # Spawn a notebook
-        second_spawn_form_resp = s.get(JHUB_URL + "/hub/spawn")
+        second_spawn_form_resp = s.get(urljoin(JHUB_URL, "/hub/spawn"))
         test_logger.info("Spawn page message: {}".format(second_spawn_form_resp.text))
 
         assert second_spawn_form_resp.status_code == 200
@@ -242,13 +252,14 @@ def test_image_selection(image, swarm, network, make_service):
         json_second_payload = json.dumps(selection_payload)
 
         spawn_resp = s.post(
-            JHUB_URL + "/hub/spawn/{}".format(username),
+            urljoin(JHUB_URL, "/hub/spawn/{}".format(username)),
             files={
                 "select_image": (
                     None,
                     json_second_payload,
                 )
             },
+            params={"_xsrf": s.cookies["_xsrf"]},
         )
         test_logger.info("Spawn POST response message: {}".format(spawn_resp.text))
         assert spawn_resp.status_code == 200
@@ -272,7 +283,9 @@ def test_image_selection(image, swarm, network, make_service):
         assert second_service_labels["ImageName"] == second_image_name
 
         # Delete the second spawned service
-        deleted = delete(s, delete_url, headers=delete_headers)
+        deleted = delete(
+            s, delete_url, headers=delete_headers, params={"_xsrf": s.cookies["_xsrf"]}
+        )
         assert deleted
 
         deleted_service = get_service(client, second_target_service_name)

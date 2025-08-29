@@ -24,19 +24,101 @@ from docker.types import (
     Placement,
 )
 from docker.utils import kwargs_from_env
-from tornado import gen
 from jupyterhub.spawner import Spawner
 from traitlets import default, Dict, Unicode, List, Bool, Int, Any
 from jhub.util import discover_datatype_klass
 
 
-class UnicodeOrFalse(Unicode):
-    info_text = "a unicode string or False"
+def get_user_uid_gid(dictionary, delimiter=":"):
+    uid_gid = dictionary.get("uid_gid", {})
+    if not uid_gid:
+        return None, None
 
-    def validate(self, obj, value):
-        if not value:
-            return value
-        return super(UnicodeOrFalse, self).validate(obj, value)
+    if delimiter not in uid_gid:
+        return None, None
+
+    uid, gid = uid_gid.split(delimiter)
+    return uid, gid
+
+
+def prepare_user_config_reference(
+    config_id, config_name, filename=None, uid=1000, gid=1000
+):
+    """Create a user config with a file associated with it"""
+    return dict(
+        config_id=config_id,
+        config_name=config_name,
+        filename=filename,
+        uid=uid,
+        gid=gid,
+    )
+
+
+def get_docker_client(api_client_kwargs=None, tls_kwargs=None):
+    if not api_client_kwargs:
+        api_client_kwargs = {}
+    if not tls_kwargs:
+        tls_kwargs = {}
+
+    kwargs = {}
+    if api_client_kwargs:
+        kwargs.update(api_client_kwargs)
+
+    if tls_kwargs:
+        kwargs["tls"] = TLSConfig(**tls_kwargs)
+
+    kwargs.update(kwargs_from_env())
+    return docker.APIClient(version="auto", **kwargs)
+
+
+def run_docker(method_name, *args, **kwargs):
+    client = get_docker_client()
+    docker_method = get_instance_function(client, method_name)
+    if not docker_method:
+        return False
+    return run_with_executor(docker_method, *args, **kwargs).result()
+
+
+def get_config(config_name_or_id):
+    try:
+        found = run_docker("inspect_config", config_name_or_id)
+        return True, found
+    except docker.errors.NotFound:
+        return False, "Docker config: {} does not exist".format(config_name_or_id)
+    return False, "Unknown error for finding the config"
+
+
+def prune_config(config_name_or_id):
+    try:
+        removed = run_docker("remove_config", config_name_or_id)
+        return True, removed
+    except docker.errors.NotFound:
+        return False, "Can't remove config: {} because it does not exist".format(
+            config_name_or_id
+        )
+    return False, "Failed to remove config: {}, unknown error".format(config_name_or_id)
+
+
+def remove_volume(name):
+    try:
+        run_docker("remove_volume", name=name)
+        return True, "removed volume: {}".format(name)
+    except APIError as err:
+        if err.response.status_code == 409:
+            return False, "Failed to remove volume: {}".format(name)
+    return False, "Unknown error occured while removing volume: {}".format(name)
+
+
+def run_with_executor(func, *args, **kwargs):
+    """Run a function in a thread pool executor"""
+    with ThreadPoolExecutor(max_workers=1) as executor:
+        return executor.submit(func, *args, **kwargs)
+
+
+def get_instance_function(instance, func_name):
+    if hasattr(instance, func_name):
+        return getattr(instance, func_name)
+    return None
 
 
 class SwarmSpawner(Spawner):
@@ -89,23 +171,71 @@ class SwarmSpawner(Spawner):
         """<option value="{value}">{name}</option>""",
         help=dedent(
             """
-            Template for html form options.
+            Option template for value and name options when rendering the form_template
+            """
+        ),
+    ).tag(config=True)
+
+    user_upload_form = Unicode(
+        """
+        <div class="upload-form" style="padding-top: 2em;">
+            <div class="form-group">
+                <label for="user-upload">Optional Upload Install File (requirements.txt)</label>
+                <input type="file" name="user-upload" id="user-upload" accept=".txt,.yml" class="form-control"/>
+            </div>
+        </div>
+        """,
+        help=dedent(
+            """ Form for allowing user upload of install files that can be used to prepare the
+            specified environment.
+            """
+        ),
+    ).tag(config=True)
+
+    enable_user_upload_install_files = Bool(
+        False,
+        help=dedent(
+            """
+            Allow users to upload install files that can be used to prepare the requsted environment.
+            """
+        ),
+    ).tag(config=True)
+
+    allowed_user_upload_extensions = List(
+        trait=Unicode(),
+        default_value=[".txt"],
+        help=dedent(
+            """
+            Allowed file extensions for user upload of install files
+            """
+        ),
+    ).tag(config=True)
+
+    user_upload_destination_directory = Unicode(
+        os.path.join(os.sep, "user-installs"),
+        help=dedent(
+            """
+            Directory where user install files will be stored inside the spawned container.
         """
         ),
     ).tag(config=True)
 
-    _executor = None
-
     @default("options_form")
     def _options_form(self):
         """Return the form with the drop-down menu."""
+        # User options not enabled -> return default jupyterhub form
+        if not self.use_user_options:
+            return ""
         template_options = []
         for image in self.images:
             value = dict(image=image["image"], name=image["name"])
             template_value = dict(name=image["name"], value=value)
             template_options.append(self.option_template.format(**template_value))
         option_template = "".join(template_options)
-        return self.form_template.format(option_template=option_template)
+        user_form = self.form_template.format(option_template=option_template)
+        if self.enable_user_upload_install_files:
+            user_form += self.user_upload_form
+        return user_form
 
     def options_from_form(self, form_data):
         """Parse the submitted form data and turn it into the correct
@@ -174,33 +304,70 @@ class SwarmSpawner(Spawner):
             "spawn_image_name": spawn_image_name,
             "spawn_image_data": spawn_image_data,
         }
+
+        # Whether user upload install files form should be parsed
+        if self.enable_user_upload_install_files:
+            # Check for uploaded file
+            user_uploaded_content = form_data.get("user-upload_file", [])
+            self.log.debug(
+                "Processing user uploaded content {}".format(user_uploaded_content)
+            )
+            user_install_files = []
+            for upload_file in user_uploaded_content:
+                if "filename" in upload_file and "body" in upload_file:
+                    filename = upload_file.get("filename", None)
+                    if "." not in filename:
+                        self.log.error(
+                            "User: {} tried to upload an invalid file: {}".format(
+                                self.user.name, filename
+                            )
+                        )
+                        raise RuntimeError(
+                            "An invalid file was uploaded, missing a valid extension, the allowed ones are: {}".format(
+                                " ".join(self.allowed_user_upload_extensions)
+                            )
+                        )
+
+                    # Allow for multiple extensions
+                    name, extension = (
+                        ".".join(filename.split(".")[:-1]),
+                        ".{}".format(filename.split(".")[-1]),
+                    )
+                    if extension not in self.allowed_user_upload_extensions:
+                        self.log.error(
+                            "User: {} upload filename extension {} was not in the allowed set of: {}".format(
+                                self.user.name,
+                                extension,
+                                self.allowed_user_upload_extensions,
+                            )
+                        )
+                        raise RuntimeError(
+                            "An invalid file extension used, the allowed ones are: {}".format(
+                                " ".join(self.allowed_user_upload_extensions)
+                            )
+                        )
+                    user_install_files.append(
+                        {
+                            "name": name,
+                            "extension": extension,
+                            "data": upload_file.get("body", None),
+                        }
+                    )
+            options["user_install_files"] = user_install_files
+        self.log.debug("Options from form {}".format(options))
         return options
 
-    @property
-    def executor(self, max_workers=1):
-        """single global executor"""
-        cls = self.__class__
-        if cls._executor is None:
-            cls._executor = ThreadPoolExecutor(max_workers)
-        return cls._executor
-
     _client = None
-
-    _tasks = None
 
     @property
     def client(self):
         """single global client instance"""
         cls = self.__class__
         if cls._client is None:
-            kwargs = {}
-            if self.tls_config:
-                kwargs["tls"] = TLSConfig(**self.tls_config)
-            kwargs.update(kwargs_from_env())
-            client = docker.APIClient(version="auto", **kwargs)
-
-            cls._client = client
+            cls._client = get_docker_client()
         return cls._client
+
+    _tasks = None
 
     service_id = Unicode()
 
@@ -424,15 +591,6 @@ class SwarmSpawner(Spawner):
         ),
     ).tag(config=True)
 
-    @property
-    def tls_client(self):
-        """A tuple consisting of the TLS client certificate and key if they
-        have been provided, otherwise None.
-        """
-        if self.tls_cert and self.tls_key:
-            return (self.tls_cert, self.tls_key)
-        return None
-
     _service_owner = None
 
     @property
@@ -465,6 +623,19 @@ class SwarmSpawner(Spawner):
         return "{}-{}-{}".format(self.service_prefix, self.service_owner, server_name)
 
     @property
+    def user_config_name_base(self):
+        """
+        Base config name for any configs that the service_owner uploads
+        """
+        if hasattr(self, "user_upload_name") and self.user_upload_name:
+            user_upload_name = self.user_upload_name
+        else:
+            user_upload_name = "upload"
+        return "{}-{}-{}".format(
+            self.service_prefix, self.service_owner, user_upload_name
+        )
+
+    @property
     def tasks(self):
         return self._tasks
 
@@ -477,6 +648,7 @@ class SwarmSpawner(Spawner):
         self.service_id = state.get("service_id", "")
 
     def get_state(self):
+        state = super().get_state()
         state = super().get_state()
         if self.service_id:
             state["service_id"] = self.service_id
@@ -514,30 +686,15 @@ class SwarmSpawner(Spawner):
         env["JPY_HUB_API_URL"] = self._public_hub_api_url()
         return env
 
-    def _docker(self, method, *args, **kwargs):
-        """wrapper for calling docker methods
-
-        to be passed to ThreadPoolExecutor
-        """
-        m = getattr(self.client, method)
-        return m(*args, **kwargs)
-
-    def docker(self, method, *args, **kwargs):
-        """Call a docker method in a background thread
-
-        returns a Future
-        """
-        return self.executor.submit(self._docker, method, *args, **kwargs)
-
-    @gen.coroutine
-    def get_service(self):
+    async def get_service(self):
         self.log.debug(
             "Getting Docker service '{}' with id: '{}'".format(
                 self.service_name, self.service_id
             )
         )
         try:
-            service = yield self.docker("inspect_service", self.service_name)
+            service = run_docker("inspect_service", self.service_name)
+            self.log.debug("Inspect service response: {}".format(service))
             self.service_id = service["ID"]
         except APIError as err:
             if err.response.status_code == 404:
@@ -554,16 +711,15 @@ class SwarmSpawner(Spawner):
                 raise
         return service
 
-    @gen.coroutine
-    def poll(self):
+    async def poll(self):
         """Check for a task state like `docker service ps id`"""
-        service = yield self.get_service()
+        service = await self.get_service()
         if service is None:
             self.log.warn("Docker service not found")
             return 0
 
         task_filter = {"service": service["Spec"]["Name"]}
-        self.tasks = yield self.docker("tasks", task_filter)
+        self.tasks = run_docker("tasks", task_filter)
 
         running_task = None
         for task in self.tasks:
@@ -588,12 +744,11 @@ class SwarmSpawner(Spawner):
                     )
                 )
                 # If the tasks is rejected -> remove it
-                yield self.stop()
+                await self.stop()
 
         if running_task is not None:
             return None
-        else:
-            return 0
+        return 0
 
     async def check_update(self, image, tag="latest"):
         full_image = "".join([image, ":", tag])
@@ -648,11 +803,13 @@ class SwarmSpawner(Spawner):
 
     @async_generator
     async def progress(self):
+        self.log.info("Checking for progress")
         if self.tasks:
             top_task = self.tasks[0]
             image = top_task["Spec"]["ContainerSpec"]["Image"]
             self.log.info("Spawning progress of {} with image".format(self.service_id))
             task_status = top_task["Status"]["State"]
+            self.log.info("Progress task status: {}".format(task_status))
             _tag = None
             if ":" in image:
                 _image, _tag = image.split(":")
@@ -678,21 +835,7 @@ class SwarmSpawner(Spawner):
                     await self.check_update(_image)
                 self.log.info("Finished progress from spawning {}".format(image))
 
-    @gen.coroutine
-    def removed_volume(self, name):
-        result = False
-        try:
-            yield self.docker("remove_volume", name=name)
-            self.log.info("Removed volume: {}".format(name))
-            result = True
-        except APIError as err:
-            if err.response.status_code == 409:
-                self.log.info("Can't remove volume: {} yet".format(name)),
-
-        return result
-
-    @gen.coroutine
-    def remove_volume(self, name, max_attempts=15):
+    async def attempt_volume_remove(self, name, max_attempts=15):
         attempt = 0
         removed = False
         # Volumes can only be removed after the service is gone
@@ -701,14 +844,18 @@ class SwarmSpawner(Spawner):
                 self.log.info("Failed to remove volume {}".format(name))
                 break
             self.log.info("Removing volume {}".format(name))
-            removed = yield self.removed_volume(name=name)
-            yield gen.sleep(1)
+            removed, remove_response = remove_volume(name)
+            if not removed:
+                self.log.info(
+                    "User: {} remove volume response: {}".format(
+                        self.user.name, remove_response
+                    )
+                )
+            await sleep(1)
             attempt += 1
-
         return removed
 
-    @gen.coroutine
-    def start(self):
+    async def start(self):
         """Start the single-user server in a docker service.
         You can specify the params for the service through
         jupyterhub_config.py or using the user_options
@@ -722,78 +869,177 @@ class SwarmSpawner(Spawner):
         user_options = self.user_options
         self.log.debug("User options received: {}".format(user_options))
 
-        service = yield self.get_service()
-        if service is None:
-            # Setup the global default state
-            # As defined by:
-            # https://docker-py.readthedocs.io/en/stable/api.html#docker.types.TaskTemplate
-            new_service_config = {
-                "container_spec": {
-                    "command": None,
-                    "args": None,
-                    "hostname": None,
-                    "env": None,
-                    "workdir": None,
-                    "user": None,
-                    "labels": None,
-                    "mounts": None,
-                    "stop_grace_period": None,
-                    "secrets": None,
-                    "tty": None,
-                    "groups": None,
-                    "open_stdin": None,
-                    "read_only": None,
-                    "stop_signal": None,
-                    "healthcheck": None,
-                    "hosts": None,
-                    "dns_config": None,
-                    "configs": None,
-                    "privileges": None,
-                    "isolation": None,
-                    "init": None,
-                    "cap_add": None,
-                    "cap_drop": None,
-                    "sysctls": None,
-                },
-                "resources": None,
-                "restart_policy": None,
-                "placement": None,
-                "log_driver": None,
-                "networks": None,
-                "force_update": None,
-            }
-
-            self.log.debug("Starting new service config: {}".format(new_service_config))
-            # Set the default value for each attribute
-            for key, value in new_service_config.items():
-                if hasattr(self, key):
-                    new_service_config[key] = getattr(self, key)
-                if key in user_options and user_options[key]:
-                    new_service_config[key] = user_options[key]
-            self.log.debug(
-                "Starting spawn of user: {} with the service config: {}".format(
-                    self.user.name, new_service_config
+        service = await self.get_service()
+        if service:
+            self.log.info(
+                "Found existing Docker service '{}' (id: {})".format(
+                    self.service_name, self.service_id[:7]
                 )
             )
+            # Handle re-using API token.
+            # Get the API token from the environment variables
+            # of the running service:
+            envs = service["Spec"]["TaskTemplate"]["ContainerSpec"]["Env"]
+            for line in envs:
+                if line.startswith("JPY_API_TOKEN="):
+                    self.api_token = line.split("=", 1)[1]
+                    break
+        else:
+            # Create a new service
+            self.log.info(
+                "Creating a new Docker service for user: {}".format(self.user.name)
+            )
+            container_spec = copy.deepcopy(self.container_spec)
 
-            # Pass on the JupyterHub environment variables
-            if not new_service_config["container_spec"]["env"]:
-                new_service_config["container_spec"]["env"] = {}
-            new_service_config["container_spec"]["env"].update(self.get_env())
+            if isinstance(container_spec, dict) and container_spec:
+                container_spec.update(user_options.get("container_spec", {}))
 
-            # Prepare the attributes that can be used to format the new_service_config
-            # before we proceed
-            user_format_dict = {}
+            # Which image to spawn
+            if (
+                "user_selected_image" in user_options
+                and "user_selected_name" in user_options
+            ):
+                self.log.debug("User options received: {}".format(user_options))
+                image_name = user_options["user_selected_name"]
+                image_value = user_options["user_selected_image"]
+                selected_image = None
+                for di in self.images:
+                    if image_name == di["name"] and image_value == di["image"]:
+                        selected_image = copy.deepcopy(di)
+                if selected_image is None:
+                    err_msg = "User selected image: {} couldn't be found".format(
+                        image_value
+                    )
+                    self.log.error(err_msg)
+                    raise Exception(err_msg)
+                self.log.info(
+                    "Using the user selected image: {}".format(selected_image)
+                )
+            else:
+                # Default image
+                selected_image = self.images[0]
+                self.log.info("Using the default image: {}".format(selected_image))
+
+            # Extract the UID and GID to use inside the container
+            uid, gid = get_user_uid_gid(container_spec)
+            if "uid_gid" in selected_image:
+                uid, gid = get_user_uid_gid(selected_image["uid_gid"])
+                # uid_gid is not a supported option in the container_spec
+            if "uid_gid" in container_spec:
+                container_spec.pop("uid_gid")
+
+            if uid:
+                container_spec.update({"user": "{}".format(uid)})
+            if uid and gid:
+                container_spec.update({"user": "{}:{}".format(uid, gid)})
+
+            # Check if the user supplied a user_install_files to create a ConfigReference from
+            # that can be used to install into the user's container upon spawning.
+            if (
+                "user_install_files" in user_options
+                and user_options["user_install_files"]
+            ):
+                for idx, user_install_file in enumerate(
+                    user_options.get("user_install_files", [])
+                ):
+                    file_name = user_install_file["name"]
+                    file_extension = user_install_file["extension"]
+
+                    config_name = "{}-{}".format(self.user_config_name_base, idx)
+                    # If an existing config_name already exists, remove
+                    # the old one before creating a new one
+                    if get_config(config_name)[0]:
+                        pruned, pruned_response = prune_config(config_name)
+                        if not pruned:
+                            self.log.error(pruned_response)
+                            raise Exception(pruned_response)
+
+                    user_config_result = run_docker(
+                        "create_config", config_name, user_install_file["data"]
+                    )
+                    if (
+                        isinstance(user_config_result, dict)
+                        and "ID" in user_config_result
+                    ):
+                        user_config_id = user_config_result.get("ID")
+                        config_mount_path = os.path.join(
+                            self.user_upload_destination_directory,
+                            file_name + file_extension,
+                        )
+                        user_install_config = prepare_user_config_reference(
+                            user_config_id,
+                            config_name,
+                            filename=config_mount_path,
+                            uid=uid,
+                            gid=gid,
+                        )
+                        self.configs.append(user_install_config)
+
+            # Assign the image name as a label
+            container_spec["labels"] = {"image_name": selected_image["name"]}
+
+            # Setup mounts
+            mounts = []
+            # Global mounts
+            if "mounts" in container_spec:
+                mounts.extend(container_spec["mounts"])
+            container_spec["mounts"] = []
+
+            # Image mounts
+            if "mounts" in selected_image:
+                mounts.extend(selected_image["mounts"])
+
+            # Prepare the dictionary that can be used
+            # to format the container_spec
+            format_mount_kwargs = {}
             if self.user_format_attributes:
                 for attr in self.user_format_attributes:
                     if hasattr(self.user, attr):
                         value = getattr(self.user, attr)
                         if not isinstance(value, dict):
                             value = {attr: value}
-                        user_format_dict[attr] = value
-                self.log.debug(
-                    "Spawner user_format_attributes prepared: {}".format(
-                        user_format_dict
+                        format_mount_kwargs[attr] = value
+
+            # Mounts can be declared as regular dictionaries
+            # or as special Mountable objects (see mount.py)
+            for mount in mounts:
+                if isinstance(mount, dict):
+                    m = VolumeMounter(mount)
+                    m = await m.create(**format_mount_kwargs)
+                else:
+                    # Custom type mount defined
+                    # Is instantiated in the config
+                    m = await mount.create(**format_mount_kwargs)
+                container_spec["mounts"].append(m)
+
+            # Some envs are required by the single-user-image
+            if "env" in container_spec:
+                container_spec["env"].update(self.get_env())
+            else:
+                container_spec["env"] = self.get_env()
+
+            # Env of image
+            if "env" in selected_image and isinstance(selected_image["env"], dict):
+                container_spec["env"].update(selected_image["env"])
+
+            # Dynamic update of env values
+            for env_key, env_value in container_spec["env"].items():
+                stripped_value = env_value.lstrip("{").rstrip("}")
+                if hasattr(self, stripped_value) and isinstance(
+                    getattr(self, stripped_value), str
+                ):
+                    container_spec["env"][env_key] = getattr(self, stripped_value)
+                if hasattr(self.user, stripped_value) and isinstance(
+                    getattr(self.user, stripped_value), str
+                ):
+                    container_spec["env"][env_key] = getattr(self.user, stripped_value)
+                if (
+                    hasattr(self.user, "data")
+                    and hasattr(self.user.data, stripped_value)
+                    and isinstance(getattr(self.user.data, stripped_value), str)
+                ):
+                    container_spec["env"][env_key] = getattr(
+                        self.user.data, stripped_value
                     )
                 )
 
@@ -839,10 +1085,108 @@ class SwarmSpawner(Spawner):
                 )
             )
 
-            if self.enable_access_system:
-                self.log.debug(
-                    "Access system enabled, checking permissions for: {}".format(
-                        selected_image_configuration
+            # Global resource_spec
+            resource_spec = {}
+            if hasattr(self, "resource_spec"):
+                resource_spec = self.resource_spec
+            resource_spec.update(user_options.get("resource_spec", {}))
+
+            networks = None
+            if hasattr(self, "networks"):
+                networks = self.networks
+            if user_options.get("networks") is not None:
+                networks = user_options.get("networks")
+
+            # Global Log driver
+            log_driver = None
+            if hasattr(self, "log_driver"):
+                log_driver = self.log_driver
+            if user_options.get("log_driver") is not None:
+                log_driver = user_options.get("log_driver")
+
+            accelerators = []
+            if hasattr(self, "accelerators"):
+                accelerators = self.accelerators
+            if user_options.get("accelerators") is not None:
+                accelerators = user_options.get("accelerators")
+
+            # Global placement
+            placement = None
+            if hasattr(self, "placement"):
+                placement = self.placement
+            if user_options.get("placement") is not None:
+                placement = user_options.get("placement")
+
+            # Image resources
+            if "resource_spec" in selected_image:
+                resource_spec = selected_image["resource_spec"]
+
+            # Accelerators attached to the image
+            if "accelerators" in selected_image:
+                accelerators = selected_image["accelerators"]
+
+            # Placement of image
+            if "placement" in selected_image:
+                placement = selected_image["placement"]
+
+            # Logdriver of image
+            if "log_driver" in selected_image:
+                log_driver = selected_image["log_driver"]
+
+            # Configs attached to image
+            if "configs" in selected_image and isinstance(
+                selected_image["configs"], list
+            ):
+                for c in selected_image["configs"]:
+                    if isinstance(c, dict):
+                        self.configs.append(c)
+
+            endpoint_spec = {}
+            if "endpoint_spec" in selected_image:
+                endpoint_spec = selected_image["endpoint_spec"]
+
+            if self.configs:
+                # Check that the supplied configs already exists
+                current_configs = run_docker("configs")
+                config_error_msg = (
+                    "The server has a misconfigured config, "
+                    "please contact an administrator to resolve this"
+                )
+
+                for c in self.configs:
+                    if "config_name" not in c:
+                        self.log.error(
+                            "Config: {} does not have a "
+                            "required config_name key".format(c)
+                        )
+                        raise Exception(config_error_msg)
+                    if "config_id" not in c:
+                        # Find the id from the supplied name
+                        config_ids = [
+                            cc["ID"]
+                            for cc in current_configs
+                            if cc["Spec"]["Name"] == c["config_name"]
+                        ]
+                        if not config_ids:
+                            self.log.error(
+                                "A config with name {} could not be found".format(
+                                    c["config_name"]
+                                )
+                            )
+                            raise Exception(config_error_msg)
+                        c["config_id"] = config_ids[0]
+
+                container_spec.update(
+                    {"configs": [ConfigReference(**c) for c in self.configs]}
+                )
+
+            # Prepare the accelerators and attach it to the environment
+            if accelerators:
+                for accelerator in accelerators:
+                    accelerator_id = accelerator.aquire(self.user.name)
+                    # NVIDIA_VISIBLE_DEVICES=0:0
+                    container_spec["env"]["NVIDIA_VISIBLE_DEVICES"] = "{}".format(
+                        accelerator_id
                     )
                 )
                 if self.access_system.restricted(selected_image_configuration):
@@ -856,121 +1200,40 @@ class SwarmSpawner(Spawner):
                         )
                         # TODO, add possible contact info about resolving the issue
 
-            # Update the new service config with the selected image configuration
-            for attr, value in selected_image_configuration.items():
-                if attr in new_service_config["container_spec"]:
-                    # If not set, just set the value
-                    if not new_service_config["container_spec"][attr]:
-                        new_service_config["container_spec"][attr] = value
-                    # If the attribute is a dictionary, merge the two dicts
-                    if new_service_config["container_spec"][attr] and isinstance(
-                        new_service_config["container_spec"][attr], dict
-                    ):
-                        new_service_config["container_spec"][attr].update(**value)
+            # Global container user
+            if "user" in container_spec:
+                container_spec["user"] = str(container_spec["user"])
 
-            if self.set_service_image_name_label:
-                self.log.debug(
-                    "Spawner set_service_image_name_label is enabled, "
-                    "updating container_spec labels"
-                )
-                if not new_service_config["container_spec"]["labels"]:
-                    new_service_config["container_spec"]["labels"] = {}
-                new_service_config["container_spec"]["labels"].update(
-                    {"ImageName": selected_image_configuration["name"]}
-                )
+            # Image user
+            if "user" in selected_image:
+                container_spec.update({"user": str(selected_image["user"])})
 
-            if self.use_spawner_datatype_helpers:
-                self.log.debug(
-                    "Spawner use_spawner_datatype_helpers enabled, "
-                    "checking supported spawner data types: {}".format(
-                        self.supported_spawner_datatype_helpers
-                    )
-                )
-                # Check for special new service config attributes that required
-                # custom Data Types
-                for attr in self.supported_spawner_datatype_helpers:
-                    if attr in new_service_config["container_spec"]:
-                        # Deep copy the existing config, because it will
-                        # be overriden
-                        config = copy.deepcopy(
-                            new_service_config["container_spec"][attr]
-                        )
-                        if isinstance(config, (list, set, tuple)):
-                            new_datatypes = []
-                            for c in config:
-                                datatype_klass = discover_datatype_klass(attr, c)
-                                instance = datatype_klass(c)
-                                # TODO, add the ability to pass user_format_attributes
-                                new_datatype = yield instance.create(**user_format_dict)
-                                new_datatypes.append(new_datatype)
-                            new_service_config["container_spec"][attr] = new_datatypes
-                        else:
-                            datatype_klass = discover_datatype_klass(attr, config)
-                            instance = datatype_klass(config)
-                            # TODO, add the ability to pass user_format_attributes
-                            new_datatype = yield instance.create(**user_format_dict)
-                            new_service_config["container_spec"][attr] = new_datatype
+            # Global container workdir
+            if "workdir" in container_spec:
+                container_spec["workdir"] = str(container_spec["workdir"])
 
-                        self.log.debug(
-                            "Generated new datatypes: {}".format(
-                                new_service_config["container_spec"][attr]
-                            )
-                        )
+            # Image workdir
+            if "workdir" in selected_image:
+                container_spec.update({"workdir": str(selected_image["workdir"])})
 
-            if self.enable_accelerator_system:
-                self.log.debug(
-                    "Spawner enable_accelerator_system enabled, checking if any "
-                    "accelerator should be associated with the to be spawned session"
-                )
-                self.log.debug(
-                    "Spawner AcceleratorManager current db contains: {}".format(
-                        self.accelerator_manager._db
-                    )
-                )
-                self.log.debug(
-                    "Spawner AcceleratorManager current db contains: {}".format(
-                        self.accelerator_manager._db
-                    )
-                )
-                # Check if the image has requested a Pool
-                if "accelerator_pools" in selected_image_configuration:
-                    for pool in selected_image_configuration["accelerator_pools"]:
-                        self.log.debug("Looking for accelerator pool: {}".format(pool))
-                        # If the user already has a request accelerator, release it first
-                        # before requesting a new one
-                        assigned_accelerator = self.accelerator_manager.request(
-                            pool, self.user.name, logger=self.log
-                        )
-                        self.log.debug(
-                            "Spawner tried to acquire accelerator resource from pool: {} - result: {}".format(
-                                pool, assigned_accelerator
-                            )
-                        )
-                        if assigned_accelerator:
-                            accelerator_type = self.accelerator_manager.get_pool_type(
-                                pool
-                            )
-                            self.log.debug(
-                                "Found acceelertor: {}".format(accelerator_type)
-                            )
-                            # Docker Swarm expects that GPU resources are set in th
-                            # Resources.generic_resources.
-                            # TODO, abstract the NVIDIA-GPU id
-                            if (
-                                "generic_resources"
-                                not in new_service_config["resources"]
-                            ):
-                                new_service_config["resources"][
-                                    "generic_resources"
-                                ] = {}
-                            new_service_config["resources"]["generic_resources"] = {
-                                accelerator_type: assigned_accelerator
-                            }
-                        else:
-                            self.log.error(
-                                "Failed to get request accelerator resource from pool:"
-                                " {} - result: {}".format(pool, assigned_accelerator)
-                            )
+            dynamic_value_owners = [Spawner, self, self.user]
+            # Format container_spec with data from the
+            # potential dynamic owners
+            for dynamic_owner in dynamic_value_owners:
+                try:
+                    if not hasattr(dynamic_owner, "__dict__"):
+                        continue
+                    recursive_format(container_spec, dynamic_owner.__dict__)
+                except TypeError:
+                    pass
+
+            # Log driver
+            log_driver_name, log_driver_options = None, None
+            if log_driver and isinstance(log_driver, dict):
+                if "name" in log_driver:
+                    log_driver_name = log_driver["name"]
+                if "options" in log_driver:
+                    log_driver_options = log_driver["options"]
 
             # Create the service
             container_spec_kwargs = new_service_config.pop("container_spec")
@@ -994,9 +1257,7 @@ class SwarmSpawner(Spawner):
                     # https://docker-py.readthedocs.io/en/stable/api.html#docker.types.TaskTemplate
                     task_template_kwargs[key] = value
 
-            task_template = TaskTemplate(**task_template_kwargs)
-            self.log.debug("scheduling task template: {}".format(task_template))
-            resp = yield self.docker(
+            resp = run_docker(
                 "create_service",
                 task_template,
                 name=self.service_name,
@@ -1013,26 +1274,14 @@ class SwarmSpawner(Spawner):
                     self.user.name,
                 )
             )
-            yield self.wait_for_running_tasks()
-        else:
-            self.log.info(
-                "Found existing Docker service '{}' (id: {})".format(
-                    self.service_name, self.service_id[:7]
-                )
-            )
-            # Handle re-using API token.
-            # Get the API token from the environment variables
-            # of the running service:
-            envs = service["Spec"]["TaskTemplate"]["ContainerSpec"]["Env"]
-            for line in envs:
-                if line.startswith("JPY_API_TOKEN="):
-                    self.api_token = line.split("=", 1)[1]
-                    break
+            await self.wait_for_running_tasks()
 
         ip = self.service_name
         port = self.service_port
         self.log.debug(
-            "Active service: '{}' with user '{}'".format(self.service_name, self.user)
+            "Active service: '{}' with user '{}'".format(
+                self.service_name, self.user.name
+            )
         )
 
         # we use service_name instead of ip
@@ -1040,69 +1289,80 @@ class SwarmSpawner(Spawner):
         # service_port is actually equal to 8888
         return ip, port
 
-    @gen.coroutine
-    def stop(self, now=False):
+    async def stop(self, now=False):
         """Stop and remove the service
         Consider using stop/start when Docker adds support
         """
         self.log.info(
-            "Stopping and removing Docker service {} (id: {})".format(
-                self.service_name, self.service_id[:7]
+            "Stopping and removing Docker service {} (id: {}) owned by: {}".format(
+                self.service_name, self.service_id[:7], self.user.name
             )
         )
 
-        service = yield self.get_service()
+        service = await self.get_service()
         if not service:
             self.log.warn("Docker service not found")
             return
 
+        self.log.debug("Docker service {}".format(service["Spec"]))
         # lookup mounts before removing the service
-        volumes = None
+        volumes = []
         if "Mounts" in service["Spec"]["TaskTemplate"]["ContainerSpec"]:
             volumes = service["Spec"]["TaskTemplate"]["ContainerSpec"]["Mounts"]
 
+        # lookup user configs before removing the service
+        user_upload_configs = []
+        service_configs = service["Spec"]["TaskTemplate"]["ContainerSpec"].get(
+            "Configs", []
+        )
+        for config in service_configs:
+            config_name = config.get("ConfigName", None)
+            if config_name and self.user_config_name_base in config_name:
+                user_upload_configs.append(config)
+
         # Even though it returns the service is gone
         # the underlying containers are still being removed
-        removed_service = yield self.docker("remove_service", service["ID"])
+        removed_service = run_docker("remove_service", service["ID"])
         if removed_service:
             self.log.info(
                 "Docker service {} (id: {}) removed".format(
                     self.service_name, self.service_id[:7]
                 )
             )
-            # if self.enable_accelerator_system:
-            #     # Release any associated accelerators
-            #     # TODO, discover the used pool
-            #     self.accelerator_manager.release(pool, self.user.name, logger=self.log)
-
-            if volumes is not None:
-                for volume in volumes:
-                    labels = volume.get("VolumeOptions", {}).get("Labels", {})
-                    # Whether the volume should be kept
-                    if "autoremove" in labels and labels["autoremove"] != "False":
-                        self.log.debug("Volume {} is not kept".format(volume))
-                        if "Source" in volume:
-                            # Validate the volume exists
-                            try:
-                                yield self.docker("inspect_volume", volume["Source"])
-                            except docker.errors.NotFound:
-                                self.log.info("No volume named: " + volume["Source"])
-                            else:
-                                yield self.remove_volume(volume["Source"])
+            for volume in volumes:
+                labels = volume.get("VolumeOptions", {}).get("Labels", {})
+                # Whether the volume should be kept
+                if "autoremove" in labels and labels["autoremove"] != "False":
+                    self.log.debug("Volume {} is not kept".format(volume))
+                    if "Source" in volume:
+                        # Validate the volume exists
+                        try:
+                            run_docker("inspect_volume", volume["Source"])
+                        except docker.errors.NotFound:
+                            self.log.info("No volume named: " + volume["Source"])
                         else:
-                            self.log.error(
-                                "Volume {} didn't have a 'Source' key so it "
-                                "can't be removed".format(volume)
-                            )
+                            await self.attempt_volume_remove(volume["Source"])
+                    else:
+                        self.log.error(
+                            "Volume {} didn't have a 'Source' key so it "
+                            "can't be removed".format(volume)
+                        )
+            for config in user_upload_configs:
+                self.log.info("Removing config: {}".format(config))
+                if not prune_config(config["ConfigName"], logger=self.log):
+                    self.log.error(
+                        "Can't remove config: {} because it does not exist".format(
+                            config["ConfigName"]
+                        )
+                    )
 
-    @gen.coroutine
-    def wait_for_running_tasks(self, max_attempts=20):
-        preparing, running = False, False
-        attempt = 0
+    async def wait_for_running_tasks(self, max_attempts=20, max_preparing=30):
+        running = False
+        num_preparing, attempt = 0, 0
         while not running:
-            service = yield self.get_service()
+            service = await self.get_service()
             task_filter = {"service": service["Spec"]["Name"]}
-            self.tasks = yield self.docker("tasks", task_filter)
+            self.tasks = run_docker("tasks", task_filter)
             preparing = False
             for task in self.tasks:
                 task_state = task["Status"]["State"]
@@ -1119,4 +1379,8 @@ class SwarmSpawner(Spawner):
                     return False
             if not preparing:
                 attempt += 1
-            yield gen.sleep(1)
+            else:
+                num_preparing += 1
+            if num_preparing > max_preparing:
+                return False
+            await sleep(1)

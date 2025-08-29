@@ -31,3 +31,12 @@ c.SwarmSpawner.images = [
         "mounts": mounts,
     }
 ]
+
+
+c.SwarmSpawner.container_spec = {
+    "args": [
+        "/usr/local/bin/start-singleuser.sh",
+        "--ServerApp.ip=0.0.0.0",
+        "--ServerApp.port=8888",
+    ]
+}

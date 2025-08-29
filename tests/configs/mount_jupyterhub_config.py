@@ -22,26 +22,28 @@ c.SwarmSpawner.jupyterhub_service_name = "jupyterhub"
 c.SwarmSpawner.networks = ["jh_test"]
 
 sshfs_mount = [
-    {
-        "type": "volume",
-        "driver_config": {
-            "name": "ucphhpc/sshfs:latest",
-            "options": {
-                "sshcmd": "{username}@{targetHost}:{targetPath}",
-                "id_rsa": "{privateKey}",
-                "allow_other": "",
-                "reconnect": "",
-                "ephemeral": "True",
-                "port": "{port}",
+    SSHFSMounter(
+        {
+            "type": "volume",
+            "driver_config": {
+                "name": "ucphhpc/sshfs:latest",
+                "options": {
+                    "sshcmd": "{username}@{targetHost}:{targetPath}",
+                    "id_rsa": "{privateKey}",
+                    "port": "{port}",
+                    "ephemeral": "True",
+                    "allow_other": "",
+                    "reconnect": "",
+                },
             },
-        },
-        "source": "sshvolume-user-{name}",
-        "target": "/home/jovyan/work",
-    }
+            "source": "sshvolume-user-{name}",
+            "target": notebook_dir,
+        }
+    )
 ]
 
 # Available docker images the user can spawn
-# Additional settings including, access, mounts, placement
+# Additional settings including, mounts, placement
 c.SwarmSpawner.images = [
     {
         "image": "ucphhpc/base-notebook:latest",
@@ -53,6 +55,11 @@ c.SwarmSpawner.images = [
 # Which user state varibales should be used to format the service config
 c.SwarmSpawner.user_format_attributes = ["mount_data", "name"]
 
-# Use internel SwarmSpawner Data types to validate the supplied config
-c.SwarmSpawner.use_spawner_datatype_helpers = True
-c.SwarmSpawner.supported_spawner_datatype_helpers = ["mounts"]
+
+c.SwarmSpawner.container_spec = {
+    "args": [
+        "/usr/local/bin/start-singleuser.sh",
+        "--ServerApp.ip=0.0.0.0",
+        "--ServerApp.port=8888",
+    ]
+}

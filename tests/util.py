@@ -75,6 +75,17 @@ def remove_volume(client, volume_name):
     return True
 
 
+def wait_for_remove_volume(client, volume_name, timeout=60):
+    attempts = 0
+    while attempts < timeout:
+        removed = remove_volume(client, volume_name)
+        if removed:
+            return True
+        attempts += 1
+        time.sleep(1)
+    return False
+
+
 def get_service_env(service, env_key=None):
     # If no Env, the service might not be started succesfully
     if "Env" not in service.attrs["Spec"]["TaskTemplate"]["ContainerSpec"]:
@@ -187,10 +198,12 @@ def get_site(session, url, headers=None, valid_status_code=200):
 
 
 # Waits for 5 minutes for a site to be ready
-def _wait_for_site(session, url, timeout=60, valid_status_code=200, require_xsrf=False):
+def _wait_for_site(
+    session, url, headers=None, timeout=60, valid_status_code=200, require_xsrf=False
+):
     attempts = 0
     while attempts < timeout:
-        if get_site(session, url, valid_status_code=valid_status_code):
+        if get_site(session, url, headers=headers, valid_status_code=valid_status_code):
             if require_xsrf:
                 if "_xsrf" in session.cookies:
                     return True
@@ -203,6 +216,7 @@ def _wait_for_site(session, url, timeout=60, valid_status_code=200, require_xsrf
 
 def wait_for_site(
     url,
+    headers=None,
     timeout=60,
     valid_status_code=200,
     auth_url=None,
@@ -218,6 +232,7 @@ def wait_for_site(
         if _wait_for_site(
             s,
             url,
+            headers=headers,
             timeout=timeout,
             valid_status_code=valid_status_code,
             require_xsrf=require_xsrf,
@@ -248,13 +263,38 @@ def wait_for_session(
     return False
 
 
-def delete(session, url, timeout=60, headers=None, valid_status_code=204):
+def put(session, url, timeout=60, valid_status_code=201, **request_kwargs):
+    attempts = 0
+    while attempts < timeout:
+        resp = session.put(url, **request_kwargs)
+        if resp.status_code == valid_status_code:
+            return True
+        attempts += 1
+        time.sleep(1)
+    return False
+
+
+def get(session, url, headers=None, valid_status_code=200, params=None):
     if not headers:
         headers = {}
+    try:
+        resp = session.get(url, headers=headers, params=params)
+        if resp.status_code == valid_status_code:
+            return resp
+    except requests.exceptions.ConnectionError:
+        pass
+    return False
+
+
+def delete(session, url, timeout=60, headers=None, valid_status_code=204, params=None):
+    if not headers:
+        headers = {}
+    if not params:
+        params = {}
 
     attempts = 0
     while attempts < timeout:
-        resp = session.delete(url, headers=headers)
+        resp = session.delete(url, headers=headers, params=params)
         if resp.status_code == valid_status_code:
             return True
         attempts += 1
@@ -266,3 +306,14 @@ def refresh_csrf(session, url, timeout=60, headers=None):
     if not headers:
         headers = {}
     return wait_for_session(session, url, timeout=timeout, require_xsrf=True)
+
+
+def load(path, mode="r", readlines=False):
+    try:
+        with open(path, mode) as fh:
+            if readlines:
+                return fh.readlines()
+            return fh.read()
+    except Exception as err:
+        print("Failed to load file: {} - {}".format(path, err))
+    return False

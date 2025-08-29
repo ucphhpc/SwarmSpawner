@@ -11,11 +11,12 @@ from tests.util import (
     wait_for_site,
     wait_for_session,
     delete,
+    put,
     get_service_api_url,
-    get_service_url,
     get_service,
     get_service_user,
-    refresh_csrf,
+    get_service_env,
+    wait_for_service_task,
 )
 
 
@@ -87,25 +88,29 @@ def test_remote_auth_hub(image, swarm, network, make_service):
     assert wait_for_site(JHUB_URL, valid_status_code=401) is True
 
     with requests.Session() as s:
+        # Refresh cookies
+        s.get(JHUB_URL)
+
         # Login
-        login_response = s.post(JHUB_URL + "/hub/login", headers=headers)
+        login_response = s.post(
+            urljoin(JHUB_URL, "/hub/login"),
+            headers=headers,
+            params={"_xsrf": s.cookies["_xsrf"]},
+        )
         test_logger.info("Login response message: {}".format(login_response.text))
         assert login_response.status_code == 200
 
         # Spawn a notebook
-        # Spawn a notebook
-        spawn_form_resp = s.get(JHUB_URL + "/hub/spawn")
+        spawn_form_resp = s.get(urljoin(JHUB_URL, "/hub/spawn"))
         test_logger.info("Spawn page message: {}".format(spawn_form_resp.text))
         assert spawn_form_resp.status_code == 200
         assert "Select a notebook image" in spawn_form_resp.text
-        user_image_name = "Basic Python Notebook"
-        user_image_data = "ucphhpc/base-notebook:latest"
-        payload = {
-            "select_image": json.dumps(
-                {"image": user_image_data, "name": user_image_name}
-            )
-        }
-        spawn_resp = s.post(JHUB_URL + "/hub/spawn", data=payload)
+        payload = {"dockerimage": "ucphhpc/base-notebook:latest"}
+        spawn_resp = s.post(
+            urljoin(JHUB_URL, "/hub/spawn"),
+            data=payload,
+            params={"_xsrf": s.cookies["_xsrf"]},
+        )
         test_logger.info("Spawn POST response message: {}".format(spawn_resp.text))
         assert spawn_resp.status_code == 200
 
@@ -114,39 +119,49 @@ def test_remote_auth_hub(image, swarm, network, make_service):
         spawned_service = get_service(client, target_service_name)
         assert spawned_service is not None
 
-        # Get the service api url
-        service_url = get_service_url(spawned_service)
-        # If failed the service might not be running
-        if not service_url:
-            test_logger.info("Properly failed to start the service correctly")
-        assert service_url is not None
+        # Wait for the spawned service to be running
+        running_task = wait_for_service_task(
+            client, spawned_service, filters={"desired-state": "running"}, timeout=300
+        )
+        assert running_task
+
+        api_token = get_service_env(spawned_service, "JUPYTERHUB_API_TOKEN")
+        assert api_token is not None
+
+        service_api_url = get_service_api_url(spawned_service)
+        assert service_api_url is not None
 
         # Combine with the base jhub URL
-        jhub_service_api = urljoin(JHUB_URL, service_url)
+        jhub_service_api_url = urljoin(JHUB_URL, f"{service_api_url}")
+        assert wait_for_session(s, jhub_service_api_url, require_xsrf=True, timeout=300)
+        jub_service_api_content_url = urljoin(jhub_service_api_url, "contents/")
 
         # Write to user home
         new_file = "write_test.ipynb"
         data = json.dumps({"name": new_file})
         test_logger.info("Looking for xsrf in: {}".format(s.cookies))
-
-        # Refresh csrf token
-        assert wait_for_session(s, jhub_service_api, require_xsrf=True, timeout=300)
         assert "_xsrf" in s.cookies
-        xsrf_token = s.cookies["_xsrf"]
-        service_api_url = get_service_api_url(spawned_service, postfix_url="contents/")
-        jhub_service_content = urljoin(JHUB_URL, service_api_url)
+        # Jupyter expects colon seperated cookie value
+        cookies = ";".join([f"{key}={value}" for key, value in dict(s.cookies).items()])
 
         # Write to home
-        xsrf_headers = {"X-XSRFToken": xsrf_token}
-        resp = s.put(
-            "".join([jhub_service_content, new_file]),
-            data=data,
-            headers=xsrf_headers,
+        xsrf_headers = {
+            "Authorization": f"token {api_token}",
+            "X-Xsrftoken": s.cookies["_xsrf"],
+            "Cookie": cookies,
+        }
+        # https://jupyter-server.readthedocs.io/en/latest/developers/rest-api.html#put--api-contents-path
+        assert (
+            put(
+                s,
+                "".join([jub_service_api_content_url, new_file]),
+                headers=xsrf_headers,
+                data=data,
+            )
+            is True
         )
-        assert resp.status_code == 201
 
         # Remove via the web interface
-        refresh_csrf(s, jhub_service_api)
         assert "_xsrf" in s.cookies
         delete_headers = {
             "Referer": urljoin(JHUB_URL, "/hub/home"),
@@ -157,7 +172,12 @@ def test_remote_auth_hub(image, swarm, network, make_service):
         delete_url = urljoin(JHUB_URL, "/hub/api/users/{}/server".format(jhub_user))
 
         # Wait for the server to finish deleting
-        deleted = delete(s, delete_url, headers=delete_headers)
+        deleted = delete(
+            s,
+            delete_url,
+            headers=delete_headers,
+            params={"_xsrf": s.cookies["_xsrf"]},
+        )
         assert deleted
 
         deleted_service = get_service(client, target_service_name)
@@ -204,24 +224,29 @@ def test_remote_auth_hub_custom_username(image, swarm, network, make_service):
     assert wait_for_site(JHUB_URL, valid_status_code=401) is True
 
     with requests.Session() as s:
+        # Refresh cookies
+        s.get(JHUB_URL)
+
         # Login
-        login_response = s.post(JHUB_URL + "/hub/login", headers=headers)
+        login_response = s.post(
+            urljoin(JHUB_URL, "/hub/login"),
+            headers=headers,
+            params={"_xsrf": s.cookies["_xsrf"]},
+        )
         test_logger.info("Login response message: {}".format(login_response.text))
         assert login_response.status_code == 200
 
         # Spawn a notebook
-        spawn_form_resp = s.get(JHUB_URL + "/hub/spawn")
+        spawn_form_resp = s.get(urljoin(JHUB_URL, "/hub/spawn"))
         test_logger.info("Spawn page message: {}".format(spawn_form_resp.text))
         assert spawn_form_resp.status_code == 200
         assert "Select a notebook image" in spawn_form_resp.text
-        user_image_name = "Basic Python Notebook"
-        user_image_data = "ucphhpc/base-notebook:latest"
-        payload = {
-            "select_image": json.dumps(
-                {"image": user_image_data, "name": user_image_name}
-            )
-        }
-        spawn_resp = s.post(JHUB_URL + "/hub/spawn", data=payload)
+        payload = {"dockerimage": "ucphhpc/base-notebook:latest"}
+        spawn_resp = s.post(
+            urljoin(JHUB_URL, "/hub/spawn"),
+            data=payload,
+            params={"_xsrf": s.cookies["_xsrf"]},
+        )
         test_logger.info("Spawn POST response message: {}".format(spawn_resp.text))
         assert spawn_resp.status_code == 200
 
@@ -230,39 +255,49 @@ def test_remote_auth_hub_custom_username(image, swarm, network, make_service):
         spawned_service = get_service(client, target_service_name)
         assert spawned_service is not None
 
-        # Get the service api url
-        service_url = get_service_url(spawned_service)
-        # If failed the service might not be running
-        if not service_url:
-            test_logger.info("Properly failed to start the service correctly")
-        assert service_url is not None
+        # Wait for the spawned service to be running
+        running_task = wait_for_service_task(
+            client, spawned_service, filters={"desired-state": "running"}, timeout=300
+        )
+        assert running_task
+
+        api_token = get_service_env(spawned_service, "JUPYTERHUB_API_TOKEN")
+        assert api_token is not None
+
+        service_api_url = get_service_api_url(spawned_service)
+        assert service_api_url is not None
 
         # Combine with the base jhub URL
-        jhub_service_api = urljoin(JHUB_URL, service_url)
+        jhub_service_api_url = urljoin(JHUB_URL, f"{service_api_url}")
+        assert wait_for_session(s, jhub_service_api_url, require_xsrf=True, timeout=300)
+        jub_service_api_content_url = urljoin(jhub_service_api_url, "contents/")
 
         # Write to user home
         new_file = "write_test.ipynb"
         data = json.dumps({"name": new_file})
         test_logger.info("Looking for xsrf in: {}".format(s.cookies))
-
-        # Refresh csrf token
-        assert wait_for_session(s, jhub_service_api, require_xsrf=True, timeout=300)
         assert "_xsrf" in s.cookies
-        xsrf_token = s.cookies["_xsrf"]
-        service_api_url = get_service_api_url(spawned_service, postfix_url="contents/")
-        jhub_service_content = urljoin(JHUB_URL, service_api_url)
+        # Jupyter expects colon seperated cookie value
+        cookies = ";".join([f"{key}={value}" for key, value in dict(s.cookies).items()])
 
         # Write to home
-        xsrf_headers = {"X-XSRFToken": xsrf_token}
-        resp = s.put(
-            "".join([jhub_service_content, new_file]),
-            data=data,
-            headers=xsrf_headers,
+        xsrf_headers = {
+            "Authorization": f"token {api_token}",
+            "X-Xsrftoken": s.cookies["_xsrf"],
+            "Cookie": cookies,
+        }
+        # https://jupyter-server.readthedocs.io/en/latest/developers/rest-api.html#put--api-contents-path
+        assert (
+            put(
+                s,
+                "".join([jub_service_api_content_url, new_file]),
+                headers=xsrf_headers,
+                data=data,
+            )
+            is True
         )
-        assert resp.status_code == 201
 
         # Remove via the web interface
-        refresh_csrf(s, jhub_service_api)
         assert "_xsrf" in s.cookies
         delete_headers = {
             "Referer": urljoin(JHUB_URL, "/hub/home"),
@@ -273,7 +308,12 @@ def test_remote_auth_hub_custom_username(image, swarm, network, make_service):
         delete_url = urljoin(JHUB_URL, "/hub/api/users/{}/server".format(jhub_user))
 
         # Wait for the server to finish deleting
-        deleted = delete(s, delete_url, headers=delete_headers)
+        deleted = delete(
+            s,
+            delete_url,
+            headers=delete_headers,
+            params={"_xsrf": s.cookies["_xsrf"]},
+        )
         assert deleted
 
         deleted_service = get_service(client, target_service_name)

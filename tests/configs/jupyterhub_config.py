@@ -22,4 +22,11 @@ c.SwarmSpawner.images = [
     {"image": "ucphhpc/base-notebook:latest", "name": "Basic Python Notebook 2"},
 ]
 
-c.SwarmSpawner.set_service_image_name_label = True
+
+c.SwarmSpawner.container_spec = {
+    "args": [
+        "/usr/local/bin/start-singleuser.sh",
+        "--ServerApp.ip=0.0.0.0",
+        "--ServerApp.port=8888",
+    ]
+}
