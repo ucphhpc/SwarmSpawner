@@ -8,7 +8,6 @@ ADD setup.py SwarmSpawner/setup.py
 ADD requirements.txt SwarmSpawner/requirements.txt
 ADD requirements-dev.txt SwarmSpawner/requirements-dev.txt
 ADD tests/requirements.txt SwarmSpawner/tests/requirements.txt
-ADD version.py SwarmSpawner/version.py
 
 RUN cd SwarmSpawner \
     && touch README.rst \
