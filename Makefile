@@ -62,8 +62,12 @@ clean: dockerclean distclean venv-clean
 	rm -fr tests/__pycache__
 
 .PHONY: dist
-dist: venv
-	$(VENV)/python setup.py sdist bdist_wheel
+dist: venv install-dist-dep
+	$(VENV)/python -m build .
+
+.PHONY: install-dist-dep
+install-dist-dep: venv
+	$(VENV)/pip install build
 
 .PHONY: distclean
 distclean:
