@@ -27,6 +27,7 @@ c.SwarmSpawner.images = [
 ]
 
 c.JupyterHub.authenticator_class = "jhubauthenticators.DummyAuthenticator"
+c.Authenticator.allow_all = True
 c.DummyAuthenticator.password = "just magnets"
 
 

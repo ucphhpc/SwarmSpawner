@@ -19,6 +19,7 @@ c.SwarmSpawner.networks = ["jh_test"]
 c.SwarmSpawner.use_user_options = True
 
 c.JupyterHub.authenticator_class = "jhubauthenticators.DummyAuthenticator"
+c.Authenticator.allow_all = True
 c.DummyAuthenticator.password = "just magnets"
 
 

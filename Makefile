@@ -109,11 +109,11 @@ uninstalltest: venv
 	@echo "*** Hit Ctrl-C to abort to preserve any local user and cert data ***"
 	@echo
 	@sleep 10
-	if [ "$$(docker volume ls -q -f 'driver=ucphhpc/sshfs${PLUGIN_TAG}')" != "" ]; then\
-		docker volume rm -f $$(docker volume ls -q -f 'driver=ucphhpc/sshfs${PLUGIN_TAG}');\
+	if [ "$$(docker volume ls -q -f 'driver=ucphhpc/sshfs:${PLUGIN_TAG}')" != "" ]; then\
+		docker volume rm -f $$(docker volume ls -q -f 'driver=ucphhpc/sshfs:${PLUGIN_TAG}');\
 	fi
-	docker plugin disable ucphhpc/sshfs${PLUGIN_TAG}
-	docker plugin rm ucphhpc/sshfs${PLUGIN_TAG}
+	docker plugin disable ucphhpc/sshfs:${PLUGIN_TAG}
+	docker plugin rm ucphhpc/sshfs:${PLUGIN_TAG}
 
 .PHONY: installtest
 installtest: venv
@@ -122,7 +122,7 @@ installtest: venv
 ifeq (${MOUNT_PLUGIN}, 1)
 	@echo "The ucphhpc/sshfs docker plugin was not found"
 	@echo "Installing the missing ucphhpc/sshfs docker plugin"
-	@docker plugin install ucphhpc/sshfs${PLUGIN_TAG} --grant-all-permissions
+	@docker plugin install ucphhpc/sshfs:${PLUGIN_TAG} --grant-all-permissions
 else
 	@echo "Found the ucphhpc/sshfs docker plugin"
 endif

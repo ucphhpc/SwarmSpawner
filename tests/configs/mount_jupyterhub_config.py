@@ -9,6 +9,7 @@ c.JupyterHub.hub_ip = "0.0.0.0"
 
 # Authenticator -> Remote-User header value
 c.JupyterHub.authenticator_class = "jhubauthenticators.HeaderAuthenticator"
+c.Authenticator.allow_all = True
 c.Authenticator.enable_auth_state = True
 c.HeaderAuthenticator.user_external_allow_attributes = ["mount_data"]
 

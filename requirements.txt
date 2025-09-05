@@ -1,5 +1,6 @@
 docker>=7.0.0
-jupyterhub>=4.1.6,<5.0.0
+jupyterhub>5.1.0
 flatten_dict>=0.4.2
-jhub-authenticators>=0.5.1
+jhub-authenticators>=0.6.0
 traitlets>=4.3.2
+async_generator>=1.10.0
