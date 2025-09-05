@@ -309,7 +309,6 @@ when the ``c.SwarmSpawner.use_user_options`` is also enabled.
 By default, the builtin ``c.SwarmSpawner.user_upload_form`` allows the user to upload a single file underneth the image selection form.
 
 .. image:: res/jupyterhub_user_packages_form.png
-   :width: 300px
    :alt: JupyterHub User Packages Form
 
 This form can be customised by overriding the ``c.SwarmSpawner.user_upload_form``. For instance if you wanted to allow multiple files to be uploaded
