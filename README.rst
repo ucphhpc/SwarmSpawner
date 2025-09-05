@@ -309,13 +309,17 @@ when the ``c.SwarmSpawner.use_user_options`` is also enabled.
 By default, the builtin ``c.SwarmSpawner.user_upload_form`` allows the user to upload a single file underneth the image selection form.
 
 .. image:: res/jupyterhub_user_packages_form.png
-   :alt: JupyterHub User Packages Form
+        :alt: JupyterHub User Packages Form
 
 This form can be customised by overriding the ``c.SwarmSpawner.user_upload_form``. For instance if you wanted to allow multiple files to be uploaded
 that can be enabled by adjusting the form ``c.SwarmSpawner.user_upload_form``.
 In addition, the ``c.SwarmSpawner.allowed_user_upload_extensions`` option specifies which filetypes are allowed to be uploaded, which by default is ``.txt``` files.
 
 Once a user Docker Swarm service is spawned, the uploaded install file(s) will be available in the ``c.SwarmSpawner.user_upload_destination_directory`` directory, which is set to ``/user-installs`` if left unchanged.
+To subsequently automatically install the included uploaded install files, the `before-notebook.d <https://github.com/jupyter/docker-stacks/blob/52cc4677349c4a94e7481811d3953c2cc3e9e2fe/images/docker-stacks-foundation/start.sh#L255>`_ directory hook as provided by the Jupyter Notebook Image can be leveraged.
+
+An example of this can be seen in `UCPHHPC Jupyter Service <https://github.com/ucphhpc/jupyter_service/tree/master>`_ with its `install_user_packages <https://github.com/ucphhpc/jupyter_service/blob/master/hub/before-notebook.d/9_install_user_packages.sh>`_ script.
+
 
 Names of the Jupyter notebook service inside Docker engine in Swarm mode
 --------------------------------------------------------------------------
