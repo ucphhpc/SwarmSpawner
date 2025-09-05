@@ -1,6 +1,6 @@
-==============================
+=================
 jhub-SwarmSpawner
-==============================
+=================
 .. image:: https://travis-ci.org/rasmunk/SwarmSpawner.svg?branch=master
     :target: https://travis-ci.org/rasmunk/SwarmSpawner
 .. image:: https://badge.fury.io/py/jhub-swarmspawner.svg
@@ -12,14 +12,14 @@ jhub-SwarmSpawner
 More info about Docker Services `here <https://docs.docker.com/engine/reference/commandline/service_create/>`_.
 
 Installation
-================
+============
 
 .. code-block:: sh
 
    pip install jhub-swarmspawner
 
 Installation from GitHub
-============================
+========================
 
 .. code-block:: sh
 
@@ -28,7 +28,7 @@ Installation from GitHub
    python setup.py install
 
 Configuration
-================
+=============
 
 You can find example JupyterHub configuration files in `examples <examples>`_.
 To quickly get started the `jupyter_config_basic.py` can be used.
@@ -46,13 +46,13 @@ An example of this can be seen in `examples/jupyter_config_basic.py <examples/ju
         c.JupyterHub.spawner_class = "jhub.SwarmSpawner"
 
 Networks
-============
-It's important to put the JupyterHub service (also the proxy) and the services that are running jupyter notebook inside the same network, otherwise they couldn't reach each other.
-SwarmSpawner use the service's name instead of the service's ip, as a consequence JupyterHub and servers should share the same overlay network (network across nodes).
+========
+It's important to put the JupyterHub service (also the proxy) and the services that are running jupyter notebook inside the same network, otherwise they can't reach each other.
+In a Docker Swarm Cluster setting, this means that they are in the same `Overlay Network <https://docs.docker.com/engine/network/drivers/overlay/>`_.
+The SwarmSpawner can be specified to use a specific network via the ``c.SwarmSPawner.networks`` configuration option.
 
 .. code-block:: python
 
-        #list of networks
         c.SwarmSpawner.networks = ["mynetwork"]
 
 
@@ -151,7 +151,7 @@ This enables an image select form in the users /hub/home url path when a noteboo
 
 
 Bind a Host dir
----------------------
+---------------
 With ``'type':'bind'`` you mount a local directory of the host inside the container.
 
 *Remember that source should exist in the node where you are creating the service.*
@@ -181,7 +181,7 @@ If the volume doesn't exist it will be created.
 
 
 Named path
---------------
+----------
 For both types, volume and bind, you can specify a ``{name}`` inside the source:
 
 .. code-block:: python
@@ -256,7 +256,7 @@ Or
 With the default being 'False'.
 
 Resource_spec
----------------
+-------------
 
 You can also specify some resource for each service
 
@@ -269,8 +269,8 @@ You can also specify some resource for each service
                         'mem_reservation' : int(512 * 1e6), # (int) – Memory reservation in Bytes
                         }
 
-Allow user form options
------------------------
+User form options
+=================
 
 By default, if the ``use_user_option`` is not enabled, the user wont be able to select between multiple available images, the user will simply spawn an instance of the default image. i.e. images[0].
 Therefore, to allow the user to select between multiple available images, the following must be set in the JupyterHub configuration file.
