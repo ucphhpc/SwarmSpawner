@@ -39,7 +39,7 @@ Docker Engine in Swarm mode and the related services work in a different way com
 Therefore the ``jhub.SwarmSpawner`` can be used to spawn user server's as a Docker Swarm Service in a precreated Docker Swarm Cluster.
 
 To enable the ``jhub.SwarmSpawner`` it must be assigned to the ``c.JupyterHub.spawner_class`` option in the JupyterHub configuration file.
-An example of this can be seen in `examples/jupyter_config_basic.py <examples/juputer_config_basic.py>`_.
+An example of this can be seen in `examples/jupyter_config_basic.py <examples/jupyter_config_basic.py>`_.
 
 .. code-block:: python
 
