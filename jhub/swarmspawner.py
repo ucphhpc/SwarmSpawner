@@ -385,15 +385,6 @@ class SwarmSpawner(Spawner):
         ),
     ).tag(config=True)
 
-    tls_config = Dict(
-        help=dedent(
-            """Arguments to pass to docker TLS configuration.
-            Check for more info:
-            http://docker-py.readthedocs.io/en/stable/tls.html
-            """
-        ),
-    ).tag(config=True)
-
     container_spec = Dict(
         {},
         help=dedent(
@@ -468,6 +459,7 @@ class SwarmSpawner(Spawner):
     ).tag(config=True)
 
     jupyterhub_service_name = Unicode(
+        "jupyterhub",
         help=dedent(
             """
             Name of the service running the JupyterHub.
