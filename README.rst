@@ -75,7 +75,7 @@ You can define *container_spec*, *
 * and *networks* inside **jupyterhub_config.py**.
 
 Container_spec__
--------------------
+----------------
 __ https://github.com/docker/docker-py/blob/master/docs/user_guides/swarm_services.md
 
 
@@ -99,7 +99,7 @@ The notebook server command should not be the ENTRYPOINT, so generally use ``arg
 See this `issue <https://github.com/cassinyio/SwarmSpawner/issues/6>`_  for more info.
 
 Placement__
----------------------
+-----------
 __ https://docs.docker.com/engine/swarm/services/#control-service-placement
 
 The spawner supports Docker Swarm service placement configurations to be imposed on the
@@ -118,7 +118,7 @@ These can be imposed as a placement policy to all services being spawned. E.g.
     }
 
 Dockerimages
----------------------
+------------
 
 To define which images are available to the users, a list of `images` must be declared
 The individual dictionaries also makes it possible to define whether the image should mount any volumes when it is spawned
@@ -281,81 +281,57 @@ You can also specify some resource for each service
                         'mem_reservation' : int(512 * 1e6), # (int) – Memory reservation in Bytes
                         }
 
-Using user_options
---------------------
+Allow user form options
+-----------------------
 
-There is the possibility to set parameters using ``user_options``
-
-.. code-block:: python
-
-        # To use user_options in service creation
-        c.SwarmSpawner.use_user_options = False
-
-
-To control the creation of the services you have 2 ways, using **jupyterhub_config.py** or **user_options**.
-
-Remember that at the end you are just using the `Docker Engine API <https://docs.docker.com/engine/api/>`_.
-
-**user_options, if used, will overwrite jupyter_config.py for services.**
-
-If you set ``c.SwarmSpawner.use_user_option = True`` the spawner will use the dict passed through the form or as json body when using the Hub Api.
-
-The spawner expect a dict with these keys:
+By default, if the ``use_user_option`` is not enabled, the user wont be able to select between multiple available images, the user will simply spawn an instance of the default image. i.e. images[0].
+Therefore, to allow the user to select between multiple available images, the following must be set in the JupyterHub configuration file.
 
 .. code-block:: python
 
-        user_options = {
-                'container_spec' : {
-                        # (string or list) command to run in the image.
-                        'args' : ['/usr/local/bin/start-singleuser.sh'],
-                        # name of the image
-                        'Image' : '',
-                        'mounts' : mounts,
-                        '
-                        
-                        
-                        
-                        
-                        
-                        
-                        
-                        ' : {
-                                # (int) – CPU limit in units of 10^9 CPU shares.
-                                'cpu_limit': int(1 * 1e9),
-                                # (int) – Memory limit in Bytes.
-                                'mem_limit': int(512 * 1e6),
-                                # (int) – CPU reservation in units of 10^9 CPU shares.
-                                'cpu_reservation': int(1 * 1e9),
-                                # (int) – Memory reservation in bytes
-                                'mem_reservation': int(512 * 1e6),
-                                },
-                        # dict of constraints
-                        'placement' : {'constraints': []},
-                        # list of networks
-                        'network' : [],
-                        # name of service
-                        'name' : ''
-                        }
-                }
+        # Allow user options in the spawn form
+        c.SwarmSpawner.use_user_options = True
 
+Allow user install files
+------------------------
+
+The ``c.SwarmSpawner.enable_user_upload_install_files`` option, can be toggled to allow the spawning users to upload files as part of the user selection form
+when the ``c.SwarmSpawner.use_user_options`` is also enabled.
+
+.. code-block:: python
+
+        # Allow user options in the spawn form
+        c.SwarmSpawner.use_user_options = True
+
+        # Allow users to upload install files that can be used to prepare the requsted environment.
+        c.SwarmSpawner.enable_user_upload_install_files = True
+
+By default, the builtin ``c.SwarmSpawner.user_upload_form`` allows the user to upload a single file underneth the image selection form.
+
+.. image:: res/jupyterhub_user_packages_form.png
+   :width: 300px
+   :alt: JupyterHub User Packages Form
+
+This form can be customised by overriding the ``c.SwarmSpawner.user_upload_form``. For instance if you wanted to allow multiple files to be uploaded
+that can be enabled by adjusting the form ``c.SwarmSpawner.user_upload_form``.
+In addition, the ``c.SwarmSpawner.allowed_user_upload_extensions`` option specifies which filetypes are allowed to be uploaded, which by default is ``.txt``` files.
+
+Once a user Docker Swarm service is spawned, the uploaded install file(s) will be available in the ``c.SwarmSpawner.user_upload_destination_directory`` directory, which is set to ``/user-installs`` if left unchanged.
 
 Names of the Jupyter notebook service inside Docker engine in Swarm mode
 --------------------------------------------------------------------------
 
 When JupyterHub spawns a new Jupyter notebook server the name of the service will be ``{service_prefix}-{service_owner}-{service_suffix}``
-
-You can change the service_prefix in this way:
-
-Prefix of the service in Docker
+By default the service_prefix is set to ``jupyter``, but it can be changed with the following option::
 
 .. code-block:: python
 
-        c.SwarmSpawner.service_prefix = "jupyterhub"
+        c.SwarmSpawner.service_prefix = "some-other-prefix"
 
 
 ``service_owner`` is the hexdigest() of the hashed ``user.name``.
 
-In case of named servers (more than one server for user) ``service_suffix`` is the name of the server, otherwise is always 1.
+In case of named servers (more than one server for user) ``service_suffix`` is the name of the server, otherwise is always ``1``.
 
 Downloading images
 -------------------
@@ -375,7 +351,7 @@ You can use all the docker images inside the `Jupyter docker-stacks`_.
 
 
 Credit
-=======
+======
 `DockerSpawner <https://github.com/jupyterhub/dockerspawner>`_
 `CassinyioSpawner <https://github.com/cassinyio/SwarmSpawner>`_
 
