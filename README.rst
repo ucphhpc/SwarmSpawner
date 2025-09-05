@@ -56,11 +56,90 @@ The SwarmSpawner can be specified to use a specific network via the ``c.SwarmSPa
         c.SwarmSpawner.networks = ["mynetwork"]
 
 
-Define the services inside jupyterhub_config.py
-===============================================
-You can define *container_spec*, *
+Specifying user service options
+===============================
+A Docker Swarm Service has a number of options that can be specified when it is launched.
 
-* and *networks* inside **jupyterhub_config.py**.
+Global Options
+--------------
+For a particular service configuration, the `TaskTemplate <https://docker-py.readthedocs.io/en/stable/api.html#docker.types.TaskTemplate>`_
+is often the most relevant, and is therefore one of the structures that is used by the SwarmSpawner and exposes a number
+of options for this::
+
+
+.. code-block:: python
+
+        # Global service options
+        c.SwarmSpawner.container_spec = {}
+        
+        c.SwarmSpawner.log_driver = {}
+
+        c.SwarmSpawner.resource_spec = {}
+
+        c.SwarmSpawner.placement = {}
+
+        c.SwarmSpawner.networks = []
+
+        c.SwarmSpawner.configs = []
+
+Each of these can be specified in the JupyterHub configuration file and will apply globally to all spawned user services if defined.
+The available options and formats for each of these can be found in the mentioned `TaskTemplate <https://docker-py.readthedocs.io/en/stable/api.html#docker.types.TaskTemplate>`_ reference.
+
+In addition to these global options that are provided by the underlying ``docker-py`` module,
+the SwarmSpawner implements a number of additional configuration options that can be seen below::
+
+.. code-block:: python
+
+    # Docker images that are available to the user of the spawn.
+    c.SwarmSpawner.images = []
+
+    # The port on which the spawned service should listen.
+    c.SwarmSpawner.service_port = 8888
+
+    # Prefix for service names. The full service name for a particular user will be <prefix>-<hash(username)>-<server_name>.
+    c.SwarmSpawner.service_prefix = "jupyter"
+
+    # Name of the service running the JupyterHub
+    c.SwarmSpawner.jupyterhub_service_name = "jupyterhub"
+
+    # List of JupyterHub user attributes that are used to format Spawner State attributes.
+    c.SwarmSpawner.user_format_attributes = []
+
+
+Image Specific Options
+----------------------
+
+When the JupyterHub service is spawned, a properly authenticated user is able to select between the specified ``c.SwarmSpawner.images`` in the JupyterHub configuration.
+For an image configuration in ``c.SwarmSpawner.images`` you are required to define the ``name`` and ``image`` key-value pairs.
+An example of this can be seen below::
+
+.. code-block:: python
+
+    c.SwarmSpawner.images = [
+        {
+            "name": "Python Notebook",
+            "image": "ucphhpc/base-notebook:latest",
+        }
+    ]
+
+Beyond the bare minimum it is also possible to apply each of the possible `TaskTemplate <https://docker-py.readthedocs.io/en/stable/api.html#docker.types.TaskTemplate>`_ options to a particular image configuration.
+For instance, 
+
+.. code-block:: python
+
+    c.SwarmSpawner.images = [
+        {
+            "name": "Python Notebook",
+            "image": "ucphhpc/base-notebook:latest",
+            "container_spec": {},
+            "log_driver": {},
+            "resource_spec": {},
+            "placement": {},
+            "networks": [],
+            "configs": []
+        }
+    ]
+
 
 Container_spec__
 ----------------
