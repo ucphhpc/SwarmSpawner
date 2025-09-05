@@ -11,13 +11,6 @@ jhub-SwarmSpawner
 
 More info about Docker Services `here <https://docs.docker.com/engine/reference/commandline/service_create/>`_.
 
-
-Prerequisites
-================
-
-Python version 3.9 or above is required.
-
-
 Installation
 ================
 
@@ -37,25 +30,20 @@ Installation from GitHub
 Configuration
 ================
 
-You can find an example jupyter_config.py inside `examples <examples>`_.
+You can find example JupyterHub configuration files in `examples <examples>`_.
+To quickly get started the `jupyter_config_basic.py` can be used.
 
-The spawner
-================
-Docker Engine in Swarm mode and the related services work in a different way compared to Docker containers.
+The Spawner
+===========
+Docker Engine in Swarm mode and the related services work in a different way compared to regular Docker containers.
+Therefore the ``jhub.SwarmSpawner`` can be used to spawn user server's as a Docker Swarm Service in a precreated Docker Swarm Cluster.
 
-Tell JupyterHub to use SwarmSpawner by adding the following lines to your `jupyterhub_config.py`:
+To enable the ``jhub.SwarmSpawner`` it must be assigned to the ``c.JupyterHub.spawner_class`` option in the JupyterHub configuration file.
+An example of this can be seen in `examples/jupyter_config_basic.py <examples/juputer_config_basic.py>`_.
 
 .. code-block:: python
 
-        c.JupyterHub.spawner_class = 'jhub.SwarmSpawner'
-        c.JupyterHub.hub_ip = '0.0.0.0'
-        # This should be the name of the jupyterhub service
-        c.SwarmSpawner.jupyterhub_service_name = 'NameOfTheService'
-
-What is ``jupyterhub_service_name``?
-
-Inside a Docker engine in Swarm mode the services use a `name` instead of a `ip` to communicate with each other.
-'jupyterhub_service_name' is the name of ther service for the JupyterHub.
+        c.JupyterHub.spawner_class = "jhub.SwarmSpawner"
 
 Networks
 ============
