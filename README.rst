@@ -39,9 +39,7 @@ Docker Engine in Swarm mode and the related services work in a different way com
 Therefore the ``jhub.SwarmSpawner`` can be used to spawn user server's as a Docker Swarm Service in a precreated Docker Swarm Cluster.
 
 To enable the ``jhub.SwarmSpawner`` it must be assigned to the ``c.JupyterHub.spawner_class`` option in the JupyterHub configuration file.
-An example of this can be seen in `examples/jupyter_config_basic.py <examples/jupyter_config_basic.py>`_.
-
-.. code-block:: python
+An example of this can be seen in `examples/jupyter_config_basic.py <examples/jupyter_config_basic.py>`_::
 
         c.JupyterHub.spawner_class = "jhub.SwarmSpawner"
 
@@ -49,9 +47,7 @@ Networks
 ========
 It's important to put the JupyterHub service (also the proxy) and the services that are running jupyter notebook inside the same network, otherwise they can't reach each other.
 In a Docker Swarm Cluster setting, this means that they are in the same `Overlay Network <https://docs.docker.com/engine/network/drivers/overlay/>`_.
-The SwarmSpawner can be specified to use a specific network via the ``c.SwarmSPawner.networks`` configuration option.
-
-.. code-block:: python
+The SwarmSpawner can be specified to use a specific network via the ``c.SwarmSPawner.networks`` configuration option::
 
         c.SwarmSpawner.networks = ["mynetwork"]
 
@@ -65,9 +61,6 @@ Global Options
 For a particular service configuration, the `TaskTemplate <https://docker-py.readthedocs.io/en/stable/api.html#docker.types.TaskTemplate>`_
 is often the most relevant, and is therefore one of the structures that is used by the SwarmSpawner and exposes a number
 of options for this::
-
-
-.. code-block:: python
 
         # Global service options
         c.SwarmSpawner.container_spec = {}
@@ -87,8 +80,6 @@ The available options and formats for each of these can be found in the mentione
 
 In addition to these global options that are provided by the underlying ``docker-py`` module,
 the SwarmSpawner implements a number of additional configuration options that can be seen below::
-
-.. code-block:: python
 
     # Docker images that are available to the user of the spawn.
     c.SwarmSpawner.images = []
@@ -113,8 +104,6 @@ When the JupyterHub service is spawned, a properly authenticated user is able to
 For an image configuration in ``c.SwarmSpawner.images`` you are required to define the ``name`` and ``image`` key-value pairs.
 An example of this can be seen below::
 
-.. code-block:: python
-
     c.SwarmSpawner.images = [
         {
             "name": "Python Notebook",
@@ -123,9 +112,7 @@ An example of this can be seen below::
     ]
 
 Beyond the bare minimum it is also possible to apply each of the possible `TaskTemplate <https://docker-py.readthedocs.io/en/stable/api.html#docker.types.TaskTemplate>`_ options to a particular image configuration.
-For instance, 
-
-.. code-block:: python
+For instance, one can set the reqular TaskTemplate options for a particular image configuration.
 
     c.SwarmSpawner.images = [
         {
@@ -141,6 +128,8 @@ For instance,
     ]
 
 
+Furthermore, to customise how the launched Jupyter Notebook is started, the ``container_spec`` can be set.
+
 Container_spec__
 ----------------
 __ https://github.com/docker/docker-py/blob/master/docs/user_guides/swarm_services.md
@@ -150,9 +139,7 @@ The ``command`` and ``args`` definitions depends on the image that you are using
 I.e the command must be possible to execute in the selected image
 The '/usr/local/bin/start-singleuser.sh' is provided by the jupyter
 `base-notebook <https://github.com/jupyter/docker-stacks/tree/master/base-notebook>`_
-The start-singleuser.sh ``args`` assumes that the launched image is extended from a version of this.
-
-.. code-block:: python
+The start-singleuser.sh ``args`` assumes that the launched image is extended from a version of this::
 
     c.SwarmSpawner.container_spec = {
                   # The command to run inside the service
