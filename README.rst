@@ -1,8 +1,6 @@
 =================
 jhub-SwarmSpawner
 =================
-.. image:: https://travis-ci.org/rasmunk/SwarmSpawner.svg?branch=master
-    :target: https://travis-ci.org/rasmunk/SwarmSpawner
 .. image:: https://badge.fury.io/py/jhub-swarmspawner.svg
     :target: https://badge.fury.io/py/jhub-swarmspawner
 
@@ -76,7 +74,7 @@ of options for this::
         c.SwarmSpawner.configs = []
 
 Each of these can be specified in the JupyterHub configuration file and will apply globally to all spawned user services if defined.
-The available options and formats for each of these can be found in the mentioned `TaskTemplate <https://docker-py.readthedocs.io/en/stable/api.html#docker.types.TaskTemplate>`_ reference.
+The available options and formats for each of these can be found in the mentioned `TaskTemplate`_ reference.
 
 In addition to these global options that are provided by the underlying ``docker-py`` module,
 the SwarmSpawner implements a number of additional configuration options that can be seen below::
@@ -111,8 +109,8 @@ An example of this can be seen below::
         }
     ]
 
-Beyond the bare minimum it is also possible to apply each of the possible `TaskTemplate <https://docker-py.readthedocs.io/en/stable/api.html#docker.types.TaskTemplate>`_ options to a particular image configuration.
-For instance, one can set the reqular TaskTemplate options for a particular image configuration::
+Beyond the bare minimum it is also possible to apply each of the possible `TaskTemplate`_ options to a particular image configuration.
+For instance, one can set the reqular `TaskTemplate`_ options for a particular image configuration::
 
     c.SwarmSpawner.images = [
         {
