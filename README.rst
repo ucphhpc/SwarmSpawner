@@ -112,7 +112,7 @@ An example of this can be seen below::
     ]
 
 Beyond the bare minimum it is also possible to apply each of the possible `TaskTemplate <https://docker-py.readthedocs.io/en/stable/api.html#docker.types.TaskTemplate>`_ options to a particular image configuration.
-For instance, one can set the reqular TaskTemplate options for a particular image configuration.
+For instance, one can set the reqular TaskTemplate options for a particular image configuration::
 
     c.SwarmSpawner.images = [
         {
@@ -381,8 +381,6 @@ Names of the Jupyter notebook service inside Docker engine in Swarm mode
 When JupyterHub spawns a new Jupyter notebook server the name of the service will be ``{service_prefix}-{service_owner}-{service_suffix}``
 By default the service_prefix is set to ``jupyter``, but it can be changed with the following option::
 
-.. code-block:: python
-
         c.SwarmSpawner.service_prefix = "some-other-prefix"
 
 
@@ -395,9 +393,7 @@ Downloading images
 Docker Engine in Swarm mode downloads images automatically from the repository.
 Either the image is available on the remote repository or locally, if not you will get an error.
 
-Because before starting the service you have to complete the download of the image is better to have a longer timeout (default is 30 secs)
-
-.. code-block:: python
+Because before starting the service you have to complete the download of the image is better to have a longer timeout (default is 30 secs)::
 
         c.SwarmSpawner.start_timeout = 60 * 5
 
