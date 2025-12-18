@@ -9,7 +9,6 @@ import docker
 import hashlib
 import os
 from asyncio import sleep
-from async_generator import async_generator, yield_
 from textwrap import dedent
 from concurrent.futures import ThreadPoolExecutor
 from pprint import pformat
@@ -637,91 +636,6 @@ class SwarmSpawner(Spawner):
         if running_task is not None:
             return None
         return 0
-
-    async def check_update(self, image, tag="latest"):
-        full_image = "".join([image, ":", tag])
-        download_tracking = {}
-        initial_output = False
-        total_download = 0
-        for download in self.client.pull(image, tag=tag, stream=True, decode=True):
-            if not initial_output:
-                await yield_(
-                    {
-                        "progress": 70,
-                        "message": "Downloading new update "
-                        "for {}".format(full_image),
-                    }
-                )
-                initial_output = True
-            if "id" and "progress" in download:
-                _id = download["id"]
-                if _id not in download_tracking:
-                    del download["id"]
-                    download_tracking[_id] = download
-                else:
-                    download_tracking[_id].update(download)
-
-                # Output every 20 MB
-                for _id, tracker in download_tracking.items():
-                    if (
-                        tracker["progressDetail"]["current"]
-                        == tracker["progressDetail"]["total"]
-                    ):
-                        total_download += tracker["progressDetail"]["total"] * pow(
-                            10, -6
-                        )
-                        await yield_(
-                            {
-                                "progress": 80,
-                                "message": "Downloaded {} MB of {}".format(
-                                    total_download, full_image
-                                ),
-                            }
-                        )
-                        # return to web processing
-                        await sleep(1)
-
-                # Remove completed
-                download_tracking = {
-                    _id: tracker
-                    for _id, tracker in download_tracking.items()
-                    if tracker["progressDetail"]["current"]
-                    != tracker["progressDetail"]["total"]
-                }
-
-    @async_generator
-    async def progress(self):
-        self.log.info("Checking for progress")
-        if self.tasks:
-            top_task = self.tasks[0]
-            image = top_task["Spec"]["ContainerSpec"]["Image"]
-            self.log.info("Spawning progress of {} with image".format(self.service_id))
-            task_status = top_task["Status"]["State"]
-            self.log.info("Progress task status: {}".format(task_status))
-            _tag = None
-            if ":" in image:
-                _image, _tag = image.split(":")
-            else:
-                _image = image
-            if task_status == "preparing":
-                await yield_(
-                    {
-                        "progress": 50,
-                        "message": "Preparing a server "
-                        "with {} the image".format(image),
-                    }
-                )
-                await yield_(
-                    {
-                        "progress": 60,
-                        "message": "Checking for new version of {}".format(image),
-                    }
-                )
-                if _tag is not None:
-                    await self.check_update(_image, _tag)
-                else:
-                    await self.check_update(_image)
-                self.log.info("Finished progress from spawning {}".format(image))
 
     async def attempt_volume_remove(self, name, max_attempts=15):
         attempt = 0
