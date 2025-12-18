@@ -1106,6 +1106,7 @@ class SwarmSpawner(Spawner):
                 "container_spec": container_spec,
                 "resources": resources,
                 "placement": placement,
+                "networks": networks,
             }
 
             if task_log_driver:
@@ -1120,7 +1121,6 @@ class SwarmSpawner(Spawner):
                 "create_service",
                 task_tmpl,
                 name=self.service_name,
-                networks=networks,
                 endpoint_spec=endpoint_spec,
             )
             self.service_id = resp["ID"]
