@@ -1115,7 +1115,10 @@ class SwarmSpawner(Spawner):
             task_tmpl = TaskTemplate(**task_spec)
             self.log.debug("task temp: {}".format(task_tmpl))
             # Set endpoint spec
-            endpoint_spec = EndpointSpec(**endpoint_spec)
+            if endpoint_spec:
+                endpoint_spec = EndpointSpec(**endpoint_spec)
+            else:
+                endpoint_spec = None
 
             resp = run_docker(
                 "create_service",
