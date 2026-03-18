@@ -28,9 +28,12 @@ pipelines:
         password: "{{SECRET:[github][access_token]}}"
         destination: publish-python-scripts
     parameters:
-      ARGS: ''
       SRC_DIRECTORY: swarmspawner
+      BUILD_MAKE_TARGET: all
+      BUILD_MAKE_ARGS: ''
       TEST_DIRECTORY: swarmspawner
+      TEST_MAKE_TARGET: test
+      TEST_MAKE_ARGS: ''
       PUSH_DIRECTORY: publish-python-scripts
     template: bare_metal_pypi_package
   swarmspawner_accelerator_selection:
@@ -51,6 +54,10 @@ pipelines:
     parameters:
       ARGS: ''
       SRC_DIRECTORY: swarmspawner_accelerator_selection
+      BUILD_MAKE_TARGET: all
+      BUILD_MAKE_ARGS: ''
       TEST_DIRECTORY: swarmspawner_accelerator_selection
+      TEST_MAKE_TARGET: test
+      TEST_MAKE_ARGS: ''
       PUSH_DIRECTORY: publish-python-scripts
     template: bare_metal_pypi_package
